@@ -1,7 +1,7 @@
    name: Test Bots
    on:
      pull_request:
-       branches: ['*']
+       branches: [main]
        types: [opened, synchronize, reopened]
    jobs:
      test:
@@ -20,6 +20,7 @@
            run: ruff check bots/participation_bot.py --line-length 120
          - name: Run unit tests
            env:
+             PYTHONPATH: .
              DISCORD_TOKEN: "dummy-token"
              TEXT_CHANNEL_ID: "855869041687003156"
              DATABASE_URL: "postgresql://dummy_user:dummy_password@localhost:5432/dummy_db"

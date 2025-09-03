@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch
-from bots.participation_bot import init_db, format_duration
+from bots.participation_bot import init_db, format_duration  # Keep this, but ensure path is correct
 
 # Mock psycopg2 to avoid real database connections
 @pytest.fixture
