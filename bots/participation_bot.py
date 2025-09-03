@@ -14,9 +14,6 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 LOG_CHANNEL_ID = os.getenv('TEXT_CHANNEL_ID')
-if not LOG_CHANNEL_ID:
-    raise ValueError("TEXT_CHANNEL_ID environment variable not set")
-
 ORG_ROLE_ID = "1143413611184795658"
 active_voice_channels = {}
 event_names = {}
@@ -423,4 +420,8 @@ async def pick_winner(ctx):
         f"You are the winner for {current_month} org raffle!"
     )
 
-bot.run(os.getenv('DISCORD_TOKEN'))
+
+if __name__ == '__main__':
+    if not LOG_CHANNEL_ID:
+        raise ValueError("TEXT_CHANNEL_ID environment variable not set")
+    bot.run(os.getenv('DISCORD_TOKEN'))
