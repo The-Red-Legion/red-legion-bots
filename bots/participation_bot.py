@@ -39,8 +39,9 @@ def retry_db_operation(max_attempts=3, delay=5):
                         raise e
                     print(f"Database error: {e}. Retrying in {delay}s...")
                     time.sleep(delay)
-            return wrapper
-        return decorator
+            return func(*args, **kwargs)  # Fallback to final attempt
+        return wrapper
+    return decorator
 
 
 # Custom check for role-based command permission
@@ -157,8 +158,8 @@ async def log_members():
                             VALUES (%s, %s, %s, %s, %s)
                             ON CONFLICT (channel_id, member_id)
                             DO UPDATE SET duration = EXCLUDED.duration,
-                                         username = EXCLUDED.username,
-                                         is_org_member = EXCLUDED.is_org_member
+                                        username = EXCLUDED.username,
+                                        is_org_member = EXCLUDED.is_org_member
                             """,
                             (
                                 str(channel_id),
@@ -305,8 +306,8 @@ async def stop_logging(ctx):
                             VALUES (%s, %s, %s, %s, %s)
                             ON CONFLICT (channel_id, member_id)
                             DO UPDATE SET duration = EXCLUDED.duration,
-                                         username = EXCLUDED.username,
-                                         is_org_member = EXCLUDED.is_org_member
+                                        username = EXCLUDED.username,
+                                        is_org_member = EXCLUDED.is_org_member
                             """,
                             (
                                 str(channel_id),
