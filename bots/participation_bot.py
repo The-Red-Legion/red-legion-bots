@@ -117,7 +117,7 @@ async def on_voice_state_update(member, before, after):
                     print(
                         f"Member {member.display_name} left channel "
                         f"{active_channel.name}, adding {duration:.2f}s "
-                        f"to total time: {member_times[channel_id][member.id]:.2f}s"
+                        f"to total: {member_times[channel_id][member.id]:.2f}s"
                     )
                     del last_checks[channel_id][member.id]
 
@@ -136,11 +136,12 @@ async def log_members():
                         duration = current_time - last_checks[channel_id][member_id]
                         member_times.setdefault(channel_id, {})
                         member_times[channel_id][member_id] = (
-                            member_times.get(channel_id, {}).get(member_id, 0) + duration
+                            member_times.get(channel_id, {}).get(member_id, 0) +
+                            duration
                         )
                         last_checks[channel_id][member_id] = current_time
                         print(
-                            f"Periodic update for {member.display_name} in "
+                            f"Update for {member.display_name} in "
                             f"{active_channel.name}: added {duration:.2f}s, "
                             f"total {member_times[channel_id][member_id]:.2f}s"
                         )
@@ -150,13 +151,14 @@ async def log_members():
                         c.execute(
                             """
                             INSERT INTO participation (
-                                channel_id, member_id, username, duration, is_org_member
+                                channel_id, member_id, username, duration,
+                                is_org_member
                             )
                             VALUES (%s, %s, %s, %s, %s)
                             ON CONFLICT (channel_id, member_id)
                             DO UPDATE SET duration = EXCLUDED.duration,
-                                        username = EXCLUDED.username,
-                                        is_org_member = EXCLUDED.is_org_member
+                                         username = EXCLUDED.username,
+                                         is_org_member = EXCLUDED.is_org_member
                             """,
                             (
                                 str(channel_id),
@@ -184,8 +186,10 @@ async def start_logging(ctx):
             return
         active_voice_channels[channel_id] = ctx.author.voice.channel
         await ctx.send("Please provide the event name for this logging session.")
+
         def check(m):
             return m.author == ctx.author and m.channel == ctx.channel
+
         try:
             msg = await bot.wait_for('message', check=check, timeout=60.0)
             event_name = msg.content.strip()
@@ -205,8 +209,12 @@ async def start_logging(ctx):
                     conn = psycopg2.connect(os.getenv("DATABASE_URL"))
                     c = conn.cursor()
                     c.execute(
-                        "INSERT INTO events (channel_id, channel_name, event_name, start_time) "
-                        "VALUES (%s, %s, %s, %s)",
+                        """
+                        INSERT INTO events (
+                            channel_id, channel_name, event_name, start_time
+                        )
+                        VALUES (%s, %s, %s, %s)
+                        """,
                         (
                             str(channel_id),
                             ctx.author.voice.channel.name,
@@ -274,7 +282,9 @@ async def stop_logging(ctx):
                 for member_id in list(member_times.get(channel_id, {}).keys()):
                     member = ctx.guild.get_member(member_id)
                     if member:
-                        total_duration = member_times.get(channel_id, {}).get(member_id, 0)
+                        total_duration = member_times.get(channel_id, {}).get(
+                            member_id, 0
+                        )
                         if member.id in last_checks.get(channel_id, {}):
                             duration = current_time - last_checks[channel_id][member.id]
                             total_duration += duration
@@ -289,13 +299,14 @@ async def stop_logging(ctx):
                         c.execute(
                             """
                             INSERT INTO participation (
-                                channel_id, member_id, username, duration, is_org_member
+                                channel_id, member_id, username, duration,
+                                is_org_member
                             )
                             VALUES (%s, %s, %s, %s, %s)
                             ON CONFLICT (channel_id, member_id)
                             DO UPDATE SET duration = EXCLUDED.duration,
-                                        username = EXCLUDED.username,
-                                        is_org_member = EXCLUDED.is_org_member
+                                         username = EXCLUDED.username,
+                                         is_org_member = EXCLUDED.is_org_member
                             """,
                             (
                                 str(channel_id),
@@ -322,7 +333,10 @@ async def stop_logging(ctx):
                             (str(member_id), current_month, 1)
                         )
                 c.execute(
-                    "UPDATE events SET end_time = %s WHERE channel_id = %s::text AND end_time IS NULL",
+                    """
+                    UPDATE events SET end_time = %s
+                    WHERE channel_id = %s::text AND end_time IS NULL
+                    """,
                     (
                         datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         str(channel_id)
@@ -377,7 +391,10 @@ async def pick_winner(ctx):
         c = conn.cursor()
         current_month = datetime.datetime.now().strftime("%B-%Y")
         c.execute(
-            "SELECT user_id, entry_count FROM entries WHERE month_year = %s",
+            """
+            SELECT user_id, entry_count FROM entries
+            WHERE month_year = %s
+            """,
             (current_month,)
         )
         entries = c.fetchall()
