@@ -1,5 +1,5 @@
 import discord
-from discord.ext import tasks, commands
+from discord.ext import tasks
 import datetime
 import time
 import random
@@ -290,13 +290,17 @@ async def log_mining_results(bot, ctx, event_id: int):
         price_cache = {}
         async with aiohttp.ClientSession() as session:
             for material in MINING_MATERIALS:
-                async with session.get(
-                    f"https://api.uexcorp.space/commodities?code={material}",
-                    headers={"api_key": UEX_API_KEY}
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        price_cache[material] = float(data.get('sell_price', 0)) or 0
+                try:
+                    async with session.get(
+                        f"https://api.uexcorp.space/commodities?code={material}",
+                        headers={"api_key": UEX_API_KEY},
+                        timeout=aiohttp.ClientTimeout(total=5)
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            price_cache[material] = float(data.get('sell_price', 0)) or 0
+                except (aiohttp.ClientError, asyncio.TimeoutError):
+                    price_cache[material] = 0  # Default to 0 on failure
 
         embed = discord.Embed(
             title=f"Log Mining Results (Event {event_id})",

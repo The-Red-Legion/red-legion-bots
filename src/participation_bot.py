@@ -72,6 +72,3 @@ async def log_mining_results(ctx, event_id: int):
 @has_org_role()
 async def list_open_events(ctx):
     await list_open_events(bot, ctx)
-
-if __name__ == '__main__':
-    bot.run(DISCORD_TOKEN)
