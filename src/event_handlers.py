@@ -4,10 +4,11 @@ import datetime
 import time
 import random
 import aiohttp
+import psycopg2
 from .discord_utils import send_embed, has_org_role
 from .database import (
     save_participation, save_event, update_event_end_time, update_entries, get_entries,
-    update_mining_results, get_events, get_open_events
+    update_mining_results, get_open_events
 )
 from .config import LOG_CHANNEL_ID, ORG_ROLE_ID, DATABASE_URL, MINING_MATERIALS, UEX_API_KEY
 
@@ -243,7 +244,7 @@ async def stop_logging(bot, ctx):
                     log_members.stop()
                 await interaction.response.send_message(
                     f"Successfully stopped logging for event ID {event_id} ({event_name}). "
-                    f"Use !log_mining_results {event_id} to enter SCUs next."
+                    f"Use !log_mining_results {event_id} to enter SCUs and prices next."
                 )
             except Exception as e:
                 await interaction.response.send_message(f"Failed to stop logging: {e}", ephemeral=True)
@@ -285,9 +286,21 @@ async def log_mining_results(bot, ctx, event_id: int):
     if not await has_org_role()(ctx):
         return
     try:
+        # Pre-fetch UEX prices for pre-population
+        price_cache = {}
+        async with aiohttp.ClientSession() as session:
+            for material in MINING_MATERIALS:
+                async with session.get(
+                    f"https://api.uexcorp.space/commodities?code={material}",
+                    headers={"api_key": UEX_API_KEY}
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        price_cache[material] = float(data.get('sell_price', 0)) or 0
+
         embed = discord.Embed(
             title=f"Log Mining Results (Event {event_id})",
-            description="Enter SCUs and prices for each material in the modal(s). Use 0 or leave blank for materials not mined.",
+            description="Enter SCUs and overwrite prices if needed. Use 0 or leave blank for materials not mined.",
             color=discord.Color.blue(),
             timestamp=datetime.datetime.now()
         )
@@ -298,44 +311,50 @@ async def log_mining_results(bot, ctx, event_id: int):
         second_half = MINING_MATERIALS[10:]  # Hephaestanite to Silicon
 
         class MiningModal1(discord.ui.Modal, title="Enter SCUs and Prices (Part 1)"):
-            def __init__(self):
+            def __init__(self, price_cache):
                 super().__init__()
+                self.price_cache = price_cache
                 for material in first_half:
                     self.add_item(discord.ui.TextInput(
                         label=f"{material} SCUs",
                         placeholder="Enter SCUs (e.g., 1000) or 0",
                         custom_id=f"{material}_scu",
                         style=discord.TextStyle.short,
-                        required=False
+                        required=False,
+                        default=""
                     ))
                     self.add_item(discord.ui.TextInput(
                         label=f"{material} Price",
-                        placeholder="Enter price (e.g., 88) or 0",
+                        placeholder=f"Default: {self.price_cache.get(material, 0)}",
                         custom_id=f"{material}_price",
                         style=discord.TextStyle.short,
-                        required=False
+                        required=False,
+                        default=str(self.price_cache.get(material, 0))
                     ))
 
             async def on_submit(self, interaction):
                 await process_mining_modal(interaction, first_half)
 
         class MiningModal2(discord.ui.Modal, title="Enter SCUs and Prices (Part 2)"):
-            def __init__(self):
+            def __init__(self, price_cache):
                 super().__init__()
+                self.price_cache = price_cache
                 for material in second_half:
                     self.add_item(discord.ui.TextInput(
                         label=f"{material} SCUs",
                         placeholder="Enter SCUs (e.g., 1000) or 0",
                         custom_id=f"{material}_scu",
                         style=discord.TextStyle.short,
-                        required=False
+                        required=False,
+                        default=""
                     ))
                     self.add_item(discord.ui.TextInput(
                         label=f"{material} Price",
-                        placeholder="Enter price (e.g., 88) or 0",
+                        placeholder=f"Default: {self.price_cache.get(material, 0)}",
                         custom_id=f"{material}_price",
                         style=discord.TextStyle.short,
-                        required=False
+                        required=False,
+                        default=str(self.price_cache.get(material, 0))
                     ))
 
             async def on_submit(self, interaction):
@@ -353,11 +372,11 @@ async def log_mining_results(bot, ctx, event_id: int):
                         price_input = interaction.data.get('components', {}).get(
                             (MINING_MATERIALS.index(material) * 2) + 1, {}).get('components', [{}])[0].get('value', '')
                         scu_refined = int(scu_input) if scu_input.strip() else 0
-                        price = float(price_input) if price_input.strip() else 0
+                        price = float(price_input) if price_input.strip() else price_cache.get(material, 0)
                         if scu_refined < 0 or price < 0:
                             await interaction.response.send_message(f"SCUs and price for {material} must be non-negative.", ephemeral=True)
                             return
-                        if scu_refined == 0 or price == 0:
+                        if scu_refined == 0:
                             continue
 
                         material_value = scu_refined * price
@@ -365,7 +384,7 @@ async def log_mining_results(bot, ctx, event_id: int):
                         total_value += material_value
 
                 if not materials_data:
-                    await interaction.response.send_message("No materials with valid SCUs and prices entered.", ephemeral=True)
+                    await interaction.response.send_message("No materials with valid SCUs entered.", ephemeral=True)
                     return
 
                 update_mining_results(DATABASE_URL, event_id, materials_data)
@@ -408,11 +427,11 @@ async def log_mining_results(bot, ctx, event_id: int):
             except Exception as e:
                 await interaction.response.send_message(f"Error processing payroll: {e}", ephemeral=True)
 
-        # Send first modal and queue second
-        await ctx.interaction.response.send_modal(MiningModal1())
+        # Send first modal with pre-fetched prices
+        await ctx.interaction.response.send_modal(MiningModal1(price_cache))
         if second_half:
             await ctx.send("Please complete the second part of the modal when ready.")
-            await ctx.interaction.followup.send_modal(MiningModal2())
+            await ctx.interaction.followup.send_modal(MiningModal2(price_cache))
 
     except Exception as e:
         await ctx.send(f"Error initiating payroll: {e}")
