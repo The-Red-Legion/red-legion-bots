@@ -17,7 +17,7 @@
              python -m pip install --upgrade pip
              pip install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
          - name: Run linting
-           run: ruff check src/**/*.py --line-length 120
+           run: ruff check src/*.py --line-length 120
          - name: Run unit tests
            env:
              PYTHONPATH: .
