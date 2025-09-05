@@ -22,7 +22,7 @@ MINING_MATERIALS = [
 LOG_CHANNEL_ID = os.getenv('TEXT_CHANNEL_ID') or get_secret("text-channel-id")
 ORG_ROLE_ID = "1143413611184795658"
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN') or get_secret("discord-token")
-DATABASE_URL = os.getenv('DATABASE_URL') or get_secret("database-url")
+DATABASE_URL = os.getenv('DATABASE_URL') or get_secret("database-connection-string", default="postgresql://event_user:QtLRoRc6xMa8XdcrpBMk@10.66.0.3:5432/red_legion_event_db")
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN') or get_secret("github-token")
 WEBHOOK_URL = os.getenv('WEBHOOK_URL') or get_secret("webhook-url")
 UEX_API_KEY = os.getenv('UEX_API_KEY') or get_secret("uex-api-key")

@@ -21,7 +21,7 @@
          - name: Run unit tests
            env:
              PYTHONPATH: .
-             DISCORD_TOKEN: "dummy-token"
-             TEXT_CHANNEL_ID: "855869041687003156"
-             DATABASE_URL: "postgresql://dummy_user:dummy_password@localhost:5432/dummy_db"
+             DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+             TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+             DATABASE_URL: ${{ secrets.DATABASE_URL }}
            run: pytest tests/
