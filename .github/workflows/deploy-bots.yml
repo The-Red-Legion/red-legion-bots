@@ -81,7 +81,9 @@ jobs:
           
           # Start bot
           echo "Starting bot..."
-          nohup python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid || { echo "ERROR: Failed to start bot"; exit 1; }
+          cd /app || { echo "ERROR: Failed to change to /app"; exit 1; }
+          export PYTHONPATH=/app:$PYTHONPATH
+          nohup python3 -m src.participation_bot > /app/bot.log 2>&1 & echo $! > /app/bot.pid || { echo "ERROR: Failed to start bot"; exit 1; }
           
           # Verify bot started
           sleep 5
