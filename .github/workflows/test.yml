@@ -24,7 +24,8 @@ jobs:
           python -m pytest tests/ -p no:cacheprovider
         env:
           PYTHONPATH: ${{ github.workspace }}/src
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116  # Explicitly set project
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+          TEXT_CHANNEL_ID: "1187497620525023262"  # Fallback for testing
     outputs:
       result: success
 
@@ -55,6 +56,6 @@ jobs:
           echo "result=success" >> $GITHUB_OUTPUT
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116  # Explicitly set project
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
     outputs:
       result: ${{ steps.test.outputs.result }}
