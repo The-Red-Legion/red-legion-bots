@@ -27,7 +27,8 @@ jobs:
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
           TEXT_CHANNEL_ID: "1187497620525023262"
           DISCORD_TOKEN: "dummy-token"
-          DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"  # Mock URL for tests
+          DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
+          GITHUB_TOKEN: "dummy-github-token"  # Mock for tests
     outputs:
       result: success
 
