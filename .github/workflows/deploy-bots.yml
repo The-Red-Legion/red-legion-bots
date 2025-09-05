@@ -24,120 +24,34 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Deploy to Compute Instance
+      - name: Install Ansible
         run: |
-          echo "=== Starting deployment to compute instance ==="
-          
-          # Create comprehensive deployment script with error handling
-          cat << 'EOF' > /tmp/deploy_script.sh
-          #!/bin/bash
-          set -e  # Exit on any error
-          
-          echo "=== Starting deployment on compute instance ==="
-          
-          # Stop existing bot
-          if [ -f /app/bot.pid ]; then
-            echo "Stopping existing bot process..."
-            PID=$(cat /app/bot.pid)
-            if kill "$PID" 2>/dev/null; then
-              # Wait up to 10 seconds for process to exit
-              for i in {1..10}; do
-                if ! kill -0 "$PID" 2>/dev/null; then
-                  echo "Process $PID terminated gracefully."
-                  break
-                fi
-                sleep 1
-              done
-              # If still running, force kill
-              if kill -0 "$PID" 2>/dev/null; then
-                echo "Process $PID did not terminate, sending SIGKILL."
-                kill -9 "$PID" 2>/dev/null || echo "No process to kill"
-              fi
-            else
-              echo "No process to kill"
-            fi
-            rm -f /app/bot.pid
-          fi
-          
-          # Clean and copy checked-out code (instead of cloning)
-          echo "Cleaning and copying repository..."
-          sudo rm -rf /app || echo "Warning: /app removal failed"
-          sudo mkdir -p /app || { echo "ERROR: Failed to create /app directory"; exit 1; }
-          sudo cp -r ./* /app/ || { echo "ERROR: Failed to copy repository"; exit 1; }
-          sudo chown -R $(whoami):$(whoami) /app || { echo "ERROR: Failed to change ownership"; exit 1; }
-          
-          # Install dependencies
-          echo "Installing dependencies..."
-          cd /app/src || { echo "ERROR: Failed to change to /app/src"; exit 1; }
-          python3 -m ensurepip --upgrade 2>&1 || { echo "ERROR: ensurepip failed"; exit 1; }
-          python3 -m pip install --upgrade pip 2>&1 || { echo "ERROR: pip upgrade failed"; exit 1; }
-          pip3 install -r ../requirements.txt psycopg2-binary 2>&1 || { echo "ERROR: Pip install failed"; exit 1; }
-          
-          # Set environment variables
-          echo "Setting environment variables..."
-          echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token --project=rl-prod-471116)" > .env || { echo "ERROR: Failed to create .env file"; exit 1; }
-          echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id --project=rl-prod-471116)" >> .env || { echo "ERROR: Failed to append to .env"; exit 1; }
-          echo "DATABASE_URL=${DATABASE_URL}" >> .env || { echo "ERROR: Failed to set DATABASE_URL"; exit 1; }
-          chmod 600 .env || { echo "ERROR: Failed to set permissions on .env"; exit 1; }
-          
-          # Start bot
-          echo "Starting bot..."
-          cd /app || { echo "ERROR: Failed to change to /app"; exit 1; }
-          export PYTHONPATH=/app:$PYTHONPATH
-          
-          # Test Python import before starting bot
-          echo "Testing Python imports..."
-          python3 -c "import sys; print('Python path:', sys.path); import src.participation_bot" 2>&1 || { echo "ERROR: Import test failed"; exit 1; }
-          
-          # Start bot with better error capture
-          echo "Starting bot process..."
-          nohup python3 -m src.participation_bot > /app/bot.log 2>&1 & echo $! > /app/bot.pid
-          
-          # Wait a moment and check if process is still running
-          sleep 2
-          if [ -f /app/bot.pid ] && kill -0 $(cat /app/bot.pid) 2>/dev/null; then
-            echo "Bot process started successfully"
-          else
-            echo "ERROR: Bot process died immediately"
-            if [ -f /app/bot.log ]; then
-              echo "=== Bot log contents ==="
-              cat /app/bot.log
-            fi
-            exit 1
-          fi
-          
-          # Verify bot started
-          sleep 5
-          if [ -f /app/bot.pid ] && kill -0 $(cat /app/bot.pid) 2>/dev/null; then
-            echo "SUCCESS: Bot started with PID $(cat /app/bot.pid)"
-            echo "=== Deployment completed successfully ==="
-            exit 0
-          else
-            echo "ERROR: Bot failed to start or died immediately"
-            if [ -f /app/bot.log ]; then
-              echo "=== Bot log contents ==="
-              cat /app/bot.log
-            fi
-            exit 1
-          fi
-          EOF
-          
-          # Make script executable
-          chmod +x /tmp/deploy_script.sh
-          
-          # Execute deployment script and capture all output
-          echo "=== Executing deployment script ==="
-          /tmp/deploy_script.sh 2>&1 || { 
-            echo "=== DEPLOYMENT FAILED ==="
-            echo "Exit code: $?"
-            if [ -f /app/bot.log ]; then
-              echo "=== Bot log contents ==="
-              cat /app/bot.log
-            fi
-            exit 1
-          }
-          
-          echo "=== Deployment completed successfully ==="
+          python -m pip install --upgrade pip
+          pip install ansible
+
+      - name: Set up SSH key for Ansible
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Compute Instance with Ansible
+        run: |
+          echo "=== Starting Ansible deployment ==="
+
+          # Set environment variables for Ansible
+          export BOT_SERVER_HOST=${{ secrets.BOT_SERVER_HOST }}
+          export BOT_SERVER_USER=${{ secrets.BOT_SERVER_USER }}
+          export BOT_SSH_KEY_PATH=~/.ssh/id_rsa
+          export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
+          export DATABASE_URL=${{ secrets.DATABASE_URL }}
+
+          # Run Ansible playbook
+          ansible-playbook ansible/deploy.yml -v
+
+          echo "=== Ansible deployment completed ==="
         shell: bash
       - name: Verify Bot Health
         run: |

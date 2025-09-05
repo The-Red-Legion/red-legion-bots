@@ -1,0 +1,33 @@
+---
+- name: Check if bot PID file exists
+  stat:
+    path: "{{ app_dir }}/bot.pid"
+  register: pid_file_check
+
+- name: Verify bot process is running
+  command: kill -0 $(cat {{ app_dir }}/bot.pid)
+  when: pid_file_check.stat.exists
+  register: process_check
+  failed_when: process_check.rc != 0
+
+- name: Check bot log for errors
+  command: tail -20 {{ app_dir }}/bot.log
+  register: log_check
+  when: pid_file_check.stat.exists
+
+- name: Display recent log entries
+  debug:
+    msg: "{{ log_check.stdout }}"
+  when: pid_file_check.stat.exists
+
+- name: Check for error patterns in log
+  command: grep -i "ERROR\|Exception\|Failed" {{ app_dir }}/bot.log
+  register: error_check
+  failed_when: error_check.rc == 0
+  ignore_errors: true
+  when: pid_file_check.stat.exists
+
+- name: Report successful deployment
+  debug:
+    msg: "✅ Bot deployment successful! PID: {{ lookup('file', app_dir + '/bot.pid') }}"
+  when: pid_file_check.stat.exists and process_check.rc == 0

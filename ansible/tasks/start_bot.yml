@@ -1,0 +1,30 @@
+---
+- name: Start bot process
+  command: >
+    nohup python3 -m src.participation_bot > {{ app_dir }}/bot.log 2>&1 &
+    echo $! > {{ app_dir }}/bot.pid
+  args:
+    chdir: "{{ app_dir }}"
+  environment:
+    PYTHONPATH: "{{ app_dir }}:$PYTHONPATH"
+
+- name: Wait for bot to start
+  pause:
+    seconds: 3
+
+- name: Verify bot process is running
+  command: kill -0 $(cat {{ app_dir }}/bot.pid)
+  register: bot_check
+  failed_when: bot_check.rc != 0
+  ignore_errors: true
+
+- name: Show bot log if startup failed
+  command: cat {{ app_dir }}/bot.log
+  when: bot_check.rc != 0
+  register: bot_log
+  failed_when: false
+
+- name: Fail with bot log
+  fail:
+    msg: "Bot failed to start. Log output: {{ bot_log.stdout }}"
+  when: bot_check.rc != 0
