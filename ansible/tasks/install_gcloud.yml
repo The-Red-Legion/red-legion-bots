@@ -3,23 +3,29 @@
   get_url:
     url: https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
     dest: /tmp/google-cloud-sdk.tar.gz
+  when: not ansible_check_mode
 
 - name: Extract Google Cloud SDK
   unarchive:
     src: /tmp/google-cloud-sdk.tar.gz
     dest: /opt/
     remote_src: yes
+  when: not ansible_check_mode
 
 - name: Install Google Cloud SDK
   command: /opt/google-cloud-sdk/install.sh --quiet --usage-reporting false --path-update false
+  when: not ansible_check_mode
 
 - name: Add Google Cloud SDK to PATH
   lineinfile:
     path: /etc/environment
     line: 'PATH=/opt/google-cloud-sdk/bin:$PATH'
     state: present
+  when: not ansible_check_mode
 
 - name: Source Google Cloud SDK in current session
   shell: source /opt/google-cloud-sdk/path.bash.inc
   args:
     executable: /bin/bash
+  when: not ansible_check_mode
+  ignore_errors: true

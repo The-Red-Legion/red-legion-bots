@@ -3,30 +3,32 @@
   stat:
     path: "{{ app_dir }}/bot.pid"
   register: pid_file
+  when: not ansible_check_mode
 
 - name: Read PID from file
   slurp:
     src: "{{ app_dir }}/bot.pid"
   register: pid_content
-  when: pid_file.stat.exists
+  when: pid_file is defined and pid_file.stat is defined and pid_file.stat.exists and not ansible_check_mode
 
 - name: Stop existing bot process
   command: kill {{ pid_content.content | b64decode | trim }}
-  when: pid_file.stat.exists
+  when: pid_file is defined and pid_file.stat is defined and pid_file.stat.exists and not ansible_check_mode
   ignore_errors: true
 
 - name: Wait for process to terminate
   pause:
     seconds: 5
-  when: pid_file.stat.exists
+  when: pid_file is defined and pid_file.stat is defined and pid_file.stat.exists and not ansible_check_mode
 
 - name: Force kill if still running
   command: kill -9 {{ pid_content.content | b64decode | trim }}
-  when: pid_file.stat.exists
+  when: pid_file is defined and pid_file.stat is defined and pid_file.stat.exists and not ansible_check_mode
   ignore_errors: true
 
 - name: Remove PID file
   file:
     path: "{{ app_dir }}/bot.pid"
     state: absent
+  when: not ansible_check_mode
   ignore_errors: true

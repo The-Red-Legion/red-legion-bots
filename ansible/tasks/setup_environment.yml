@@ -6,9 +6,11 @@
     mode: '0600'
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
+  when: not ansible_check_mode
 
 - name: Set PYTHONPATH environment variable
   lineinfile:
     path: /etc/environment
     line: "PYTHONPATH={{ app_dir }}:$PYTHONPATH"
     state: present
+  when: not ansible_check_mode
