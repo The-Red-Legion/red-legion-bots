@@ -47,19 +47,35 @@ jobs:
           echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id)" >> $GITHUB_ENV
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
 
-          # Test Discord connection
-          python -c "import discord; client = discord.Client(intents=discord.Intents.default()); async def test(): await client.fetch_user(client.user.id); client.close(); client.loop.run_until_complete(test());" || { echo "::set-output name=result::fail"; echo "Discord connection failed"; exit 1; }
+          # Test Discord connection (using a proper async script)
+          cat << 'EOF' > test_discord.py
+          import discord
+          import asyncio
+          import os
+
+          async def test_connection():
+              intents = discord.Intents.default()
+              client = discord.Client(intents=intents)
+              await client.login(os.getenv('DISCORD_TOKEN'))
+              try:
+                  await client.fetch_user(client.user.id)
+              finally:
+                  await client.close()
+
+          asyncio.run(test_connection())
+          EOF
+          python test_discord.py || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Discord connection failed"; exit 1; }
           echo "Discord connection successful"
 
           # Test Database connection
-          python -c "import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL')); conn.close();" || { echo "::set-output name=result::fail"; echo "Database connection failed"; exit 1; }
+          python -c "import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL')); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database connection failed"; exit 1; }
           echo "Database connection successful"
 
           # Test Secret Manager
-          python -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/$(gcloud config get-value project)/secrets/discord-token/versions/latest');" || { echo "::set-output name=result::fail"; echo "Secret Manager access failed"; exit 1; }
+          python -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/$(gcloud config get-value project)/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret Manager access failed"; exit 1; }
           echo "Secret Manager access successful"
 
-          echo "::set-output name=result::success"
+          echo "result=success" >> $GITHUB_OUTPUT
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
     outputs:
