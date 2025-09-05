@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 from src.database import init_db
 from src.event_handlers import start_logging
 
@@ -16,8 +16,9 @@ def mock_db():
 @pytest.fixture
 def mock_discord():
     with patch('discord.Client') as mock_client:
-        mock_client.return_value = Mock()
-        mock_client.get_channel = Mock(return_value=Mock(send=Mock()))
+        mock_client_instance = Mock()
+        mock_client_instance.get_channel = Mock(return_value=Mock(send=AsyncMock()))
+        mock_client.return_value = mock_client_instance
         yield mock_client
 
 def test_init_db(mock_db):
@@ -32,11 +33,14 @@ def test_start_logging_command(mock_db, mock_discord):
     ctx = Mock()
     ctx.author = Mock()
     ctx.author.voice = None  # Simulate no voice channel
-    mock_channel = mock_discord.get_channel.return_value
-    mock_channel.send = Mock(return_value=Mock())
+    mock_channel = mock_discord.return_value.get_channel.return_value
+    mock_channel.send = AsyncMock()
     with patch('src.event_handlers.active_voice_channels', {}):
         bot = Mock()
         bot.loop = Mock()
-        bot.get_channel = mock_discord.get_channel
-        bot.loop.run_until_complete(start_logging(bot, ctx))
+        bot.get_channel = mock_discord.return_value.get_channel
+        # Use asyncio to properly await the coroutine
+        import asyncio
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(start_logging(bot, ctx))
     mock_channel.send.assert_called_with("You must be in a voice channel to start logging.")
