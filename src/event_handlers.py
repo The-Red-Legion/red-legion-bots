@@ -5,6 +5,7 @@ import time
 import random
 import aiohttp
 import psycopg2
+import asyncio
 from .discord_utils import send_embed, has_org_role
 from .database import (
     save_participation, save_event, update_event_end_time, update_entries, get_entries,
@@ -288,7 +289,7 @@ async def log_mining_results(bot, ctx, event_id: int):
     try:
         # Pre-fetch UEX prices for pre-population
         price_cache = {}
-        async with aiohttp.ClientSession():
+        async with aiohttp.ClientSession() as session:
             for material in MINING_MATERIALS:
                 try:
                     async with session.get(
@@ -369,7 +370,7 @@ async def log_mining_results(bot, ctx, event_id: int):
                 materials_data = []
                 total_value = 0
 
-                async with aiohttp.ClientSession():
+                async with aiohttp.ClientSession() as session:
                     for material in MINING_MATERIALS:
                         scu_input = interaction.data.get('components', {}).get(
                             MINING_MATERIALS.index(material) * 2, {}).get('components', [{}])[0].get('value', '')
