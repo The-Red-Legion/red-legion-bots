@@ -2,7 +2,7 @@ name: Deploy Bots
 on:
   pull_request:
     branches: [main]
-    types: [closed]
+    types: [labeled]  # Trigger on label application
 jobs:
   deploy-participation-bot:
     runs-on: self-hosted
@@ -35,7 +35,8 @@ jobs:
       - name: Install Dependencies
         run: |
           cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
-          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip  # Use installed Python
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m ensurepip --upgrade
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip
           /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/pip3 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
           echo "Dependencies installed"
         shell: bash
@@ -59,3 +60,32 @@ jobs:
         shell: bash
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    # Trigger only on 'Ok to Deploy' label
+    if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')
+
+  post-deployment:
+    needs: deploy-participation-bot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close PR on Success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              state: 'closed'
+            });
+      - name: Add Bug Label on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['bug']
+            });
