@@ -24,7 +24,7 @@ jobs:
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}  # Ensure secret is set
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pytest tests/
 
@@ -48,7 +48,7 @@ jobs:
         run: |
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
           echo "DEBUG: DATABASE_URL set to [${DATABASE_URL}]" >> $GITHUB_STEP_SUMMARY
-          python -c "import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL')); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed"; exit 1; }
+          python -c "import os; import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL')); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed"; exit 1; }
           echo "Database successful"
           python -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
           echo "Secret successful"
