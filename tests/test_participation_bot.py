@@ -38,5 +38,7 @@ def test_start_logging_command(mock_db, mock_discord):
         bot = Mock()
         bot.loop = Mock()
         bot.get_channel = mock_discord.get_channel
+        # Ensure the coroutine is awaited properly
         bot.loop.run_until_complete(start_logging(bot, ctx))
-    mock_channel.send.assert_called_with("You must be in a voice channel to start logging.")
+        # Check if send was called with the expected message
+        mock_channel.send.assert_called_with("You must be in a voice channel to start logging.")
