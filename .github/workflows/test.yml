@@ -12,7 +12,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'  # Explicitly set
+          python-version: '3.9'
           check-latest: false
       - name: Install dependencies
         run: |
@@ -30,7 +30,7 @@ jobs:
 
   test-connections:
     needs: test-bots
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,16 +42,16 @@ jobs:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
       - name: Install Dependencies
         run: |
-          python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt psycopg2-binary google-cloud-secret-manager
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/pip3 install -r requirements.txt psycopg2-binary google-cloud-secret-manager
       - name: Test Connections
         id: test
         run: |
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
           echo "DEBUG: DATABASE_URL set to [${DATABASE_URL}]" >> $GITHUB_STEP_SUMMARY
-          python3 -c "import os; import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL'), connect_timeout=5); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed"; exit 1; }
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -c "import os; import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL').replace('%', '%25'), connect_timeout=10, sslmode='require'); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed: ${conn.error}"; exit 1; }
           echo "Database successful"
-          python3 -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
           echo "Secret successful"
           echo "result=success" >> $GITHUB_OUTPUT
         env:
