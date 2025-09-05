@@ -58,9 +58,9 @@ jobs:
           # Install dependencies
           echo "Installing dependencies..."
           cd /app/src || { echo "ERROR: Failed to change to /app/src"; exit 1; }
-          python3 -m ensurepip --upgrade 2>&1 || { echo "ERROR: ensurepip failed"; exit 1; }
+
           python3 -m pip install --upgrade pip 2>&1 || { echo "ERROR: pip upgrade failed"; exit 1; }
-          pip3 install -r ../requirements.txt psycopg2-binary 2>&1 || { echo "ERROR: Pip install failed"; exit 1; }
+          pip3 install -r ../requirements.txt 2>&1 || { echo "ERROR: Pip install failed"; exit 1; }
           
           # Set environment variables
           echo "Setting environment variables..."
