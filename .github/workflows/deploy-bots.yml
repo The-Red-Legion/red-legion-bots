@@ -138,9 +138,9 @@ jobs:
             tail -10 /app/bot.log
             
             # Check for common error patterns
-            if grep -q "ERROR\|Exception\|Failed" /app/bot.log; then
+            if grep -iq "ERROR\|Exception\|Failed" /app/bot.log; then
               echo "⚠️  Warning: Found error messages in bot log"
-              grep -A 2 -B 2 "ERROR\|Exception\|Failed" /app/bot.log
+              grep -i -A 2 -B 2 "ERROR\|Exception\|Failed" /app/bot.log
             else
               echo "✅ No obvious errors found in recent logs"
             fi
