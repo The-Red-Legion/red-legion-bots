@@ -38,7 +38,24 @@ jobs:
           # Stop existing bot
           if [ -f /app/bot.pid ]; then
             echo "Stopping existing bot process..."
-            kill -9 $(cat /app/bot.pid) 2>/dev/null || echo "No process to kill"
+            PID=$(cat /app/bot.pid)
+            if kill "$PID" 2>/dev/null; then
+              # Wait up to 10 seconds for process to exit
+              for i in {1..10}; do
+                if ! kill -0 "$PID" 2>/dev/null; then
+                  echo "Process $PID terminated gracefully."
+                  break
+                fi
+                sleep 1
+              done
+              # If still running, force kill
+              if kill -0 "$PID" 2>/dev/null; then
+                echo "Process $PID did not terminate, sending SIGKILL."
+                kill -9 "$PID" 2>/dev/null || echo "No process to kill"
+              fi
+            else
+              echo "No process to kill"
+            fi
             rm -f /app/bot.pid
           fi
           
