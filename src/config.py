@@ -2,7 +2,7 @@ import os
 from google.cloud import secretmanager
 from dotenv import load_dotenv
 
-load_dotenv()  # Load .env for local development
+load_dotenv()
 
 def get_secret(secret_id, project_id=os.getenv('GCP_PROJECT_ID')):
     client = secretmanager.SecretManagerServiceClient()
@@ -10,7 +10,6 @@ def get_secret(secret_id, project_id=os.getenv('GCP_PROJECT_ID')):
     response = client.access_secret_version(name=name)
     return response.payload.data.decode("UTF-8")
 
-# List of valid mining materials based on the provided list
 MINING_MATERIALS = [
     "Stileron", "Quantainium", "Riccite", "Taranite", "Bexalite",
     "Gold", "Borase", "Laranite", "Beryl", "Agricium",
@@ -18,25 +17,36 @@ MINING_MATERIALS = [
     "Corundum", "Copper", "Tin", "Aluminum", "Silicon"
 ]
 
-# Load secrets from Google Cloud Secret Manager (or .env for local dev)
-LOG_CHANNEL_ID = os.getenv('TEXT_CHANNEL_ID') or get_secret("text-channel-id")
-ORG_ROLE_ID = "1143413611184795658"
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN') or get_secret("discord-token")
-DATABASE_URL = os.getenv('DATABASE_URL') or get_secret("database-connection-string", default="postgresql://event_user:QtLRoRc6xMa8XdcrpBMk@10.66.0.3:5432/red_legion_event_db")
-GITHUB_TOKEN = os.getenv('GITHUB_TOKEN') or get_secret("github-token")
-WEBHOOK_URL = os.getenv('WEBHOOK_URL') or get_secret("webhook-url")
-UEX_API_KEY = os.getenv('UEX_API_KEY') or get_secret("uex-api-key")
+def get_config():
+    return {
+        'TEXT_CHANNEL_ID': os.getenv('TEXT_CHANNEL_ID', '1187497620525023262'),
+        'ORG_ROLE_ID': "1143413611184795658",
+        'DISCORD_TOKEN': os.getenv('DISCORD_TOKEN', 'dummy-token'),
+        'DATABASE_URL': os.getenv('DATABASE_URL', 'postgresql://test:test@localhost:5432/testdb'),
+        'GITHUB_TOKEN': os.getenv('GITHUB_TOKEN', 'dummy-github-token'),
+        'WEBHOOK_URL': os.getenv('WEBHOOK_URL', 'https://dummy.webhook.url'),
+        'UEX_API_KEY': os.getenv('UEX_API_KEY', 'dummy-uex-key')
+    }
 
-# Validate required environment variables
-if not LOG_CHANNEL_ID:
-    raise ValueError("TEXT_CHANNEL_ID not set")
-if not DISCORD_TOKEN:
+# Validate config (optional, for runtime)
+config = get_config()
+if not config['TEXT_CHANNEL_ID']:
+    raise ValueError("TEXT_CHANNEL_ID not set or empty")
+if not config['DISCORD_TOKEN']:
     raise ValueError("DISCORD_TOKEN not set")
-if not DATABASE_URL:
+if not config['DATABASE_URL']:
     raise ValueError("DATABASE_URL not set")
-if not GITHUB_TOKEN:
+if not config['GITHUB_TOKEN']:
     raise ValueError("GITHUB_TOKEN not set")
-if not WEBHOOK_URL:
+if not config['WEBHOOK_URL']:
     raise ValueError("WEBHOOK_URL not set")
-if not UEX_API_KEY:
+if not config['UEX_API_KEY']:
     raise ValueError("UEX_API_KEY not set")
+
+LOG_CHANNEL_ID = config['TEXT_CHANNEL_ID']
+ORG_ROLE_ID = config['ORG_ROLE_ID']
+DISCORD_TOKEN = config['DISCORD_TOKEN']
+DATABASE_URL = config['DATABASE_URL']
+GITHUB_TOKEN = config['GITHUB_TOKEN']
+WEBHOOK_URL = config['WEBHOOK_URL']
+UEX_API_KEY = config['UEX_API_KEY']

@@ -29,7 +29,7 @@ jobs:
           DISCORD_TOKEN: "dummy-token"
           DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
           GITHUB_TOKEN: "dummy-github-token"
-          WEBHOOK_URL: "https://dummy.webhook.url"  # Mock for tests
+          WEBHOOK_URL: "https://dummy.webhook.url"
     outputs:
       result: success
 
