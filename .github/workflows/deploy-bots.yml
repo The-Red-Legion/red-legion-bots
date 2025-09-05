@@ -2,12 +2,25 @@ name: Deploy Bots
 on:
   pull_request:
     branches: [main]
-    types: [closed]
+    types: [labeled]  # Trigger on label application
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: read
+  checks: read
+
 jobs:
   deploy-participation-bot:
     runs-on: self-hosted
+    if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')  # Moved to job level
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
@@ -30,17 +43,20 @@ jobs:
         run: |
           sudo rm -rf /app || echo "Warning: /app removal failed, may not exist"
           sudo git clone https://github.com/The-Red-Legion/red-legion-bots /app || { echo "Git clone failed"; exit 1; }
-          echo "Repo cloned to /app"
+          sudo chown -R $(whoami):$(whoami) /app || { echo "Failed to change ownership"; exit 1; }
+          echo "Repo cloned to /app and ownership changed"
         shell: bash
       - name: Install Dependencies
         run: |
           cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
-          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip  # Use installed Python
-          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/pip3 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
+          python3 -m ensurepip --upgrade
+          python3 -m pip install --upgrade pip
+          pip3 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
           echo "Dependencies installed"
         shell: bash
       - name: Set Environment Variables
         run: |
+          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
           echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token --project=rl-prod-471116)" > .env
           echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id --project=rl-prod-471116)" >> .env
           echo "DATABASE_URL=${DATABASE_URL}" >> .env
@@ -49,7 +65,8 @@ jobs:
         shell: bash
       - name: Start Bot
         run: |
-          nohup /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
+          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
+          nohup python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
           echo "Bot deployed, PID: $(cat /app/bot.pid)"
         shell: bash
       - name: Make Script Executable and Run
@@ -59,3 +76,66 @@ jobs:
         shell: bash
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  post-deployment:
+    if: always()  # Run regardless of deploy job success/failure
+    needs: deploy-participation-bot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge and Close PR on Success
+        if: needs.deploy-participation-bot.result == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              // Get PR details for merge
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number
+              });
+              
+              // Merge the pull request
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                commit_title: `Deploy: ${pr.data.title}`,
+                commit_message: `Deployment successful for PR #${context.payload.pull_request.number}\n\n${pr.data.body || 'No description provided'}`,
+                merge_method: 'squash'
+              });
+              console.log('Pull request merged successfully');
+            } catch (error) {
+              console.error('Failed to merge pull request:', error.message);
+              throw error;
+            }
+      - name: Add Bug Label and Remove Ok to Deploy on Failure
+        if: needs.deploy-participation-bot.result == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              // Add bug label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['bug']
+              });
+              console.log('Bug label added successfully');
+              
+              // Remove "Ok to Deploy" label
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                name: 'Ok to Deploy'
+              });
+              console.log('Ok to Deploy label removed successfully');
+            } catch (error) {
+              console.error('Failed to update labels:', error.message);
+              // Don't throw error here to avoid failing the workflow
+              // since this is just cleanup
+            }
