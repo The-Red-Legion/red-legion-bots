@@ -25,7 +25,8 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/src
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
-          TEXT_CHANNEL_ID: "1187497620525023262"  # Fallback for testing
+          TEXT_CHANNEL_ID: "1187497620525023262"  # Fallback
+          DISCORD_TOKEN: "dummy-token"  # Mock token to avoid secret access during unit tests
     outputs:
       result: success
 
