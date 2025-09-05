@@ -24,7 +24,7 @@ jobs:
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}  # Ensure secret is set
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pytest tests/
 
