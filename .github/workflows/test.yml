@@ -23,7 +23,7 @@ jobs:
         run: |
           python -m pytest tests/ -p no:cacheprovider
         env:
-          PYTHONPATH: ${{ github.workspace }}/src
+          PYTHONPATH: ${{ github.workspace }}/src  # Ensure all src modules are in path
     outputs:
       result: success
 
