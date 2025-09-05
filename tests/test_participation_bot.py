@@ -46,4 +46,4 @@ def test_start_logging_command(mock_db, mock_discord):
         asyncio.set_event_loop(loop)
         loop.run_until_complete(start_logging(bot, ctx))
         loop.close()
-    mock_channel.send.assert_called_with("You must be in a voice channel to start logging.")
+    ctx.send.assert_called_with("You must be in a voice channel to start logging.")  # Check ctx.send instead
