@@ -3,6 +3,12 @@ on:
   pull_request:
     branches: [main]
     types: [labeled]  # Trigger on label application
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   deploy-participation-bot:
     runs-on: self-hosted
@@ -79,26 +85,43 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.pulls.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              state: 'closed'
-            });
+            try {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                state: 'closed'
+              });
+              console.log('Pull request closed successfully');
+            } catch (error) {
+              console.error('Failed to close pull request:', error.message);
+              throw error;
+            }
       - name: Add Bug Label and Remove Ok to Deploy on Failure
         if: needs.deploy-participation-bot.result == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              labels: ['bug']
-            });
-            github.rest.issues.removeLabel({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              name: 'Ok to Deploy'
-            });
+            try {
+              // Add bug label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['bug']
+              });
+              console.log('Bug label added successfully');
+              
+              // Remove "Ok to Deploy" label
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                name: 'Ok to Deploy'
+              });
+              console.log('Ok to Deploy label removed successfully');
+            } catch (error) {
+              console.error('Failed to update labels:', error.message);
+              // Don't throw error here to avoid failing the workflow
+              // since this is just cleanup
+            }
