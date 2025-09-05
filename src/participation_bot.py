@@ -1,69 +1,42 @@
-import discord
-from discord.ext import commands
-from .config import DATABASE_URL
-from .database import init_db
-from .event_handlers import (
-    on_voice_state_update, start_logging, stop_logging, pick_winner,
-    log_mining_results, list_open_events
-)
-from .market import list_items, add_item
-from .loan import request_loan
-from .discord_utils import has_org_role
+import pytest
+from unittest.mock import Mock, patch
+from src.database import init_db
+from src.event_handlers import start_logging
 
-intents = discord.Intents.default()
-intents.members = True
-intents.voice_states = True
-intents.message_content = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+@pytest.fixture
+def mock_db():
+    with patch('psycopg2.connect') as mock_connect:
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+        mock_connect.side_effect = lambda url: mock_conn
+        yield mock_conn, mock_cursor
 
-# Dynamically register event handler
-async def setup_event_handlers():
-    bot.add_listener(on_voice_state_update, 'on_voice_state_update')
+@pytest.fixture
+def mock_discord():
+    with patch('discord.Client') as mock_client:
+        mock_client.return_value = Mock()
+        yield mock_client
 
-# Dynamically register commands
-def setup_commands():
-    # Command without role restriction
-    bot.command(name="start_logging")(lambda ctx: start_logging(bot, ctx))
-    bot.command(name="stop_logging")(lambda ctx: stop_logging(bot, ctx))
-    bot.command(name="pick_winner")(lambda ctx: pick_winner(bot, ctx))
+def test_init_db(mock_db):
+    conn, cursor = mock_db
+    init_db("postgresql://test:test@localhost:5432/testdb")
+    cursor.execute.assert_called()
+    assert cursor.execute.call_count == 6
+    conn.commit.assert_called_once()
+    conn.close.assert_called_once()
 
-    # Commands with role restriction
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def wrapped_list_market(ctx):
-        await list_items(ctx)
-    bot.add_command(wrapped_list_market)
-
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def wrapped_add_market_item(ctx, name: str, price: int, stock: int):
-        await add_item(ctx, name, price, stock)
-    bot.add_command(wrapped_add_market_item)
-
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def wrapped_request_loan(ctx, amount: int):
-        await request_loan(ctx, amount)
-    bot.add_command(wrapped_request_loan)
-
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def wrapped_log_mining_results(ctx, event_id: int):
-        await log_mining_results(bot, ctx, event_id)
-    bot.add_command(wrapped_log_mining_results)
-
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def wrapped_list_open_events(ctx):
-        await list_open_events(bot, ctx)
-    bot.add_command(wrapped_list_open_events)
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user}')
-    try:
-        init_db(DATABASE_URL)
-        await setup_event_handlers()  # Register event handler
-        setup_commands()  # Register commands
-    except Exception as e:
-        print(f"Error during setup: {e}")
+def test_start_logging_command(mock_db, mock_discord):
+    ctx = Mock()
+    ctx.author.voice = Mock()
+    ctx.author.voice.channel = Mock()
+    ctx.author.voice.channel.id = "12345"
+    mock_channel = Mock(send=Mock())
+    mock_discord.get_channel.return_value = mock_channel
+    with patch('src.event_handlers.active_voice_channels', {}):
+        bot = Mock()
+        bot.loop = Mock()
+        bot.get_channel = mock_discord.get_channel
+        bot.loop.run_until_complete(start_logging(bot, ctx))
+    mock_channel.send.assert_called()
