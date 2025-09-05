@@ -1,13 +1,11 @@
 import discord
 from discord.ext import commands
 from .config import DATABASE_URL
-from .database import init_db
+from .database import init_db, add_market_item, get_market_items, issue_loan
 from .event_handlers import (
     on_voice_state_update, start_logging, stop_logging, pick_winner,
     log_mining_results, list_open_events
 )
-from .market import list_items, add_item
-from .loan import request_loan
 from .discord_utils import has_org_role
 
 intents = discord.Intents.default()
@@ -31,19 +29,38 @@ def setup_commands():
     @has_org_role()
     @commands.cooldown(1, 30, commands.BucketType.guild)
     async def wrapped_list_market(ctx):
-        await list_items(ctx)
+        items = get_market_items(DATABASE_URL)
+        if not items:
+            await ctx.send("No market items available.")
+            return
+        
+        embed = discord.Embed(title="Market Items", color=discord.Color.blue())
+        for item_id, name, price, stock in items:
+            embed.add_field(name=f"{name} (ID: {item_id})", value=f"Price: {price} credits\nStock: {stock}", inline=False)
+        await ctx.send(embed=embed)
     bot.add_command(wrapped_list_market)
 
     @has_org_role()
     @commands.cooldown(1, 30, commands.BucketType.guild)
     async def wrapped_add_market_item(ctx, name: str, price: int, stock: int):
-        await add_item(ctx, name, price, stock)
+        try:
+            add_market_item(DATABASE_URL, name, price, stock)
+            await ctx.send(f"Added {name} to market for {price} credits (Stock: {stock})")
+        except Exception as e:
+            await ctx.send(f"Failed to add market item: {e}")
     bot.add_command(wrapped_add_market_item)
 
     @has_org_role()
     @commands.cooldown(1, 30, commands.BucketType.guild)
     async def wrapped_request_loan(ctx, amount: int):
-        await request_loan(ctx, amount)
+        try:
+            from datetime import datetime, timedelta
+            issued_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            due_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+            issue_loan(DATABASE_URL, ctx.author.id, amount, issued_date, due_date)
+            await ctx.send(f"Loan request submitted for {amount} credits. Due date: {due_date}")
+        except Exception as e:
+            await ctx.send(f"Failed to request loan: {e}")
     bot.add_command(wrapped_request_loan)
 
     @has_org_role()
