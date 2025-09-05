@@ -1,7 +1,7 @@
 ---
 - name: Deploy Participation Bot
   hosts: participation-bot
-  become: no
+  become: yes
   gather_facts: yes
 
   vars:

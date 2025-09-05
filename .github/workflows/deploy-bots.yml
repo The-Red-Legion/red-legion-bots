@@ -13,10 +13,16 @@ permissions:
 
 jobs:
   deploy-participation-bot:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')  # Moved to job level
     steps:
       - uses: actions/checkout@v4
+      - name: Set up SSH key for Ansible
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -53,68 +59,74 @@ jobs:
         shell: bash
       - name: Verify Bot Health
         run: |
-          echo "=== Checking bot health ==="
+          echo "=== Checking bot health on remote host ==="
           
-          # Check if bot process is running
-          if [ -f /app/bot.pid ] && kill -0 $(cat /app/bot.pid) 2>/dev/null; then
-            echo "✅ Bot process is running (PID: $(cat /app/bot.pid))"
-          else
-            echo "❌ Bot process is not running"
-            if [ -f /app/bot.log ]; then
-              echo "=== Bot log contents ==="
-              tail -20 /app/bot.log
-            fi
-            exit 1
-          fi
-          
-          # Check bot log for any immediate errors
-          if [ -f /app/bot.log ]; then
-            echo "=== Recent bot log entries ==="
-            tail -10 /app/bot.log
-            
-            # Check for common error patterns
-            if grep -iq "ERROR\|Exception\|Failed" /app/bot.log; then
-              echo "⚠️  Warning: Found error messages in bot log"
-              grep -i -A 2 -B 2 "ERROR\|Exception\|Failed" /app/bot.log
+          # SSH into the remote host and check bot status
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.BOT_SERVER_HOST }} << 'EOF'
+            # Check if bot process is running
+            if [ -f /app/bot.pid ] && kill -0 $(cat /app/bot.pid) 2>/dev/null; then
+              echo "✅ Bot process is running (PID: $(cat /app/bot.pid))"
             else
-              echo "✅ No obvious errors found in recent logs"
+              echo "❌ Bot process is not running"
+              if [ -f /app/bot.log ]; then
+                echo "=== Bot log contents ==="
+                tail -20 /app/bot.log
+              fi
+              exit 1
             fi
-          else
-            echo "⚠️  Warning: No bot log file found"
-          fi
-          
-          echo "=== Bot health check completed ==="
+            
+            # Check bot log for any immediate errors
+            if [ -f /app/bot.log ]; then
+              echo "=== Recent bot log entries ==="
+              tail -10 /app/bot.log
+              
+              # Check for common error patterns
+              if grep -iq "ERROR\|Exception\|Failed" /app/bot.log; then
+                echo "⚠️  Warning: Found error messages in bot log"
+                grep -i -A 2 -B 2 "ERROR\|Exception\|Failed" /app/bot.log
+              else
+                echo "✅ No obvious errors found in recent logs"
+              fi
+            else
+              echo "⚠️  Warning: No bot log file found"
+            fi
+            
+            echo "=== Bot health check completed ==="
+          EOF
         shell: bash
       - name: Capture Deployment Logs
         if: always()
         run: |
           echo "=== Final deployment status ==="
           
-          # Show bot status
-          if [ -f /app/bot.pid ]; then
-            if kill -0 $(cat /app/bot.pid) 2>/dev/null; then
-              echo "✅ Bot is running (PID: $(cat /app/bot.pid))"
+          # SSH into remote host to check deployment status
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.BOT_SERVER_HOST }} << 'EOF'
+            # Show bot status
+            if [ -f /app/bot.pid ]; then
+              if kill -0 $(cat /app/bot.pid) 2>/dev/null; then
+                echo "✅ Bot is running (PID: $(cat /app/bot.pid))"
+              else
+                echo "❌ Bot process exists but is not running"
+              fi
             else
-              echo "❌ Bot process exists but is not running"
+              echo "❌ No bot PID file found"
             fi
-          else
-            echo "❌ No bot PID file found"
-          fi
-          
-          # Show recent logs
-          if [ -f /app/bot.log ]; then
-            echo "=== Last 20 lines of bot log ==="
-            tail -20 /app/bot.log
-          else
-            echo "❌ No bot log file found"
-          fi
-          
-          # Check system resources
-          echo "=== System resource check ==="
-          df -h /app || echo "Could not check disk space"
-          free -h || echo "Could not check memory"
-          
-          echo "=== Deployment log capture completed ==="
+            
+            # Show recent logs
+            if [ -f /app/bot.log ]; then
+              echo "=== Last 20 lines of bot log ==="
+              tail -20 /app/bot.log
+            else
+              echo "❌ No bot log file found"
+            fi
+            
+            # Check system resources
+            echo "=== System resource check ==="
+            df -h /app || echo "Could not check disk space"
+            free -h || echo "Could not check memory"
+            
+            echo "=== Deployment log capture completed ==="
+          EOF
         shell: bash
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
