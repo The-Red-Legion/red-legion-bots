@@ -76,12 +76,14 @@
     - name: Install Python dependencies
       pip:
         requirements: "{{ app_dir }}/requirements.txt"
+        executable: /usr/local/bin/pip3
         extra_args: --user
 
     - name: Install additional packages
       pip:
         name:
           - psycopg2-binary
+        executable: /usr/local/bin/pip3
         extra_args: --user
 
     - name: Set up environment variables
