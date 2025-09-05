@@ -31,25 +31,23 @@ jobs:
 
       - name: Set up SSH key for Ansible
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts
+          # SSH setup not needed for local deployment
+          echo "Using local connection for deployment"
 
       - name: Deploy to Compute Instance with Ansible
         run: |
           echo "=== Starting Ansible deployment ==="
 
           # Set environment variables for Ansible
-          export BOT_SERVER_HOST=${{ secrets.BOT_SERVER_HOST }}
-          export BOT_SERVER_USER=${{ secrets.BOT_SERVER_USER }}
-          export BOT_SSH_KEY_PATH=~/.ssh/id_rsa
           export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
           export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
           export DATABASE_URL=${{ secrets.DATABASE_URL }}
 
           # Run Ansible playbook
-          ansible-playbook ansible/deploy.yml -v
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} \
+          TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }} \
+          DATABASE_URL=${{ secrets.DATABASE_URL }} \
+          ansible-playbook ansible/deploy.yml -i ansible/inventory.ini -v
 
           echo "=== Ansible deployment completed ==="
         shell: bash

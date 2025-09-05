@@ -4,8 +4,14 @@
     path: "{{ app_dir }}/bot.pid"
   register: pid_file
 
+- name: Read PID from file
+  slurp:
+    src: "{{ app_dir }}/bot.pid"
+  register: pid_content
+  when: pid_file.stat.exists
+
 - name: Stop existing bot process
-  command: kill {{ lookup('file', app_dir + '/bot.pid') }}
+  command: kill {{ pid_content.content | b64decode | trim }}
   when: pid_file.stat.exists
   ignore_errors: true
 
@@ -15,7 +21,7 @@
   when: pid_file.stat.exists
 
 - name: Force kill if still running
-  command: kill -9 {{ lookup('file', app_dir + '/bot.pid') }}
+  command: kill -9 {{ pid_content.content | b64decode | trim }}
   when: pid_file.stat.exists
   ignore_errors: true
 

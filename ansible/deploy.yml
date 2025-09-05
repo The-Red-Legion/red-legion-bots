@@ -1,7 +1,7 @@
 ---
 - name: Deploy Participation Bot
   hosts: participation-bot
-  become: yes
+  become: no
   gather_facts: yes
 
   vars:
@@ -21,7 +21,6 @@
       apt:
         name:
           - python3
-          - python3-pip
           - python3-dev
           - git
           - build-essential
@@ -30,8 +29,24 @@
         state: present
       when: ansible_os_family == 'Debian'
 
+    - name: Install pip
+      command: curl -sS https://bootstrap.pypa.io/get-pip.py | python3
+      args:
+        creates: /usr/local/bin/pip3
+
+    - name: Ensure pip3 is in PATH
+      command: ln -sf /usr/local/bin/pip3 /usr/bin/pip3
+      args:
+        creates: /usr/bin/pip3
+
+    - name: Check if Google Cloud SDK is available
+      command: which gcloud
+      register: gcloud_check
+      ignore_errors: true
+
     - name: Install Google Cloud SDK
       include_tasks: tasks/install_gcloud.yml
+      when: gcloud_check.rc != 0
 
     - name: Stop existing bot process
       include_tasks: tasks/stop_bot.yml
@@ -61,14 +76,12 @@
     - name: Install Python dependencies
       pip:
         requirements: "{{ app_dir }}/requirements.txt"
-        executable: pip3
         extra_args: --user
 
     - name: Install additional packages
       pip:
         name:
           - psycopg2-binary
-        executable: pip3
         extra_args: --user
 
     - name: Set up environment variables
