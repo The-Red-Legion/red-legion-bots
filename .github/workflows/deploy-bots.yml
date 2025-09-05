@@ -11,37 +11,51 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Deploy Participation Bot
+      - name: Create Deployment Script
         run: |
-          # Create deployment script
           cat << 'EOF' > deploy.sh
           #!/bin/bash
           set -e
-
-          # Stop any running bot instance
+          EOF
+        shell: bash
+      - name: Stop Running Bot Instance
+        run: |
           if [ -f /app/bot.pid ]; then
             kill -9 $(cat /app/bot.pid) 2>/dev/null || true
             rm -f /app/bot.pid
           fi
-          # Clean and clone repo
+          echo "Bot instance stopped or no PID found"
+        shell: bash
+      - name: Clean and Clone Repo
+        run: |
           sudo rm -rf /app || echo "Warning: /app removal failed, may not exist"
           sudo git clone https://github.com/The-Red-Legion/red-legion-bots /app || { echo "Git clone failed"; exit 1; }
-          # Install dependencies
+          echo "Repo cloned to /app"
+        shell: bash
+      - name: Install Dependencies
+        run: |
           cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
-          /usr/bin/python3.9 -m pip install --upgrade pip  # Use specific Python
+          /usr/bin/python3.9 -m pip install --upgrade pip
           /usr/bin/pip3.9 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
-          # Set environment variables
+          echo "Dependencies installed"
+        shell: bash
+      - name: Set Environment Variables
+        run: |
           echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token --project=rl-prod-471116)" > .env
           echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id --project=rl-prod-471116)" >> .env
           echo "DATABASE_URL=${DATABASE_URL}" >> .env
           export $(cat .env)
-          # Start bot with logging
+          echo "Environment variables set"
+        shell: bash
+      - name: Start Bot
+        run: |
           nohup /usr/bin/python3.9 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
           echo "Bot deployed, PID: $(cat /app/bot.pid)"
-          EOF
-
-          # Make script executable and run
+        shell: bash
+      - name: Make Script Executable and Run
+        run: |
           chmod +x deploy.sh
-          ./deploy.sh  # Run locally on self-hosted VM
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ./deploy.sh
+        shell: bash
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
