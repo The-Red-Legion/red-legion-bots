@@ -84,7 +84,27 @@ jobs:
           echo "Starting bot..."
           cd /app || { echo "ERROR: Failed to change to /app"; exit 1; }
           export PYTHONPATH=/app:$PYTHONPATH
-          nohup python3 -m src.participation_bot > /app/bot.log 2>&1 & echo $! > /app/bot.pid || { echo "ERROR: Failed to start bot"; exit 1; }
+          
+          # Test Python import before starting bot
+          echo "Testing Python imports..."
+          python3 -c "import sys; print('Python path:', sys.path); import src.participation_bot" 2>&1 || { echo "ERROR: Import test failed"; exit 1; }
+          
+          # Start bot with better error capture
+          echo "Starting bot process..."
+          nohup python3 -m src.participation_bot > /app/bot.log 2>&1 & echo $! > /app/bot.pid
+          
+          # Wait a moment and check if process is still running
+          sleep 2
+          if [ -f /app/bot.pid ] && kill -0 $(cat /app/bot.pid) 2>/dev/null; then
+            echo "Bot process started successfully"
+          else
+            echo "ERROR: Bot process died immediately"
+            if [ -f /app/bot.log ]; then
+              echo "=== Bot log contents ==="
+              cat /app/bot.log
+            fi
+            exit 1
+          fi
           
           # Verify bot started
           sleep 5
