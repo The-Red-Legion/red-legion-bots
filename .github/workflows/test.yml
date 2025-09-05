@@ -6,32 +6,27 @@ on:
 
 jobs:
   test-bots:
+    name: Test Bots
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest pytest-mock psycopg2-binary
-      - name: Run Unit Tests
-        run: |
-          python -m pytest tests/ -p no:cacheprovider
+          pip install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+      - name: Run linting
+        run: ruff check src/*.py --line-length 120
+      - name: Run unit tests
         env:
-          PYTHONPATH: ${{ github.workspace }}/src
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-          TEXT_CHANNEL_ID: "1187497620525023262"
-          DISCORD_TOKEN: "dummy-token"
-          DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
-          GITHUB_TOKEN: "dummy-github-token"
-          WEBHOOK_URL: "https://dummy.webhook.url"
-    outputs:
-      result: success
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pytest tests/
 
   test-connections:
     needs: test-bots
