@@ -1,0 +1,61 @@
+name: Test
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+jobs:
+  test-bots:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          check-latest: false
+      - name: Install dependencies
+        run: |
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+      - name: Run linting
+        run: /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m ruff check src/*.py --line-length 120
+      - name: Run unit tests
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pytest tests/
+
+  test-connections:
+    needs: test-bots
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          check-latest: false
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - name: Install Dependencies
+        run: |
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/pip3 install -r requirements.txt psycopg2-binary google-cloud-secret-manager
+      - name: Test Connections
+        id: test
+        run: |
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          echo "DEBUG: DATABASE_URL set to [${DATABASE_URL}]" >> $GITHUB_STEP_SUMMARY
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -c "import os; import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL').replace('%', '%25'), connect_timeout=10, sslmode='require'); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed: ${conn.error}"; exit 1; }
+          echo "Database successful"
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
+          echo "Secret successful"
+          echo "result=success" >> $GITHUB_OUTPUT
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+    outputs:
+      result: ${{ steps.test.outputs.result }}
