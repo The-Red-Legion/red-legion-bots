@@ -6,6 +6,7 @@ on:
 jobs:
   deploy-participation-bot:
     runs-on: self-hosted
+    if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')  # Moved to job level
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -60,15 +61,14 @@ jobs:
         shell: bash
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    # Trigger only on 'Ok to Deploy' label
-    if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')
 
   post-deployment:
+    if: always()  # Run regardless of deploy job success/failure
     needs: deploy-participation-bot
     runs-on: ubuntu-latest
     steps:
       - name: Close PR on Success
-        if: success()
+        if: needs.deploy-participation-bot.result == 'success'
         uses: actions/github-script@v7
         with:
           script: |
@@ -78,8 +78,8 @@ jobs:
               pull_number: context.payload.pull_request.number,
               state: 'closed'
             });
-      - name: Add Bug Label on Failure
-        if: failure()
+      - name: Add Bug Label and Remove Ok to Deploy on Failure
+        if: needs.deploy-participation-bot.result == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
@@ -88,4 +88,10 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
               labels: ['bug']
+            });
+            github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              name: 'Ok to Deploy'
             });
