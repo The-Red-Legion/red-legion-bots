@@ -28,7 +28,8 @@ jobs:
           TEXT_CHANNEL_ID: "1187497620525023262"
           DISCORD_TOKEN: "dummy-token"
           DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
-          GITHUB_TOKEN: "dummy-github-token"  # Mock for tests
+          GITHUB_TOKEN: "dummy-github-token"
+          WEBHOOK_URL: "https://dummy.webhook.url"  # Mock for tests
     outputs:
       result: success
 
