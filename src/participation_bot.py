@@ -16,17 +16,18 @@ intents.voice_states = True
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# Dynamically register the event handler
+async def setup_event_handlers():
+    bot.add_listener(on_voice_state_update, 'on_voice_state_update')
+
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
     try:
         init_db(DATABASE_URL)
+        await setup_event_handlers()  # Register the event handler
     except Exception as e:
-        print(f"Error during database initialization: {e}")
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    await on_voice_state_update(member, before, after)
+        print(f"Error during setup: {e}")
 
 @bot.command()
 @commands.cooldown(1, 30, commands.BucketType.guild)
