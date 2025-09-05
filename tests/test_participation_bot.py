@@ -17,7 +17,8 @@ def mock_db():
 def mock_discord():
     with patch('discord.Client') as mock_client:
         mock_client_instance = Mock()
-        mock_client_instance.get_channel = Mock(return_value=Mock(send=AsyncMock()))
+        mock_client_instance.get_channel = Mock(return_value=Mock())
+        mock_client_instance.get_channel.return_value.send = AsyncMock()
         mock_client.return_value = mock_client_instance
         yield mock_client
 
@@ -39,8 +40,10 @@ def test_start_logging_command(mock_db, mock_discord):
         bot = Mock()
         bot.loop = Mock()
         bot.get_channel = mock_discord.return_value.get_channel
-        # Use asyncio to properly await the coroutine
+        # Use asyncio to run the coroutine
         import asyncio
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         loop.run_until_complete(start_logging(bot, ctx))
+        loop.close()
     mock_channel.send.assert_called_with("You must be in a voice channel to start logging.")
