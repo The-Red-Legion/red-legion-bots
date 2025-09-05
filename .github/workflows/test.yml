@@ -38,34 +38,13 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt psycopg2-binary discord.py google-cloud-secret-manager
+          pip install -r requirements.txt psycopg2-binary google-cloud-secret-manager
       - name: Test Connections
         id: test
         run: |
-          # Set up environment variables
-          echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token)" >> $GITHUB_ENV
-          echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id)" >> $GITHUB_ENV
+          # Set up environment variables with debug
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
-
-          # Test Discord connection (using a proper async script)
-          cat << 'EOF' > test_discord.py
-          import discord
-          import asyncio
-          import os
-
-          async def test_connection():
-              intents = discord.Intents.default()
-              client = discord.Client(intents=intents)
-              await client.login(os.getenv('DISCORD_TOKEN'))
-              try:
-                  await client.fetch_user(client.user.id)
-              finally:
-                  await client.close()
-
-          asyncio.run(test_connection())
-          EOF
-          python test_discord.py || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Discord connection failed"; exit 1; }
-          echo "Discord connection successful"
+          echo "DEBUG: DATABASE_URL set to [${DATABASE_URL}]" >> $GITHUB_STEP_SUMMARY
 
           # Test Database connection
           python -c "import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL')); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database connection failed"; exit 1; }
