@@ -14,6 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - name: Set GCP Project
+        run: echo "GOOGLE_CLOUD_PROJECT=rl-prod-471116" >> $GITHUB_ENV
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,6 +36,7 @@ jobs:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: python3 -m pytest tests/
 
   test-connections:
@@ -94,6 +100,7 @@ jobs:
           export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
           export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
           export DATABASE_URL=${{ secrets.DATABASE_URL }}
+          export GOOGLE_CLOUD_PROJECT=rl-prod-471116
           
           # Run Ansible playbook in check mode (dry run)
           if ansible-playbook --check ansible/deploy.yml -i ansible/inventory.ini -v; then
