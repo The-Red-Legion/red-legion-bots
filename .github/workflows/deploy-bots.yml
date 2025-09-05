@@ -77,6 +77,7 @@ jobs:
           echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token --project=rl-prod-471116)" > .env || { echo "ERROR: Failed to create .env file"; exit 1; }
           echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id --project=rl-prod-471116)" >> .env || { echo "ERROR: Failed to append to .env"; exit 1; }
           echo "DATABASE_URL=${DATABASE_URL}" >> .env || { echo "ERROR: Failed to set DATABASE_URL"; exit 1; }
+          chmod 600 .env || { echo "ERROR: Failed to set permissions on .env"; exit 1; }
           
           # Start bot
           echo "Starting bot..."
