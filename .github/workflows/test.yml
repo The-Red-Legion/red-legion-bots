@@ -12,11 +12,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ''  # Use latest available
+          python-version: '3.9'  # Explicitly set version
+          check-latest: false
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
       - name: Run linting
         run: ruff check src/*.py --line-length 120
       - name: Run unit tests
@@ -34,22 +35,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ''  # Use latest available
+          python-version: '3.9'
+          check-latest: false
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
       - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt psycopg2-binary google-cloud-secret-manager
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt psycopg2-binary google-cloud-secret-manager
       - name: Test Connections
         id: test
         run: |
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
           echo "DEBUG: DATABASE_URL set to [${DATABASE_URL}]" >> $GITHUB_STEP_SUMMARY
-          python -c "import os; import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL'), connect_timeout=5); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed"; exit 1; }
+          python3 -c "import os; import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL'), connect_timeout=5); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed"; exit 1; }
           echo "Database successful"
-          python -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
+          python3 -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
           echo "Secret successful"
           echo "result=success" >> $GITHUB_OUTPUT
         env:
