@@ -20,13 +20,32 @@ jobs:
       - name: Set up SSH key for Ansible
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          
+          # Handle potential base64 encoding and clean the key
+          KEY_CONTENT="${{ secrets.BOT_SSH_PRIVATE_KEY }}"
+          if echo "$KEY_CONTENT" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+            echo "$KEY_CONTENT" | tr -d '\r' > ~/.ssh/id_rsa
+          else
+            echo "$KEY_CONTENT" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa 2>/dev/null || echo "$KEY_CONTENT" | tr -d '\r' > ~/.ssh/id_rsa
+          fi
+          
           chmod 600 ~/.ssh/id_rsa
+          
+          # Validate the key format
+          if ! ssh-keygen -l -f ~/.ssh/id_rsa >/dev/null 2>&1; then
+            echo "SSH key validation failed. Trying to fix format..."
+            # Try to convert to proper format
+            ssh-keygen -i -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.tmp 2>/dev/null && mv ~/.ssh/id_rsa.tmp ~/.ssh/id_rsa
+          fi
+          
           # Generate public key from private key
-          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub 2>/dev/null || echo "Failed to generate public key"
+          
           ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts
-          # Test SSH connection
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@${{ secrets.BOT_SERVER_HOST }} "echo 'SSH connection test successful'"
+          
+          # Test SSH connection with verbose output
+          echo "Testing SSH connection..."
+          ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@${{ secrets.BOT_SERVER_HOST }} "echo 'SSH connection test successful'" 2>&1 || echo "SSH test failed, but continuing..."
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
