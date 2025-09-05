@@ -16,17 +16,17 @@ jobs:
           check-latest: false
       - name: Install dependencies
         run: |
-          /usr/bin/python3.9 -m pip install --upgrade pip
-          /usr/bin/pip3.9 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip
+          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
       - name: Run linting
-        run: /usr/bin/python3.9 -m ruff check src/*.py --line-length 120
+        run: /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m ruff check src/*.py --line-length 120
       - name: Run unit tests
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: /usr/bin/python3.9 -m pytest tests/
+        run: /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pytest tests/
 
   test-connections:
     needs: test-bots
