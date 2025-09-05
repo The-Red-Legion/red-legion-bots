@@ -32,11 +32,12 @@ def test_start_logging_command(mock_db, mock_discord):
     ctx.author.voice = Mock()
     ctx.author.voice.channel = Mock()
     ctx.author.voice.channel.id = "12345"
-    mock_channel = Mock(send=Mock())
+    mock_channel = Mock()
+    mock_channel.send = Mock()
     mock_discord.get_channel.return_value = mock_channel
     with patch('src.event_handlers.active_voice_channels', {}):
         bot = Mock()
         bot.loop = Mock()
         bot.get_channel = mock_discord.get_channel
         bot.loop.run_until_complete(start_logging(bot, ctx))
-    mock_channel.send.assert_called()
+    mock_channel.send.assert_called_with("You must be in a voice channel to start logging.")  # Specific check
