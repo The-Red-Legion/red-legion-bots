@@ -59,10 +59,11 @@ jobs:
             rm -f /app/bot.pid
           fi
           
-          # Clean and clone
-          echo "Cleaning and cloning repository..."
+          # Clean and copy checked-out code (instead of cloning)
+          echo "Cleaning and copying repository..."
           sudo rm -rf /app || echo "Warning: /app removal failed"
-          sudo git clone https://github.com/The-Red-Legion/red-legion-bots /app || { echo "ERROR: Git clone failed"; exit 1; }
+          sudo mkdir -p /app || { echo "ERROR: Failed to create /app directory"; exit 1; }
+          sudo cp -r /home/runner/work/red-legion-bots/red-legion-bots/* /app/ || { echo "ERROR: Failed to copy repository"; exit 1; }
           sudo chown -R $(whoami):$(whoami) /app || { echo "ERROR: Failed to change ownership"; exit 1; }
           
           # Install dependencies
