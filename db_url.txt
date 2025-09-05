@@ -1,0 +1,1 @@
+postgresql://event_user:QtLRoRc6xMa8XdcrpBMk@10.66.0.3:5432/red_legion_event_db
