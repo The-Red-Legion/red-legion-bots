@@ -23,7 +23,8 @@ jobs:
         run: |
           python -m pytest tests/ -p no:cacheprovider
         env:
-          PYTHONPATH: ${{ github.workspace }}/src  # Ensure all src modules are in path
+          PYTHONPATH: ${{ github.workspace }}/src
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116  # Explicitly set project
     outputs:
       result: success
 
@@ -49,10 +50,11 @@ jobs:
           echo "DEBUG: DATABASE_URL set to [${DATABASE_URL}]" >> $GITHUB_STEP_SUMMARY
           python -c "import psycopg2; conn = psycopg2.connect(os.getenv('DATABASE_URL')); conn.close();" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Database failed"; exit 1; }
           echo "Database successful"
-          python -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/$(gcloud config get-value project)/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
+          python -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
           echo "Secret successful"
           echo "result=success" >> $GITHUB_OUTPUT
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116  # Explicitly set project
     outputs:
       result: ${{ steps.test.outputs.result }}
