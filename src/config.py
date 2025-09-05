@@ -22,8 +22,8 @@ def get_config():
         'TEXT_CHANNEL_ID': os.getenv('TEXT_CHANNEL_ID', '1187497620525023262'),
         'ORG_ROLE_ID': "1143413611184795658",
         'DISCORD_TOKEN': os.getenv('DISCORD_TOKEN', get_secret("discord-token")),
-        'DATABASE_URL': os.getenv('DATABASE_URL', 'postgresql://event_user:QtLRoRc6xMa8XdcrpBMk@10.66.0.3:5432/red_legion_event_db'),  # Fallback
-        'GITHUB_TOKEN': os.getenv('GITHUB_TOKEN', get_secret("github-token")),
+        'DATABASE_URL': os.getenv('DATABASE_URL', get_secret("database-connection-string")),
+        'GITHUB_TOKEN': os.getenv('GITHUB_TOKEN', 'dummy-github-token'),  # Fallback if secret missing
         'WEBHOOK_URL': os.getenv('WEBHOOK_URL', 'https://default.webhook.url'),
         'UEX_API_KEY': os.getenv('UEX_API_KEY', get_secret("uex-api-key"))
     }
