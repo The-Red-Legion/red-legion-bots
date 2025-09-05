@@ -35,7 +35,8 @@ jobs:
         run: |
           sudo rm -rf /app || echo "Warning: /app removal failed, may not exist"
           sudo git clone https://github.com/The-Red-Legion/red-legion-bots /app || { echo "Git clone failed"; exit 1; }
-          echo "Repo cloned to /app"
+          sudo chown -R $(whoami):$(whoami) /app || { echo "Failed to change ownership"; exit 1; }
+          echo "Repo cloned to /app and ownership changed"
         shell: bash
       - name: Install Dependencies
         run: |
@@ -47,6 +48,7 @@ jobs:
         shell: bash
       - name: Set Environment Variables
         run: |
+          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
           echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token --project=rl-prod-471116)" > .env
           echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id --project=rl-prod-471116)" >> .env
           echo "DATABASE_URL=${DATABASE_URL}" >> .env
@@ -55,6 +57,7 @@ jobs:
         shell: bash
       - name: Start Bot
         run: |
+          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
           nohup python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
           echo "Bot deployed, PID: $(cat /app/bot.pid)"
         shell: bash
