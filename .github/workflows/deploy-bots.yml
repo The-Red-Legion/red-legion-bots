@@ -9,6 +9,10 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')  # Moved to job level
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
@@ -36,9 +40,9 @@ jobs:
       - name: Install Dependencies
         run: |
           cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
-          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m ensurepip --upgrade
-          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 -m pip install --upgrade pip
-          /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/pip3 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
+          python3 -m ensurepip --upgrade
+          python3 -m pip install --upgrade pip
+          pip3 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
           echo "Dependencies installed"
         shell: bash
       - name: Set Environment Variables
@@ -51,7 +55,7 @@ jobs:
         shell: bash
       - name: Start Bot
         run: |
-          nohup /home/jt/actions-runner/_work/_tool/Python/3.9.23/x64/bin/python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
+          nohup python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
           echo "Bot deployed, PID: $(cat /app/bot.pid)"
         shell: bash
       - name: Make Script Executable and Run
