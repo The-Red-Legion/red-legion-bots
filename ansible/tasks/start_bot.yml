@@ -23,11 +23,11 @@
 
 - name: Show bot log if startup failed
   command: cat {{ app_dir }}/bot.log
-  when: (bot_check is defined and bot_check.rc != 0 and not ansible_check_mode) or (ansible_check_mode and false)
+  when: (bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)
   register: bot_log
   failed_when: false
 
 - name: Fail with bot log
   fail:
     msg: "Bot failed to start. Log output: {{ bot_log.stdout }}"
-  when: (bot_check is defined and bot_check.rc != 0 and not ansible_check_mode) or (ansible_check_mode and false)
+  when: (bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)

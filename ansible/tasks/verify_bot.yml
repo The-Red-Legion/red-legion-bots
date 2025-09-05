@@ -31,4 +31,4 @@
 - name: Report successful deployment
   debug:
     msg: "✅ Bot deployment successful! PID: {{ lookup('file', app_dir + '/bot.pid') }}"
-  when: (pid_file_check is defined and pid_file_check.stat.exists and process_check is defined and process_check.rc == 0 and not ansible_check_mode) or (ansible_check_mode and false)
+  when: (pid_file_check is defined and pid_file_check.stat.exists and process_check is defined and (process_check.rc | default(0)) == 0 and not ansible_check_mode) or (ansible_check_mode and false)
