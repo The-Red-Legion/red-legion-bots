@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_secret(secret_id, project_id=os.getenv('GCP_PROJECT_ID')):
+def get_secret(secret_id, project_id=os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')):
     client = secretmanager.SecretManagerServiceClient()
     name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
     response = client.access_secret_version(name=name)
@@ -21,14 +21,13 @@ def get_config():
     return {
         'TEXT_CHANNEL_ID': os.getenv('TEXT_CHANNEL_ID', '1187497620525023262'),
         'ORG_ROLE_ID': "1143413611184795658",
-        'DISCORD_TOKEN': os.getenv('DISCORD_TOKEN', 'dummy-token'),
-        'DATABASE_URL': os.getenv('DATABASE_URL', 'postgresql://test:test@localhost:5432/testdb'),
-        'GITHUB_TOKEN': os.getenv('GITHUB_TOKEN', 'dummy-github-token'),
-        'WEBHOOK_URL': os.getenv('WEBHOOK_URL', 'https://dummy.webhook.url'),
-        'UEX_API_KEY': os.getenv('UEX_API_KEY', 'dummy-uex-key')
+        'DISCORD_TOKEN': os.getenv('DISCORD_TOKEN', get_secret("discord-token")),
+        'DATABASE_URL': os.getenv('DATABASE_URL', get_secret("database-connection-string")),
+        'GITHUB_TOKEN': os.getenv('GITHUB_TOKEN', get_secret("github-token")),
+        'WEBHOOK_URL': os.getenv('WEBHOOK_URL', get_secret("webhook-url")),
+        'UEX_API_KEY': os.getenv('UEX_API_KEY', get_secret("uex-api-key"))
     }
 
-# Validate config (optional, for runtime)
 config = get_config()
 if not config['TEXT_CHANNEL_ID']:
     raise ValueError("TEXT_CHANNEL_ID not set or empty")
