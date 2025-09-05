@@ -31,7 +31,8 @@ def test_start_logging_command(mock_db, mock_discord):
     ctx = Mock()
     ctx.author = Mock()
     ctx.author.voice = None  # Simulate no voice channel
-    mock_channel = Mock(send=Mock())
+    mock_channel = Mock()
+    mock_channel.send = Mock(return_value=Mock())  # Ensure send returns something
     mock_discord.get_channel.return_value = mock_channel
     with patch('src.event_handlers.active_voice_channels', {}):
         bot = Mock()
