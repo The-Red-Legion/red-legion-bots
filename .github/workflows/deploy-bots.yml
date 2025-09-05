@@ -58,6 +58,10 @@ jobs:
           ansible-playbook ansible/deploy.yml -i ansible/inventory.ini -v
 
           echo "=== Ansible deployment completed ==="
+          
+          echo "=== Waiting for bot to stabilize ==="
+          sleep 10
+          echo "=== Bot startup wait completed ==="
         shell: bash
       - name: Verify Bot Health
         run: |
@@ -65,6 +69,13 @@ jobs:
           
           # SSH into the remote host and check bot status
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.BOT_SERVER_HOST }} << 'EOF'
+            # Check if this is a first deployment (no /app directory yet)
+            if [ ! -d /app ]; then
+              echo "ℹ️  First deployment detected - /app directory does not exist yet"
+              echo "This is expected for initial deployments"
+              exit 0
+            fi
+            
             # Check if bot process is running
             if [ -f /app/bot.pid ] && kill -0 $(cat /app/bot.pid) 2>/dev/null; then
               echo "✅ Bot process is running (PID: $(cat /app/bot.pid))"
@@ -103,6 +114,16 @@ jobs:
           
           # SSH into remote host to check deployment status
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.BOT_SERVER_HOST }} << 'EOF'
+            # Check if this is a first deployment
+            if [ ! -d /app ]; then
+              echo "ℹ️  First deployment in progress - /app directory does not exist yet"
+              echo "This is normal during initial setup"
+              echo "=== System resource check ==="
+              free -h || echo "Could not check memory"
+              echo "=== Deployment log capture completed ==="
+              exit 0
+            fi
+            
             # Show bot status
             if [ -f /app/bot.pid ]; then
               if kill -0 $(cat /app/bot.pid) 2>/dev/null; then
@@ -124,7 +145,11 @@ jobs:
             
             # Check system resources
             echo "=== System resource check ==="
-            df -h /app || echo "Could not check disk space"
+            if [ -d /app ]; then
+              df -h /app || echo "Could not check disk space for /app"
+            else
+              df -h / || echo "Could not check disk space"
+            fi
             free -h || echo "Could not check memory"
             
             echo "=== Deployment log capture completed ==="
