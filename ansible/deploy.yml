@@ -97,6 +97,7 @@
         PYTHONPATH: "{{ app_dir }}:$PYTHONPATH"
       register: import_test
       failed_when: import_test.rc != 0
+      when: not ansible_check_mode
 
     - name: Start bot service
       include_tasks: tasks/start_bot.yml
