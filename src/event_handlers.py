@@ -5,6 +5,7 @@ import time
 import random
 import aiohttp
 import psycopg2
+import asyncio
 from .discord_utils import send_embed, has_org_role
 from .database import (
     save_participation, save_event, update_event_end_time, update_entries, get_entries,

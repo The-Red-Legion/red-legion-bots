@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch
-from bots.participation_bot import init_db
+from src.database import init_db
 
 @pytest.fixture
 def mock_db():
@@ -15,6 +15,6 @@ def test_init_db(mock_db):
     conn, cursor = mock_db
     init_db()
     cursor.execute.assert_called()
-    assert cursor.execute.call_count == 3  # Three CREATE TABLE statements
+    assert cursor.execute.call_count == 6  # Six CREATE TABLE statements (entries, events, event_materials, participation, market_items, loans)
     conn.commit.assert_called_once()
     conn.close.assert_called_once()

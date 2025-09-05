@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from .config import DISCORD_TOKEN, DATABASE_URL
+from .config import DATABASE_URL
 from .database import init_db
 from .event_handlers import (
     on_voice_state_update, log_members, start_logging, stop_logging, pick_winner,
