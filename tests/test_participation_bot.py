@@ -36,11 +36,11 @@ def test_start_logging_command(mock_db, mock_discord):
     ctx.author.voice = None  # Simulate no voice channel
     mock_channel = mock_discord.return_value.get_channel.return_value
     mock_channel.send = AsyncMock()
+    ctx.send = AsyncMock()  # Mock ctx.send to handle await
     with patch('src.event_handlers.active_voice_channels', {}):
         bot = Mock()
         bot.loop = Mock()
         bot.get_channel = mock_discord.return_value.get_channel
-        # Use asyncio to run the coroutine
         import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
