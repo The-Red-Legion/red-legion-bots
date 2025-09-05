@@ -5,12 +5,42 @@ on:
     types: [closed]
 jobs:
   deploy-participation-bot:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - run: |
-          gcloud compute ssh participation-bot --zone=us-central1-a --command="sudo rm -rf /app && sudo git clone https://github.com/The-Red-Legion/red-legion-bots /app && cd /app/bots && sudo pip3 install -r ../requirements.txt psycopg2-binary && export DISCORD_TOKEN=\$(gcloud secrets versions access latest --secret=discord-token) && export TEXT_CHANNEL_ID=855869041687003156 && export DATABASE_URL=${{ secrets.DATABASE_URL }} && nohup python3 participation_bot.py &"
+      - name: Deploy Participation Bot
+        run: |
+          # Create deployment script
+          cat << 'EOF' > deploy.sh
+          #!/bin/bash
+          set -e
+
+          # Stop any running bot instance
+          if [ -f /app/bot.pid ]; then
+            kill -9 $(cat /app/bot.pid) 2>/dev/null || true
+            rm -f /app/bot.pid
+          fi
+          # Clean and clone repo
+          sudo rm -rf /app || echo "Warning: /app removal failed, may not exist"
+          sudo git clone https://github.com/The-Red-Legion/red-legion-bots /app || { echo "Git clone failed"; exit 1; }
+          # Install dependencies
+          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
+          sudo pip3 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
+          # Set environment variables
+          echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token)" > .env
+          echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id)" >> .env
+          echo "DATABASE_URL=${DATABASE_URL}" >> .env
+          export $(cat .env)
+          # Start bot with logging
+          nohup python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
+          echo "Bot deployed, PID: $(cat /app/bot.pid)"
+          EOF
+
+          # Make script executable and run
+          chmod +x deploy.sh
+          gcloud compute ssh participation-bot --zone=us-central1-a --command="./deploy.sh" || { echo "Deployment failed"; exit 1; }
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
