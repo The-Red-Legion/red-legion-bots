@@ -1,0 +1,185 @@
+﻿2025-09-06T01:03:28.4152963Z ##[group]Run echo "=== Starting Ansible deployment ==="
+2025-09-06T01:03:28.4153617Z [36;1mecho "=== Starting Ansible deployment ==="[0m
+2025-09-06T01:03:28.4154135Z [36;1m[0m
+2025-09-06T01:03:28.4154574Z [36;1m# Set environment variables for Ansible[0m
+2025-09-06T01:03:28.4155366Z [36;1mexport DISCORD_TOKEN=***[0m
+2025-09-06T01:03:28.4155888Z [36;1mexport TEXT_CHANNEL_ID=***[0m
+2025-09-06T01:03:28.4156669Z [36;1mexport DATABASE_URL=***[0m
+2025-09-06T01:03:28.4157133Z [36;1m[0m
+2025-09-06T01:03:28.4157533Z [36;1m# Run Ansible playbook[0m
+2025-09-06T01:03:28.4158231Z [36;1mDISCORD_TOKEN=*** \[0m
+2025-09-06T01:03:28.4158710Z [36;1mTEXT_CHANNEL_ID=*** \[0m
+2025-09-06T01:03:28.4159675Z [36;1mDATABASE_URL=*** \[0m
+2025-09-06T01:03:28.4160314Z [36;1mansible-playbook ansible/deploy.yml -i ansible/inventory.ini -v[0m
+2025-09-06T01:03:28.4160912Z [36;1m[0m
+2025-09-06T01:03:28.4161348Z [36;1mecho "=== Ansible deployment completed ==="[0m
+2025-09-06T01:03:28.4161846Z [36;1m[0m
+2025-09-06T01:03:28.4162310Z [36;1mecho "=== Waiting for bot to stabilize ==="[0m
+2025-09-06T01:03:28.4162812Z [36;1msleep 10[0m
+2025-09-06T01:03:28.4163266Z [36;1mecho "=== Bot startup wait completed ==="[0m
+2025-09-06T01:03:28.4193615Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail ***0***
+2025-09-06T01:03:28.4194208Z env:
+2025-09-06T01:03:28.4194868Z   DATABASE_URL: ***
+2025-09-06T01:03:28.4195397Z   pythonLocation: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T01:03:28.4196049Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.9.23/x64/lib/pkgconfig
+2025-09-06T01:03:28.4196702Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T01:03:28.4197311Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T01:03:28.4197902Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T01:03:28.4198489Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.9.23/x64/lib
+2025-09-06T01:03:28.4199349Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-3f5ff3456bbd4d75.json
+2025-09-06T01:03:28.4200639Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-3f5ff3456bbd4d75.json
+2025-09-06T01:03:28.4201659Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-3f5ff3456bbd4d75.json
+2025-09-06T01:03:28.4202394Z   CLOUDSDK_CORE_PROJECT: rl-prod-471116
+2025-09-06T01:03:28.4202891Z   CLOUDSDK_PROJECT: rl-prod-471116
+2025-09-06T01:03:28.4203367Z   GCLOUD_PROJECT: rl-prod-471116
+2025-09-06T01:03:28.4203823Z   GCP_PROJECT: rl-prod-471116
+2025-09-06T01:03:28.4204280Z   GOOGLE_CLOUD_PROJECT: rl-prod-471116
+2025-09-06T01:03:28.4204911Z ##[endgroup]
+2025-09-06T01:03:28.4256939Z === Starting Ansible deployment ===
+2025-09-06T01:03:29.4310337Z [WARNING]: Invalid characters were found in group names but not replaced, use
+2025-09-06T01:03:29.4311224Z -vvvv to see details
+2025-09-06T01:03:29.9340371Z Using /home/runner/work/red-legion-bots/red-legion-bots/ansible.cfg as config file
+2025-09-06T01:03:29.9341377Z 
+2025-09-06T01:03:29.9341917Z PLAY [Deploy Participation Bot] ************************************************
+2025-09-06T01:03:29.9342604Z 
+2025-09-06T01:03:29.9343049Z TASK [Gathering Facts] *********************************************************
+2025-09-06T01:03:33.0542517Z ok: [***]
+2025-09-06T01:03:33.0542891Z 
+2025-09-06T01:03:33.0543324Z TASK [Update system packages] **************************************************
+2025-09-06T01:03:40.8219854Z ok: [***] => ***"changed": false, "msg": "Reading package lists...\nBuilding dependency tree...\nReading state information...\nCalculating upgrade...\n0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.\n", "stderr": "", "stderr_lines": [], "stdout": "Reading package lists...\nBuilding dependency tree...\nReading state information...\nCalculating upgrade...\n0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.\n", "stdout_lines": ["Reading package lists...", "Building dependency tree...", "Reading state information...", "Calculating upgrade...", "0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."]***
+2025-09-06T01:03:40.8224261Z 
+2025-09-06T01:03:40.8224800Z TASK [Install required system packages] ****************************************
+2025-09-06T01:03:43.3862182Z ok: [***] => ***"cache_update_time": 1757120618, "cache_updated": false, "changed": false***
+2025-09-06T01:03:43.3862754Z 
+2025-09-06T01:03:43.3863117Z TASK [Install pip via package manager] *****************************************
+2025-09-06T01:03:48.3686970Z ok: [***] => ***"cache_update_time": 1757120626, "cache_updated": true, "changed": false***
+2025-09-06T01:03:48.3687842Z 
+2025-09-06T01:03:48.3688343Z TASK [Ensure pip3 is in PATH] **************************************************
+2025-09-06T01:03:50.6118137Z changed: [***] => ***"changed": true, "cmd": ["pip3", "--version"], "delta": "0:00:01.071348", "end": "2025-09-06 01:03:50.475493", "msg": "", "rc": 0, "start": "2025-09-06 01:03:49.404145", "stderr": "", "stderr_lines": [], "stdout": "pip 22.0.2 from /usr/lib/python3/dist-packages/pip (python 3.10)", "stdout_lines": ["pip 22.0.2 from /usr/lib/python3/dist-packages/pip (python 3.10)"]***
+2025-09-06T01:03:50.6119801Z 
+2025-09-06T01:03:50.6120183Z TASK [Check if Google Cloud SDK is available] **********************************
+2025-09-06T01:03:51.6910438Z changed: [***] => ***"changed": true, "cmd": ["which", "gcloud"], "delta": "0:00:00.007097", "end": "2025-09-06 01:03:51.554741", "msg": "", "rc": 0, "start": "2025-09-06 01:03:51.547644", "stderr": "", "stderr_lines": [], "stdout": "/snap/bin/gcloud", "stdout_lines": ["/snap/bin/gcloud"]***
+2025-09-06T01:03:51.6911462Z 
+2025-09-06T01:03:51.6911793Z TASK [Install Google Cloud SDK] ************************************************
+2025-09-06T01:03:51.7075495Z skipping: [***] => ***"changed": false, "false_condition": "gcloud_check.rc != 0", "skip_reason": "Conditional result was False"***
+2025-09-06T01:03:51.7076142Z 
+2025-09-06T01:03:51.7076484Z TASK [Stop existing bot process] ***********************************************
+2025-09-06T01:03:51.7295618Z included: /home/runner/work/red-legion-bots/red-legion-bots/ansible/tasks/stop_bot.yml for ***
+2025-09-06T01:03:51.7296231Z 
+2025-09-06T01:03:51.7296570Z TASK [Check if bot PID file exists] ********************************************
+2025-09-06T01:03:52.9388744Z ok: [***] => ***"changed": false, "stat": ***"atime": 1757120157.9916995, "attr_flags": "e", "attributes": ["extents"], "block_size": 4096, "blocks": 8, "charset": "us-ascii", "checksum": "b6230f61170d8a216fd97f902167147e0e9d3219", "ctime": 1757120151.4451652, "dev": 2049, "device_type": 0, "executable": false, "exists": true, "gid": 0, "gr_name": "root", "inode": 774212, "isblk": false, "ischr": false, "isdir": false, "isfifo": false, "isgid": false, "islnk": false, "isreg": true, "issock": false, "isuid": false, "mimetype": "text/plain", "mode": "0644", "mtime": 1757120151.4451652, "nlink": 1, "path": "/app/bot.pid", "pw_name": "root", "readable": true, "rgrp": true, "roth": true, "rusr": true, "size": 6, "uid": 0, "version": "1819842462", "wgrp": false, "woth": false, "writeable": true, "wusr": true, "xgrp": false, "xoth": false, "xusr": false***
+2025-09-06T01:03:52.9391834Z 
+2025-09-06T01:03:52.9392146Z TASK [Read PID from file] ******************************************************
+2025-09-06T01:03:54.0400574Z ok: [***] => ***"changed": false, "content": "NDM4MzIK", "encoding": "base64", "source": "/app/bot.pid"***
+2025-09-06T01:03:54.0401209Z 
+2025-09-06T01:03:54.0401569Z TASK [Stop existing bot process] ***********************************************
+2025-09-06T01:03:55.1463706Z changed: [***] => ***"changed": true, "cmd": ["kill", "43832"], "delta": "0:00:00.010037", "end": "2025-09-06 01:03:54.998327", "msg": "", "rc": 0, "start": "2025-09-06 01:03:54.988290", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []***
+2025-09-06T01:03:55.1464802Z 
+2025-09-06T01:03:55.1465187Z TASK [Wait for process to terminate] *******************************************
+2025-09-06T01:04:00.1775773Z Pausing for 5 seconds
+2025-09-06T01:04:00.1777904Z ok: [***] => ***"changed": false, "delta": 5, "echo": true, "rc": 0, "start": "2025-09-06 01:03:55.162272", "stderr": "", "stdout": "Paused for 5.01 seconds", "stop": "2025-09-06 01:04:00.168610", "user_input": ""***
+2025-09-06T01:04:00.1778975Z 
+2025-09-06T01:04:00.1779323Z TASK [Force kill if still running] *********************************************
+2025-09-06T01:04:01.2994043Z fatal: [***]: FAILED! => ***"changed": true, "cmd": ["kill", "-9", "43832"], "delta": "0:00:00.007314", "end": "2025-09-06 01:04:01.170613", "msg": "non-zero return code", "rc": 1, "start": "2025-09-06 01:04:01.163299", "stderr": "kill: (43832): No such process", "stderr_lines": ["kill: (43832): No such process"], "stdout": "", "stdout_lines": []***
+2025-09-06T01:04:01.2996518Z ...ignoring
+2025-09-06T01:04:01.2997034Z 
+2025-09-06T01:04:01.2997753Z TASK [Remove PID file] *********************************************************
+2025-09-06T01:04:02.8461982Z changed: [***] => ***"changed": true, "path": "/app/bot.pid", "state": "absent"***
+2025-09-06T01:04:02.8462703Z 
+2025-09-06T01:04:02.8463246Z TASK [Clean and prepare application directory] *********************************
+2025-09-06T01:04:04.1105596Z changed: [***] => ***"changed": true, "path": "/app", "state": "absent"***
+2025-09-06T01:04:04.1106405Z 
+2025-09-06T01:04:04.1106871Z TASK [Create application directory] ********************************************
+2025-09-06T01:04:05.5086494Z changed: [***] => ***"changed": true, "gid": 1000, "group": "ubuntu", "mode": "0755", "owner": "ubuntu", "path": "/app", "size": 4096, "state": "directory", "uid": 1000***
+2025-09-06T01:04:05.5087816Z 
+2025-09-06T01:04:05.5088424Z TASK [Copy application code] ***************************************************
+2025-09-06T01:11:00.9333970Z changed: [***] => ***"changed": true, "dest": "/app/", "src": "/home/runner/work/red-legion-bots/red-legion-bots/"***
+2025-09-06T01:11:00.9334630Z 
+2025-09-06T01:11:00.9335016Z TASK [Install Python dependencies] *********************************************
+2025-09-06T01:11:16.9952082Z ok: [***] => ***"changed": false, "cmd": ["/usr/bin/pip3", "install", "--user", "-r", "/app/requirements.txt"], "name": null, "requirements": "/app/requirements.txt", "state": "present", "stderr": "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv\n", "stderr_lines": ["WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv"], "stdout": "Requirement already satisfied: discord.py==2.4.0 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 1)) (2.4.0)\nRequirement already satisfied: psycopg2-binary==2.9.9 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 2)) (2.9.9)\nRequirement already satisfied: python-dotenv==1.0.1 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 3)) (1.0.1)\nRequirement already satisfied: google-cloud-secret-manager==2.20.0 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 4)) (2.20.0)\nRequirement already satisfied: aiohttp==3.9.5 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 5)) (3.9.5)\nRequirement already satisfied: protobuf!=3.20.0,!=3.20.1,!=4.21.0,!=4.21.1,!=4.21.2,!=4.21.3,!=4.21.4,!=4.21.5,<5.0.0dev,>=3.19.5 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (4.25.8)\nRequirement already satisfied: google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (2.40.3)\nRequirement already satisfied: grpc-google-iam-v1<1.0.0dev,>=0.12.4 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (0.14.2)\nRequirement already satisfied: google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (2.25.1)\nRequirement already satisfied: proto-plus<2.0.0dev,>=1.22.3 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.26.1)\nRequirement already satisfied: aiosignal>=1.1.2 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (1.4.0)\nRequirement already satisfied: attrs>=17.3.0 in /usr/lib/python3/dist-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (21.2.0)\nRequirement already satisfied: async-timeout<5.0,>=4.0 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (4.0.3)\nRequirement already satisfied: multidict<7.0,>=4.5 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (6.6.4)\nRequirement already satisfied: yarl<2.0,>=1.0 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (1.20.1)\nRequirement already satisfied: frozenlist>=1.1.1 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (1.7.0)\nRequirement already satisfied: typing-extensions>=4.2 in /root/.local/lib/python3.10/site-packages (from aiosignal>=1.1.2->aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (4.15.0)\nRequirement already satisfied: googleapis-common-protos<2.0.0,>=1.56.2 in /root/.local/lib/python3.10/site-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.70.0)\nRequirement already satisfied: requests<3.0.0,>=2.18.0 in /usr/lib/python3/dist-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (2.25.1)\nRequirement already satisfied: grpcio-status<2.0.0,>=1.33.2 in /root/.local/lib/python3.10/site-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.62.3)\nRequirement already satisfied: grpcio<2.0.0,>=1.33.2 in /root/.local/lib/python3.10/site-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.74.0)\nRequirement already satisfied: rsa<5,>=3.1.4 in /root/.local/lib/python3.10/site-packages (from google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (4.9.1)\nRequirement already satisfied: cachetools<6.0,>=2.0.0 in /root/.local/lib/python3.10/site-packages (from google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (5.5.2)\nRequirement already satisfied: pyasn1-modules>=0.2.1 in /usr/lib/python3/dist-packages (from google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (0.2.1)\nRequirement already satisfied: idna>=2.0 in /usr/lib/python3/dist-packages (from yarl<2.0,>=1.0->aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (3.3)\nRequirement already satisfied: propcache>=0.2.1 in /root/.local/lib/python3.10/site-packages (from yarl<2.0,>=1.0->aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (0.3.2)\nRequirement already satisfied: pyasn1>=0.1.3 in /usr/lib/python3/dist-packages (from rsa<5,>=3.1.4->google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (0.4.8)\n", "stdout_lines": ["Requirement already satisfied: discord.py==2.4.0 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 1)) (2.4.0)", "Requirement already satisfied: psycopg2-binary==2.9.9 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 2)) (2.9.9)", "Requirement already satisfied: python-dotenv==1.0.1 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 3)) (1.0.1)", "Requirement already satisfied: google-cloud-secret-manager==2.20.0 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 4)) (2.20.0)", "Requirement already satisfied: aiohttp==3.9.5 in /root/.local/lib/python3.10/site-packages (from -r /app/requirements.txt (line 5)) (3.9.5)", "Requirement already satisfied: protobuf!=3.20.0,!=3.20.1,!=4.21.0,!=4.21.1,!=4.21.2,!=4.21.3,!=4.21.4,!=4.21.5,<5.0.0dev,>=3.19.5 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (4.25.8)", "Requirement already satisfied: google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (2.40.3)", "Requirement already satisfied: grpc-google-iam-v1<1.0.0dev,>=0.12.4 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (0.14.2)", "Requirement already satisfied: google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (2.25.1)", "Requirement already satisfied: proto-plus<2.0.0dev,>=1.22.3 in /root/.local/lib/python3.10/site-packages (from google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.26.1)", "Requirement already satisfied: aiosignal>=1.1.2 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (1.4.0)", "Requirement already satisfied: attrs>=17.3.0 in /usr/lib/python3/dist-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (21.2.0)", "Requirement already satisfied: async-timeout<5.0,>=4.0 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (4.0.3)", "Requirement already satisfied: multidict<7.0,>=4.5 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (6.6.4)", "Requirement already satisfied: yarl<2.0,>=1.0 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (1.20.1)", "Requirement already satisfied: frozenlist>=1.1.1 in /root/.local/lib/python3.10/site-packages (from aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (1.7.0)", "Requirement already satisfied: typing-extensions>=4.2 in /root/.local/lib/python3.10/site-packages (from aiosignal>=1.1.2->aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (4.15.0)", "Requirement already satisfied: googleapis-common-protos<2.0.0,>=1.56.2 in /root/.local/lib/python3.10/site-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.70.0)", "Requirement already satisfied: requests<3.0.0,>=2.18.0 in /usr/lib/python3/dist-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (2.25.1)", "Requirement already satisfied: grpcio-status<2.0.0,>=1.33.2 in /root/.local/lib/python3.10/site-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.62.3)", "Requirement already satisfied: grpcio<2.0.0,>=1.33.2 in /root/.local/lib/python3.10/site-packages (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (1.74.0)", "Requirement already satisfied: rsa<5,>=3.1.4 in /root/.local/lib/python3.10/site-packages (from google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (4.9.1)", "Requirement already satisfied: cachetools<6.0,>=2.0.0 in /root/.local/lib/python3.10/site-packages (from google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (5.5.2)", "Requirement already satisfied: pyasn1-modules>=0.2.1 in /usr/lib/python3/dist-packages (from google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (0.2.1)", "Requirement already satisfied: idna>=2.0 in /usr/lib/python3/dist-packages (from yarl<2.0,>=1.0->aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (3.3)", "Requirement already satisfied: propcache>=0.2.1 in /root/.local/lib/python3.10/site-packages (from yarl<2.0,>=1.0->aiohttp==3.9.5->-r /app/requirements.txt (line 5)) (0.3.2)", "Requirement already satisfied: pyasn1>=0.1.3 in /usr/lib/python3/dist-packages (from rsa<5,>=3.1.4->google-auth!=2.24.0,!=2.25.0,<3.0.0dev,>=2.14.1->google-cloud-secret-manager==2.20.0->-r /app/requirements.txt (line 4)) (0.4.8)"], "version": null, "virtualenv": null***
+2025-09-06T01:11:16.9987272Z 
+2025-09-06T01:11:16.9987624Z TASK [Install additional packages] *********************************************
+2025-09-06T01:11:24.2445957Z ok: [***] => ***"changed": false, "cmd": ["/usr/bin/pip3", "install", "--user", "psycopg2-binary"], "name": ["psycopg2-binary"], "requirements": null, "state": "present", "stderr": "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv\n", "stderr_lines": ["WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv"], "stdout": "Requirement already satisfied: psycopg2-binary in /root/.local/lib/python3.10/site-packages (2.9.9)\n", "stdout_lines": ["Requirement already satisfied: psycopg2-binary in /root/.local/lib/python3.10/site-packages (2.9.9)"], "version": null, "virtualenv": null***
+2025-09-06T01:11:24.2450020Z 
+2025-09-06T01:11:24.2450383Z TASK [Set up environment variables] ********************************************
+2025-09-06T01:11:24.2681108Z included: /home/runner/work/red-legion-bots/red-legion-bots/ansible/tasks/setup_environment.yml for ***
+2025-09-06T01:11:24.2681915Z 
+2025-09-06T01:11:24.2682299Z TASK [Create .env file] ********************************************************
+2025-09-06T01:11:26.5083879Z changed: [***] => ***"changed": true, "checksum": "a974a4f3ee2ec4647427d36713d12cb9940147b7", "dest": "/app/.env", "gid": 1000, "group": "ubuntu", "md5sum": "87eb36bf35058f17fde58db0ef954cb3", "mode": "0600", "owner": "ubuntu", "size": 252, "src": "/home/ubuntu/.ansible/tmp/ansible-tmp-1757121084.357995-3714-254973237948721/source", "state": "file", "uid": 1000***
+2025-09-06T01:11:26.5086245Z 
+2025-09-06T01:11:26.5086766Z TASK [Set PYTHONPATH environment variable] *************************************
+2025-09-06T01:11:27.6415808Z ok: [***] => ***"backup": "", "changed": false, "msg": ""***
+2025-09-06T01:11:27.6416473Z 
+2025-09-06T01:11:27.6416961Z TASK [Test Python imports] *****************************************************
+2025-09-06T01:11:30.1202530Z changed: [***] => ***"changed": true, "cmd": ["python3", "-c", "import sys; print('Python path:', sys.path); import src.participation_bot"], "delta": "0:00:01.463591", "end": "2025-09-06 01:11:29.985886", "failed_when_result": false, "msg": "", "rc": 0, "start": "2025-09-06 01:11:28.522295", "stderr": "", "stderr_lines": [], "stdout": "Python path: ['', '/app', '/app/$PYTHONPATH', '/usr/lib/python310.zip', '/usr/lib/python3.10', '/usr/lib/python3.10/lib-dynload', '/root/.local/lib/python3.10/site-packages', '/usr/local/lib/python3.10/dist-packages', '/usr/lib/python3/dist-packages']\nWarning: GITHUB_TOKEN not set or using dummy value\nWarning: WEBHOOK_URL not set or using default value\nWarning: UEX_API_KEY not set or using dummy value", "stdout_lines": ["Python path: ['', '/app', '/app/$PYTHONPATH', '/usr/lib/python310.zip', '/usr/lib/python3.10', '/usr/lib/python3.10/lib-dynload', '/root/.local/lib/python3.10/site-packages', '/usr/local/lib/python3.10/dist-packages', '/usr/lib/python3/dist-packages']", "Warning: GITHUB_TOKEN not set or using dummy value", "Warning: WEBHOOK_URL not set or using default value", "Warning: UEX_API_KEY not set or using dummy value"]***
+2025-09-06T01:11:30.1208614Z 
+2025-09-06T01:11:30.1208953Z TASK [Start bot service] *******************************************************
+2025-09-06T01:11:30.1464786Z included: /home/runner/work/red-legion-bots/red-legion-bots/ansible/tasks/start_bot.yml for ***
+2025-09-06T01:11:30.1465583Z 
+2025-09-06T01:11:30.1466051Z TASK [Test Python imports before starting bot] *********************************
+2025-09-06T01:11:34.3574860Z changed: [***] => ***"changed": true, "cmd": ["python3", "-c", "import src.participation_bot; print('Import successful')"], "delta": "0:00:02.771271", "end": "2025-09-06 01:11:33.850624", "msg": "", "rc": 0, "start": "2025-09-06 01:11:31.079353", "stderr": "", "stderr_lines": [], "stdout": "Warning: GITHUB_TOKEN not set or using dummy value\nWarning: WEBHOOK_URL not set or using default value\nWarning: UEX_API_KEY not set or using dummy value\nImport successful", "stdout_lines": ["Warning: GITHUB_TOKEN not set or using dummy value", "Warning: WEBHOOK_URL not set or using default value", "Warning: UEX_API_KEY not set or using dummy value", "Import successful"]***
+2025-09-06T01:11:34.3578484Z 
+2025-09-06T01:11:34.3578994Z TASK [Show import test result] *************************************************
+2025-09-06T01:11:34.3828843Z ok: [***] => ***
+2025-09-06T01:11:34.3830825Z     "msg": "Import test result: Warning: GITHUB_TOKEN not set or using dummy value\nWarning: WEBHOOK_URL not set or using default value\nWarning: UEX_API_KEY not set or using dummy value\nImport successful"
+2025-09-06T01:11:34.3832942Z ***
+2025-09-06T01:11:34.3833275Z 
+2025-09-06T01:11:34.3833742Z TASK [Start bot process] *******************************************************
+2025-09-06T01:11:38.1417403Z changed: [***] => ***"changed": true, "cmd": "#!/bin/bash\ncd /app\nexport PYTHONPATH=\"/app:$PYTHONPATH\"\n\n# Load environment variables from .env file\nif [ -f .env ]; then\n  set -a  # automatically export all variables\n  . .env  # use . instead of source for compatibility\n  set +a\nfi\n\necho \"Starting bot with environment:\"\necho \"DISCORD_TOKEN: $***DISCORD_TOKEN:0:10***...\"\necho \"DATABASE_URL: $***DATABASE_URL:0:20***...\"\necho \"TEXT_CHANNEL_ID: $TEXT_CHANNEL_ID\"\necho \"PYTHONPATH: $PYTHONPATH\"\n\nnohup python3 -m src.participation_bot > /app/bot.log 2>&1 &\nBOT_PID=$!\necho $BOT_PID > /app/bot.pid\necho \"Bot started with PID: $BOT_PID\"\nsleep 2\n\nif kill -0 $BOT_PID 2>/dev/null; then\n  echo \"Bot process is running\"\nelse\n  echo \"Bot process failed to start or died immediately\"\n  if [ -f /app/bot.log ]; then\n    echo \"Bot log contents:\"\n    cat /app/bot.log\n  fi\nfi\n", "delta": "0:00:02.011935", "end": "2025-09-06 01:11:37.341402", "msg": "", "rc": 0, "start": "2025-09-06 01:11:35.329467", "stderr": "", "stderr_lines": [], "stdout": "Starting bot with environment:\nDISCORD_TOKEN: MTQxMTc4ND...\nDATABASE_URL: postgresql://event_u...\nTEXT_CHANNEL_ID: ***\nPYTHONPATH: /app:/app:$PYTHONPATH\nBot started with PID: 50289\nBot process is running", "stdout_lines": ["Starting bot with environment:", "DISCORD_TOKEN: MTQxMTc4ND...", "DATABASE_URL: postgresql://event_u...", "TEXT_CHANNEL_ID: ***", "PYTHONPATH: /app:/app:$PYTHONPATH", "Bot started with PID: 50289", "Bot process is running"]***
+2025-09-06T01:11:38.1423118Z 
+2025-09-06T01:11:38.1423440Z TASK [Show startup debug info] *************************************************
+2025-09-06T01:11:38.1667125Z ok: [***] => ***
+2025-09-06T01:11:38.1667645Z     "msg": [
+2025-09-06T01:11:38.1668129Z         "Starting bot with environment:",
+2025-09-06T01:11:38.1668733Z         "DISCORD_TOKEN: MTQxMTc4ND...",
+2025-09-06T01:11:38.1669333Z         "DATABASE_URL: postgresql://event_u...",
+2025-09-06T01:11:38.1670164Z         "TEXT_CHANNEL_ID: ***",
+2025-09-06T01:11:38.1670701Z         "PYTHONPATH: /app:/app:$PYTHONPATH",
+2025-09-06T01:11:38.1671279Z         "Bot started with PID: 50289",
+2025-09-06T01:11:38.1671797Z         "Bot process is running"
+2025-09-06T01:11:38.1672258Z     ]
+2025-09-06T01:11:38.1672657Z ***
+2025-09-06T01:11:38.1672863Z 
+2025-09-06T01:11:38.1673169Z TASK [Wait for bot to start] ***************************************************
+2025-09-06T01:11:41.1907993Z Pausing for 3 seconds
+2025-09-06T01:11:41.1909271Z ok: [***] => ***"changed": false, "delta": 3, "echo": true, "rc": 0, "start": "2025-09-06 01:11:38.177397", "stderr": "", "stdout": "Paused for 3.0 seconds", "stop": "2025-09-06 01:11:41.181570", "user_input": ""***
+2025-09-06T01:11:41.1910416Z 
+2025-09-06T01:11:41.1910818Z TASK [Verify bot process is running] *******************************************
+2025-09-06T01:11:42.3198726Z changed: [***] => ***"changed": true, "cmd": "#!/bin/bash\nif [ -f \"/app/bot.pid\" ]; then\n  kill -0 $(cat /app/bot.pid) 2>/dev/null\nelse\n  exit 1\nfi\n", "delta": "0:00:00.013452", "end": "2025-09-06 01:11:42.180753", "failed_when_result": false, "msg": "", "rc": 0, "start": "2025-09-06 01:11:42.167301", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []***
+2025-09-06T01:11:42.3200265Z 
+2025-09-06T01:11:42.3200598Z TASK [Show bot log if startup failed] ******************************************
+2025-09-06T01:11:42.3510281Z skipping: [***] => ***"changed": false, "false_condition": "(bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)", "skip_reason": "Conditional result was False"***
+2025-09-06T01:11:42.3511224Z 
+2025-09-06T01:11:42.3511532Z TASK [Fail with bot log] *******************************************************
+2025-09-06T01:11:42.3817934Z skipping: [***] => ***"changed": false, "false_condition": "(bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)", "skip_reason": "Conditional result was False"***
+2025-09-06T01:11:42.3818887Z 
+2025-09-06T01:11:42.3819209Z TASK [Verify bot is running] ***************************************************
+2025-09-06T01:11:42.4086694Z included: /home/runner/work/red-legion-bots/red-legion-bots/ansible/tasks/verify_bot.yml for ***
+2025-09-06T01:11:42.4087490Z 
+2025-09-06T01:11:42.4087902Z TASK [Check if bot PID file exists] ********************************************
+2025-09-06T01:11:43.4307199Z ok: [***] => ***"changed": false, "stat": ***"atime": 1757121102.1787398, "attr_flags": "e", "attributes": ["extents"], "block_size": 4096, "blocks": 8, "charset": "us-ascii", "checksum": "ad83e83278cbe51685138b483d2b1e681da89d51", "ctime": 1757121095.3351812, "dev": 2049, "device_type": 0, "executable": false, "exists": true, "gid": 0, "gr_name": "root", "inode": 774214, "isblk": false, "ischr": false, "isdir": false, "isfifo": false, "isgid": false, "islnk": false, "isreg": true, "issock": false, "isuid": false, "mimetype": "text/plain", "mode": "0644", "mtime": 1757121095.3351812, "nlink": 1, "path": "/app/bot.pid", "pw_name": "root", "readable": true, "rgrp": true, "roth": true, "rusr": true, "size": 6, "uid": 0, "version": "2616755310", "wgrp": false, "woth": false, "writeable": true, "wusr": true, "xgrp": false, "xoth": false, "xusr": false***
+2025-09-06T01:11:43.4311967Z 
+2025-09-06T01:11:43.4312483Z TASK [Verify bot process is running] *******************************************
+2025-09-06T01:11:44.4595350Z changed: [***] => ***"changed": true, "cmd": "kill -0 $(cat /app/bot.pid)", "delta": "0:00:00.006934", "end": "2025-09-06 01:11:44.320658", "failed_when_result": false, "msg": "", "rc": 0, "start": "2025-09-06 01:11:44.313724", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []***
+2025-09-06T01:11:44.4597299Z 
+2025-09-06T01:11:44.4597727Z TASK [Check bot log for errors] ************************************************
+2025-09-06T01:11:45.4572661Z changed: [***] => ***"changed": true, "cmd": ["tail", "-20", "/app/bot.log"], "delta": "0:00:00.006268", "end": "2025-09-06 01:11:45.327556", "msg": "", "rc": 0, "start": "2025-09-06 01:11:45.321288", "stderr": "", "stderr_lines": [], "stdout": "[2025-09-06 01:11:38] [INFO    ] discord.client: logging in using static token\n[2025-09-06 01:11:38] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 726749e57bceef7313f476817e03f980).", "stdout_lines": ["[2025-09-06 01:11:38] [INFO    ] discord.client: logging in using static token", "[2025-09-06 01:11:38] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 726749e57bceef7313f476817e03f980)."]***
+2025-09-06T01:11:45.4574792Z 
+2025-09-06T01:11:45.4575129Z TASK [Display recent log entries] **********************************************
+2025-09-06T01:11:45.4821360Z ok: [***] => ***
+2025-09-06T01:11:45.4822613Z     "msg": "[2025-09-06 01:11:38] [INFO    ] discord.client: logging in using static token\n[2025-09-06 01:11:38] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 726749e57bceef7313f476817e03f980)."
+2025-09-06T01:11:45.4839122Z ***
+2025-09-06T01:11:45.4839652Z 
+2025-09-06T01:11:45.4840166Z TASK [Check for error patterns in log] *****************************************
+2025-09-06T01:11:46.4757943Z changed: [***] => ***"changed": true, "cmd": "grep -i \"ERROR\\|Exception\\|Failed\" /app/bot.log", "delta": "0:00:00.006760", "end": "2025-09-06 01:11:46.346878", "failed_when_result": false, "msg": "non-zero return code", "rc": 1, "start": "2025-09-06 01:11:46.340118", "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []***
+2025-09-06T01:11:46.4759078Z 
+2025-09-06T01:11:46.4759378Z TASK [Read PID from file] ******************************************************
+2025-09-06T01:11:47.4357166Z ok: [***] => ***"changed": false, "content": "NTAyODkK", "encoding": "base64", "source": "/app/bot.pid"***
+2025-09-06T01:11:47.4358066Z 
+2025-09-06T01:11:47.4358420Z TASK [Report successful deployment] ********************************************
+2025-09-06T01:11:47.4640070Z fatal: [***]: FAILED! => ***"msg": "The 'file' lookup had an issue accessing the file '/app/bot.pid'. file not found, use -vvvvv to see paths searched"***
+2025-09-06T01:11:47.4641143Z 
+2025-09-06T01:11:47.4641456Z PLAY RECAP *********************************************************************
+2025-09-06T01:11:47.4642292Z ***               : ok=36   changed=16   unreachable=0    failed=1    skipped=3    rescued=0    ignored=1   
+2025-09-06T01:11:47.4642771Z 
+2025-09-06T01:11:47.5131315Z ##[error]Process completed with exit code 2.
