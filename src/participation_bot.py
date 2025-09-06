@@ -408,6 +408,11 @@ if __name__ == "__main__":
     print(f"Discord token length: {len(DISCORD_TOKEN) if DISCORD_TOKEN else 'None'}")
     print(f"Database URL configured: {'Yes' if DATABASE_URL else 'No'}")
     
+    # Register commands before starting the bot
+    print("Setting up commands...")
+    setup_commands()
+    print("Commands setup complete")
+    
     try:
         print("Calling bot.run()...")
         bot.run(DISCORD_TOKEN)
