@@ -1,7 +1,5 @@
 import discord
 import datetime  # Add this import
-import asyncio
-import logging
 from discord.ext import commands
 from .config import DATABASE_URL
 from .database import init_db, add_market_item, get_market_items, issue_loan
@@ -124,14 +122,6 @@ def setup_commands():
                 process = psutil.Process(os.getpid())
                 memory_mb = process.memory_info().rss / 1024 / 1024
                 
-                health_info = {
-                    'status': 'healthy',
-                    'uptime': str(uptime),
-                    'guilds': guild_count,
-                    'memory_mb': round(memory_mb, 2),
-                    'timestamp': datetime.datetime.now().isoformat()
-                }
-                
                 embed = discord.Embed(
                     title="🟢 Bot Health Status", 
                     description="Bot is running normally",
@@ -250,7 +240,7 @@ def setup_commands():
                         test_results.append(f"✅ Voice channels ({len(guild.voice_channels)})")
                     else:
                         test_results.append("⚠️ No guild context")
-                except Exception as e:
+                except Exception:
                     test_results.append("❌ Guild access failed")
                 
                 # Test 2: Can check user permissions
@@ -259,7 +249,7 @@ def setup_commands():
                         test_results.append("✅ User permissions")
                     else:
                         test_results.append("⚠️ No user context")
-                except:
+                except Exception:
                     test_results.append("❌ User permission check failed")
                 
                 embed.add_field(
@@ -355,8 +345,8 @@ def setup_commands():
                     conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
                     cursor = conn.cursor()
                     cursor.execute("SELECT version();")
-                    version = cursor.fetchone()[0]
-                    db_test = f"✅ Connected (PostgreSQL)"
+                    cursor.fetchone()[0]  # Just test the connection, don't store
+                    db_test = "✅ Connected (PostgreSQL)"
                     conn.close()
                 except Exception as e:
                     db_test = f"❌ Error: {str(e)[:40]}"
@@ -371,8 +361,8 @@ def setup_commands():
                 infra_info = []
                 project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
                 infra_info.append(f"📍 Project: {project_id}")
-                infra_info.append(f"🏗️ Instance: arccorp-compute")
-                infra_info.append(f"🗄️ Database: arccorp-data-nexus")
+                infra_info.append("🏗️ Instance: arccorp-compute")
+                infra_info.append("🗄️ Database: arccorp-data-nexus")
                 
                 embed.add_field(
                     name="🏗️ Infrastructure",
@@ -452,7 +442,7 @@ async def on_ready():
         
         # Start heartbeat task
         import asyncio
-        heartbeat_task = asyncio.create_task(heartbeat())
+        asyncio.create_task(heartbeat())  # Start task but don't store reference
         print("Heartbeat monitoring started")
         
     except Exception as e:
@@ -483,7 +473,7 @@ async def on_command_error(ctx, error):
     # Send error message to user but don't crash
     try:
         await ctx.send(f"⚠️ Command error: {str(error)}")
-    except:
+    except Exception:
         pass  # Don't crash if we can't send the error message
 
 # Add a disconnect handler to log when bot disconnects
