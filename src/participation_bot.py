@@ -5,10 +5,8 @@ This is the main bot file that initializes and runs the Red Legion Discord bot.
 The bot now uses a modular architecture with feature-specific command modules.
 """
 
-import discord
 import datetime
 import asyncio
-from discord.ext import commands
 
 # Import configuration and database utilities
 from .config import DISCORD_TOKEN, get_database_url
