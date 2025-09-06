@@ -14,40 +14,41 @@
     msg: "Import test result: {{ import_test.stdout if import_test.rc == 0 else import_test.stderr }}"
   when: not ansible_check_mode and import_test is defined
 
-- name: Start bot process
-  shell: |
-    #!/bin/bash
-    cd {{ app_dir }}
-    export PYTHONPATH="{{ app_dir }}:$PYTHONPATH"
-    
-    # Load environment variables from .env file
-    if [ -f .env ]; then
-      set -a  # automatically export all variables
-      . .env  # use . instead of source for compatibility
-      set +a
-    fi
-    
-    echo "Starting bot with environment:"
-    echo "DISCORD_TOKEN: ${DISCORD_TOKEN:0:10}..."
-    echo "DATABASE_URL: ${DATABASE_URL:0:20}..."
-    echo "TEXT_CHANNEL_ID: $TEXT_CHANNEL_ID"
-    echo "PYTHONPATH: $PYTHONPATH"
-    
-    nohup python3 -m src.participation_bot > {{ app_dir }}/bot.log 2>&1 &
-    BOT_PID=$!
-    echo $BOT_PID > {{ app_dir }}/bot.pid
-    echo "Bot started with PID: $BOT_PID"
-    sleep 2
-    
-    if kill -0 $BOT_PID 2>/dev/null; then
-      echo "Bot process is running"
-    else
-      echo "Bot process failed to start or died immediately"
-      if [ -f {{ app_dir }}/bot.log ]; then
-        echo "Bot log contents:"
-        cat {{ app_dir }}/bot.log
-      fi
-    fi
+- name: Create systemd service file
+  template:
+    content: |
+      [Unit]
+      Description=Red Legion Discord Bot
+      After=network.target
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory={{ app_dir }}
+      ExecStart=/usr/bin/python3 -m src.participation_bot
+      Restart=always
+      RestartSec=10
+      StandardOutput=journal
+      StandardError=journal
+      Environment=PYTHONUNBUFFERED=1
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/red-legion-bot.service
+    mode: '0644'
+  notify: reload systemd
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start systemd service
+  systemd:
+    name: red-legion-bot
+    enabled: yes
+    state: started
   args:
     executable: /bin/bash
   register: start_result

@@ -187,6 +187,12 @@
     - name: Set up environment variables
       include_tasks: tasks/setup_environment.yml
 
+    - name: Remove any cached .env files that might cause conflicts
+      file:
+        path: "{{ app_dir }}/.env"
+        state: absent
+      ignore_errors: true
+
     - name: Test Python imports
       command: python3 -c "import sys; print('Python path:', sys.path); import src.participation_bot"
       args:
@@ -211,3 +217,8 @@
         - "{{ app_dir }}/.git"
         - "{{ app_dir }}/ansible"
         - "{{ app_dir }}/tests"
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
