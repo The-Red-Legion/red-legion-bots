@@ -479,11 +479,11 @@ def setup_commands():
                         db_test = "❌ Error: DATABASE_URL not configured"
                     else:
                         conn = psycopg2.connect(db_url, connect_timeout=5)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT version();")
-                    cursor.fetchone()[0]  # Just test the connection, don't store
-                    db_test = "✅ Connected (PostgreSQL)"
-                    conn.close()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT version();")
+                        cursor.fetchone()[0]  # Just test the connection, don't store
+                        db_test = "✅ Connected (PostgreSQL)"
+                        conn.close()
                 except Exception as e:
                     db_test = f"❌ Error: {str(e)[:40]}"
                 
