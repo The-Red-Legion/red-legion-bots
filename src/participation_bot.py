@@ -676,7 +676,7 @@ async def on_ready():
         
         # Start heartbeat task
         import asyncio
-        asyncio.create_task(heartbeat())  # Start task but don't store reference
+        bot.heartbeat_task = asyncio.create_task(heartbeat())  # Store reference to prevent GC
         print("Heartbeat monitoring started")
         
     except Exception as e:
