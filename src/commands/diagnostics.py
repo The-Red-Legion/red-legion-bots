@@ -91,7 +91,7 @@ def register_commands(bot):
                 # Try to get database URL from config
                 try:
                     db_url = config_get_db_url()
-                except:
+                except Exception:
                     db_url = get_database_url()
                 
                 if not db_url:
