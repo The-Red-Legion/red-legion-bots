@@ -15,34 +15,13 @@ from .config import DISCORD_TOKEN, get_database_url
 from .database import init_db
 
 # Import our new modular components
-from .core.bot_setup import create_bot_instance, setup_bot_events, setup_heartbeat
+from .core.bot_setup import create_bot_instance, setup_heartbeat
 from .commands import register_all_commands
 from .handlers.voice_tracking import start_voice_tracking
 from .event_handlers import setup_event_handlers
 
 # Create bot instance using our core setup
 bot = create_bot_instance()
-
-
-# Setup functions for modular architecture
-async def setup_event_handlers():
-    """Set up event handlers using our modular system."""
-    try:
-        # Import and register voice state handler
-        from .event_handlers import on_voice_state_update
-        bot.add_listener(on_voice_state_update, 'on_voice_state_update')
-        print("✅ Voice state update handler registered")
-        
-        # Set up core event handlers
-        from .handlers.core import setup_core_handlers
-        await setup_core_handlers(bot)
-        print("✅ Core event handlers registered")
-        
-    except Exception as e:
-        print(f"❌ ERROR registering event handlers: {e}")
-        import traceback
-        print("Full traceback:")
-        print(traceback.format_exc())
 
 
 def setup_commands():
