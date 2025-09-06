@@ -628,7 +628,7 @@ def setup_commands():
 
 @bot.event
 async def on_ready():
-    bot.start_time = datetime.now()  # Add this line
+    bot.start_time = datetime.datetime.now()  # Add this line
     
     print(f'Logged in as {bot.user}')
     print(f'Bot is ready and connected to {len(bot.guilds)} servers')
