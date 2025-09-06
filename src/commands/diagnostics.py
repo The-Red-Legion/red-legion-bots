@@ -85,14 +85,10 @@ def register_commands(bot):
             # Test database connection
             db_status = "❌ Not tested"
             try:
-                from ..database import get_database_url
-                from ..config import get_database_url as config_get_db_url
+                from ..config import get_database_url
                 
                 # Try to get database URL from config
-                try:
-                    db_url = config_get_db_url()
-                except Exception:
-                    db_url = get_database_url()
+                db_url = get_database_url()
                 
                 if not db_url:
                     db_status = "❌ DATABASE_URL not configured"
