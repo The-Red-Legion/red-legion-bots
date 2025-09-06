@@ -44,8 +44,8 @@ async def on_voice_state_update(member, before, after):
                     
                     db_url = get_database_url()
                     if db_url:
-                        # Check if member has org role (simplified check)
-                        is_org_member = True  # TODO: Implement proper role checking
+                        # Check if member has org role
+                        is_org_member = has_org_role(member)
                         
                         save_participation(
                             db_url, 
