@@ -18,15 +18,36 @@ def register_all_commands(bot):
     Args:
         bot: The Discord bot instance
     """
-    from . import market, loans, events, mining, diagnostics, admin, general
-    
-    # Register commands from each module
-    market.register_commands(bot)
-    loans.register_commands(bot)
-    events.register_commands(bot)
-    mining.register_commands(bot)
-    diagnostics.register_commands(bot)
-    admin.register_commands(bot)
-    general.register_commands(bot)
-    
-    print("✅ All command modules registered successfully")
+    try:
+        from . import market, loans, events, mining, diagnostics, admin, general
+        
+        # Register commands from each module
+        print("  📦 Registering market commands...")
+        market.register_commands(bot)
+        
+        print("  💰 Registering loan commands...")
+        loans.register_commands(bot)
+        
+        print("  🎯 Registering event commands...")
+        events.register_commands(bot)
+        
+        print("  ⛏️ Registering mining commands...")
+        mining.register_commands(bot)
+        
+        print("  🔍 Registering diagnostic commands...")
+        diagnostics.register_commands(bot)
+        
+        print("  🛡️ Registering admin commands...")
+        admin.register_commands(bot)
+        
+        print("  🏓 Registering general commands...")
+        general.register_commands(bot)
+        
+        print("✅ All command modules registered successfully")
+        
+    except Exception as e:
+        print(f"❌ Error registering command modules: {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
+        raise

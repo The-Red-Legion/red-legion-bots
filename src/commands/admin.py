@@ -35,15 +35,8 @@ def register_commands(bot):
             try:
                 from ..config import get_config
                 
-                # Clear any cached config values
-                global DATABASE_URL
-                DATABASE_URL = None
-                
                 # Get fresh config
                 new_config = get_config()
-                
-                # Update global variables
-                DATABASE_URL = new_config.get('DATABASE_URL')
                 
                 # Update embed with success
                 embed.title = "✅ Configuration Refreshed"
@@ -53,7 +46,7 @@ def register_commands(bot):
                 # Add status fields
                 embed.add_field(
                     name="Database URL", 
-                    value="✅ Updated" if DATABASE_URL else "❌ Not found", 
+                    value="✅ Updated" if new_config.get('DATABASE_URL') else "❌ Not found", 
                     inline=True
                 )
                 embed.add_field(

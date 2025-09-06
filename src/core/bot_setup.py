@@ -30,48 +30,9 @@ async def setup_bot_events(bot):
     Args:
         bot: The Discord bot instance
     """
-    
-    @bot.event
-    async def on_ready():
-        bot.start_time = datetime.datetime.now()
-        
-        print(f'Logged in as {bot.user}')
-        print(f'Bot is ready and connected to {len(bot.guilds)} servers')
-        print(f"🤖 {bot.user} has connected to Discord!")
-        print(f"📅 Bot started at: {bot.start_time}")
-        print(f"🏠 Connected to {len(bot.guilds)} guilds")
-        
-        # Log guild information
-        for guild in bot.guilds:
-            print(f'Connected to guild: {guild.name} (ID: {guild.id})')
-
-    @bot.event
-    async def on_error(event, *args, **kwargs):
-        print(f'DISCORD EVENT ERROR in event {event}')
-        print(f'Args: {args}')
-        print(f'Kwargs: {kwargs}')
-        import traceback
-        print("Full traceback:")
-        print(traceback.format_exc())
-
-    @bot.event
-    async def on_command_error(ctx, error):
-        print(f'COMMAND ERROR in command {ctx.command}: {error}')
-        import traceback
-        print("Full traceback:")
-        print(traceback.format_exc())
-        try:
-            await ctx.send(f"⚠️ Command error: {str(error)}")
-        except Exception:
-            pass
-
-    @bot.event
-    async def on_disconnect():
-        print("⚠️  Bot disconnected from Discord!")
-
-    @bot.event
-    async def on_resumed():
-        print("✅ Bot resumed connection to Discord!")
+    # Note: Events are now handled in handlers/core.py
+    # This function is kept for backwards compatibility
+    pass
 
 
 async def setup_heartbeat(bot):
