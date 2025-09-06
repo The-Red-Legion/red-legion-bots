@@ -338,26 +338,26 @@ def setup_commands():
                         embed.color = discord.Color.red()
                     else:
                         conn = psycopg2.connect(current_db_url, connect_timeout=10)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT version();")
-                    version_info = cursor.fetchone()[0]
-                    cursor.execute("SELECT current_database();")
-                    db_name = cursor.fetchone()[0]
-                    cursor.execute("SELECT current_user;")
-                    db_user = cursor.fetchone()[0]
-                    
-                    embed.add_field(
-                        name="✅ Connection Status",
-                        value="Successfully connected to database",
-                        inline=False
-                    )
-                    embed.add_field(
-                        name="📋 Database Info",
-                        value=f"**Database**: {db_name}\n**User**: {db_user}\n**Version**: {version_info[:50]}...",
-                        inline=False
-                    )
-                    embed.color = discord.Color.green()
-                    conn.close()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT version();")
+                        version_info = cursor.fetchone()[0]
+                        cursor.execute("SELECT current_database();")
+                        db_name = cursor.fetchone()[0]
+                        cursor.execute("SELECT current_user;")
+                        db_user = cursor.fetchone()[0]
+                        
+                        embed.add_field(
+                            name="✅ Connection Status",
+                            value="Successfully connected to database",
+                            inline=False
+                        )
+                        embed.add_field(
+                            name="📋 Database Info",
+                            value=f"**Database**: {db_name}\n**User**: {db_user}\n**Version**: {version_info[:50]}...",
+                            inline=False
+                        )
+                        embed.color = discord.Color.green()
+                        conn.close()
                     
                 except psycopg2.OperationalError as e:
                     error_msg = str(e)
