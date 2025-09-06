@@ -38,10 +38,3 @@
   debug:
     msg: "✅ Bot deployment successful! PID: {{ (pid_content.content | b64decode).strip() }}"
   when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and process_check is defined and (process_check.rc | default(0)) == 0 and pid_content is defined and not ansible_check_mode
-
-- name: Remove PID file
-  file:
-    path: "{{ app_dir }}/bot.pid"
-    state: absent
-  when: not ansible_check_mode
-  ignore_errors: true
