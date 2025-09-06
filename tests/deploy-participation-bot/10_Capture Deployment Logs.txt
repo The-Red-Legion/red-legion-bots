@@ -1,0 +1,101 @@
+﻿2025-09-06T02:13:08.3139143Z ##[group]Run echo "=== Final deployment status ==="
+2025-09-06T02:13:08.3139845Z [36;1mecho "=== Final deployment status ==="[0m
+2025-09-06T02:13:08.3140406Z [36;1m[0m
+2025-09-06T02:13:08.3140929Z [36;1m# SSH into remote host to check deployment status[0m
+2025-09-06T02:13:08.3141699Z [36;1mssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@*** << 'EOF'[0m
+2025-09-06T02:13:08.3142397Z [36;1m  # Check if this is a first deployment[0m
+2025-09-06T02:13:08.3142975Z [36;1m  if [ ! -d /app ]; then[0m
+2025-09-06T02:13:08.3143962Z [36;1m    echo "ℹ️  First deployment in progress - /app directory does not exist yet"[0m
+2025-09-06T02:13:08.3144705Z [36;1m    echo "This is normal during initial setup"[0m
+2025-09-06T02:13:08.3145350Z [36;1m    echo "=== System resource check ==="[0m
+2025-09-06T02:13:08.3145956Z [36;1m    free -h || echo "Could not check memory"[0m
+2025-09-06T02:13:08.3146595Z [36;1m    echo "=== Deployment log capture completed ==="[0m
+2025-09-06T02:13:08.3147405Z [36;1m    exit 0[0m
+2025-09-06T02:13:08.3147917Z [36;1m  fi[0m
+2025-09-06T02:13:08.3148374Z [36;1m  [0m
+2025-09-06T02:13:08.3148839Z [36;1m  # Show bot status[0m
+2025-09-06T02:13:08.3149368Z [36;1m  if [ -f /app/bot.pid ]; then[0m
+2025-09-06T02:13:08.3149980Z [36;1m    if kill -0 $(cat /app/bot.pid) 2>/dev/null; then[0m
+2025-09-06T02:13:08.3150634Z [36;1m      echo "✅ Bot is running (PID: $(cat /app/bot.pid))"[0m
+2025-09-06T02:13:08.3151233Z [36;1m    else[0m
+2025-09-06T02:13:08.3151757Z [36;1m      echo "❌ Bot process exists but is not running"[0m
+2025-09-06T02:13:08.3152332Z [36;1m    fi[0m
+2025-09-06T02:13:08.3152793Z [36;1m  else[0m
+2025-09-06T02:13:08.3153392Z [36;1m    echo "❌ No bot PID file found"[0m
+2025-09-06T02:13:08.3153939Z [36;1m  fi[0m
+2025-09-06T02:13:08.3154395Z [36;1m  [0m
+2025-09-06T02:13:08.3154855Z [36;1m  # Show recent logs[0m
+2025-09-06T02:13:08.3155374Z [36;1m  if [ -f /app/bot.log ]; then[0m
+2025-09-06T02:13:08.3155956Z [36;1m    echo "=== Last 20 lines of bot log ==="[0m
+2025-09-06T02:13:08.3156535Z [36;1m    tail -20 /app/bot.log[0m
+2025-09-06T02:13:08.3157055Z [36;1m  else[0m
+2025-09-06T02:13:08.3157548Z [36;1m    echo "❌ No bot log file found"[0m
+2025-09-06T02:13:08.3158090Z [36;1m  fi[0m
+2025-09-06T02:13:08.3158543Z [36;1m  [0m
+2025-09-06T02:13:08.3159014Z [36;1m  # Check system resources[0m
+2025-09-06T02:13:08.3159568Z [36;1m  echo "=== System resource check ==="[0m
+2025-09-06T02:13:08.3160137Z [36;1m  if [ -d /app ]; then[0m
+2025-09-06T02:13:08.3160721Z [36;1m    df -h /app || echo "Could not check disk space for /app"[0m
+2025-09-06T02:13:08.3161324Z [36;1m  else[0m
+2025-09-06T02:13:08.3161997Z [36;1m    df -h / || echo "Could not check disk space"[0m
+2025-09-06T02:13:08.3162592Z [36;1m  fi[0m
+2025-09-06T02:13:08.3163189Z [36;1m  free -h || echo "Could not check memory"[0m
+2025-09-06T02:13:08.3163747Z [36;1m  [0m
+2025-09-06T02:13:08.3164257Z [36;1m  echo "=== Deployment log capture completed ==="[0m
+2025-09-06T02:13:08.3164847Z [36;1mEOF[0m
+2025-09-06T02:13:08.3195141Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail ***0***
+2025-09-06T02:13:08.3195786Z env:
+2025-09-06T02:13:08.3196540Z   DATABASE_URL: ***
+2025-09-06T02:13:08.3197104Z   pythonLocation: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T02:13:08.3197836Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.9.23/x64/lib/pkgconfig
+2025-09-06T02:13:08.3198560Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T02:13:08.3199219Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T02:13:08.3199874Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.23/x64
+2025-09-06T02:13:08.3200536Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.9.23/x64/lib
+2025-09-06T02:13:08.3201459Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-50486cd06a6c0f8b.json
+2025-09-06T02:13:08.3202555Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-50486cd06a6c0f8b.json
+2025-09-06T02:13:08.3203936Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-50486cd06a6c0f8b.json
+2025-09-06T02:13:08.3204730Z   CLOUDSDK_CORE_PROJECT: rl-prod-471116
+2025-09-06T02:13:08.3205291Z   CLOUDSDK_PROJECT: rl-prod-471116
+2025-09-06T02:13:08.3205826Z   GCLOUD_PROJECT: rl-prod-471116
+2025-09-06T02:13:08.3206347Z   GCP_PROJECT: rl-prod-471116
+2025-09-06T02:13:08.3206878Z   GOOGLE_CLOUD_PROJECT: rl-prod-471116
+2025-09-06T02:13:08.3207414Z ##[endgroup]
+2025-09-06T02:13:08.3260525Z === Final deployment status ===
+2025-09-06T02:13:08.3297598Z Pseudo-terminal will not be allocated because stdin is not a terminal.
+2025-09-06T02:13:09.9595639Z Welcome to Ubuntu 22.04.5 LTS (GNU/Linux 6.8.0-1037-gcp x86_64)
+2025-09-06T02:13:09.9596381Z 
+2025-09-06T02:13:09.9596736Z  * Documentation:  https://help.ubuntu.com
+2025-09-06T02:13:09.9597548Z  * Management:     https://landscape.canonical.com
+2025-09-06T02:13:09.9598780Z  * Support:        https://ubuntu.com/pro
+2025-09-06T02:13:09.9599140Z 
+2025-09-06T02:13:09.9599422Z  System information as of Sat Sep  6 02:13:02 UTC 2025
+2025-09-06T02:13:09.9599789Z 
+2025-09-06T02:13:09.9600069Z   System load:  0.49              Processes:             103
+2025-09-06T02:13:09.9600717Z   Usage of /:   34.1% of 9.51GB   Users logged in:       0
+2025-09-06T02:13:09.9601368Z   Memory usage: 61%               IPv4 address for ens4: 10.128.0.5
+2025-09-06T02:13:09.9601970Z   Swap usage:   0%
+2025-09-06T02:13:09.9602239Z 
+2025-09-06T02:13:09.9602244Z 
+2025-09-06T02:13:09.9602548Z Expanded Security Maintenance for Applications is not enabled.
+2025-09-06T02:13:09.9602959Z 
+2025-09-06T02:13:09.9603482Z 0 updates can be applied immediately.
+2025-09-06T02:13:09.9603812Z 
+2025-09-06T02:13:09.9604105Z Enable ESM Apps to receive additional future security updates.
+2025-09-06T02:13:09.9604761Z See https://ubuntu.com/esm or run: sudo pro status
+2025-09-06T02:13:09.9605130Z 
+2025-09-06T02:13:09.9605363Z New release '24.04.3 LTS' available.
+2025-09-06T02:13:09.9605925Z Run 'do-release-upgrade' to upgrade to it.
+2025-09-06T02:13:09.9606266Z 
+2025-09-06T02:13:09.9606270Z 
+2025-09-06T02:13:09.9834344Z ❌ Bot process exists but is not running
+2025-09-06T02:13:09.9835317Z === Last 20 lines of bot log ===
+2025-09-06T02:13:09.9873481Z [2025-09-06 02:12:22] [INFO    ] discord.client: logging in using static token
+2025-09-06T02:13:09.9874897Z [2025-09-06 02:12:23] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: f9db1e0e4d86916cdba1e92d77b217f6).
+2025-09-06T02:13:09.9875910Z === System resource check ===
+2025-09-06T02:13:10.1939781Z Filesystem      Size  Used Avail Use% Mounted on
+2025-09-06T02:13:10.1940636Z /dev/root       9.6G  3.3G  6.3G  35% /
+2025-09-06T02:13:10.2052590Z                total        used        free      shared  buff/cache   available
+2025-09-06T02:13:10.2053722Z Mem:           554Mi       305Mi        55Mi       0.0Ki       193Mi       152Mi
+2025-09-06T02:13:10.2054589Z Swap:             0B          0B          0B
+2025-09-06T02:13:10.2074976Z === Deployment log capture completed ===

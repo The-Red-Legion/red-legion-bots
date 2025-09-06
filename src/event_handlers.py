@@ -1,5 +1,5 @@
 import discord
-from discord.ext import tasks
+from discord.ext import tasks, commands
 import datetime
 import time
 import random
@@ -19,29 +19,35 @@ member_times = {}
 last_checks = {}
 
 async def on_voice_state_update(member, before, after):
-    for channel_id, active_channel in list(active_voice_channels.items()):
-        if active_channel:
-            current_time = time.time()
-            if after.channel == active_channel and before.channel != active_channel:
-                last_checks.setdefault(channel_id, {})
-                last_checks[channel_id][member.id] = current_time
-                print(
-                    f"Member {member.display_name} joined channel "
-                    f"{active_channel.name} at {current_time}"
-                )
-            elif before.channel == active_channel and after.channel != active_channel:
-                if member.id in last_checks.get(channel_id, {}):
-                    duration = current_time - last_checks[channel_id][member.id]
-                    member_times.setdefault(channel_id, {})
-                    member_times[channel_id][member.id] = (
-                        member_times.get(channel_id, {}).get(member.id, 0) + duration
-                    )
+    try:
+        for channel_id, active_channel in list(active_voice_channels.items()):
+            if active_channel:
+                current_time = time.time()
+                if after.channel == active_channel and before.channel != active_channel:
+                    last_checks.setdefault(channel_id, {})
+                    last_checks[channel_id][member.id] = current_time
                     print(
-                        f"Member {member.display_name} left channel "
-                        f"{active_channel.name}, adding {duration:.2f}s "
-                        f"to total: {member_times[channel_id][member.id]:.2f}s"
+                        f"Member {member.display_name} joined channel "
+                        f"{active_channel.name} at {current_time}"
                     )
-                    del last_checks[channel_id][member.id]
+                elif before.channel == active_channel and after.channel != active_channel:
+                    if member.id in last_checks.get(channel_id, {}):
+                        duration = current_time - last_checks[channel_id][member.id]
+                        member_times.setdefault(channel_id, {})
+                        member_times[channel_id][member.id] = (
+                            member_times.get(channel_id, {}).get(member.id, 0) + duration
+                        )
+                        print(
+                            f"Member {member.display_name} left channel "
+                            f"{active_channel.name}, adding {duration:.2f}s "
+                            f"to total: {member_times[channel_id][member.id]:.2f}s"
+                        )
+                        del last_checks[channel_id][member.id]
+    except Exception as e:
+        print(f"ERROR in on_voice_state_update: {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
 
 @tasks.loop(seconds=60)
 async def log_members(bot):
@@ -139,7 +145,7 @@ async def start_logging(bot, ctx):
         except Exception as e:
             await ctx.send(f"Failed to connect to database: {e}")
             del active_voice_channels[channel_id]
-    except discord.ext.commands.errors.CommandInvokeError:
+    except commands.errors.CommandInvokeError:
         await ctx.send("Timed out waiting for event name. Please try again.")
         del active_voice_channels[channel_id]
 
@@ -289,11 +295,10 @@ async def log_mining_results(bot, ctx, event_id: int):
     try:
         # Pre-fetch UEX prices for pre-population
         price_cache = {}
-        async with aiohttp.ClientSession():
+        async with aiohttp.ClientSession() as session:
             for material in MINING_MATERIALS:
                 try:
-                    async with aiohttp.request(
-                        "GET",
+                    async with session.get(
                         f"https://api.uexcorp.space/commodities?code={material}",
                         headers={"api_key": UEX_API_KEY},
                         timeout=aiohttp.ClientTimeout(total=5)

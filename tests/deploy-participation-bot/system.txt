@@ -1,0 +1,5 @@
+2025-09-06T02:00:00.9400000Z Requested labels: ubuntu-latest
+2025-09-06T02:00:00.9400000Z Job defined at: The-Red-Legion/red-legion-bots/.github/workflows/deploy-bots.yml@refs/pull/47/merge
+2025-09-06T02:00:00.9400000Z Waiting for a runner to pick up this job...
+2025-09-06T02:00:00.9430000Z Job is about to start running on the hosted runner: GitHub Actions 1000000261
+2025-09-06T02:00:00.9430000Z Job is waiting for a hosted runner to come online.
