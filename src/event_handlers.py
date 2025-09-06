@@ -1,5 +1,5 @@
 import discord
-from discord.ext import tasks
+from discord.ext import tasks, commands
 import datetime
 import time
 import random
@@ -19,29 +19,35 @@ member_times = {}
 last_checks = {}
 
 async def on_voice_state_update(member, before, after):
-    for channel_id, active_channel in list(active_voice_channels.items()):
-        if active_channel:
-            current_time = time.time()
-            if after.channel == active_channel and before.channel != active_channel:
-                last_checks.setdefault(channel_id, {})
-                last_checks[channel_id][member.id] = current_time
-                print(
-                    f"Member {member.display_name} joined channel "
-                    f"{active_channel.name} at {current_time}"
-                )
-            elif before.channel == active_channel and after.channel != active_channel:
-                if member.id in last_checks.get(channel_id, {}):
-                    duration = current_time - last_checks[channel_id][member.id]
-                    member_times.setdefault(channel_id, {})
-                    member_times[channel_id][member.id] = (
-                        member_times.get(channel_id, {}).get(member.id, 0) + duration
-                    )
+    try:
+        for channel_id, active_channel in list(active_voice_channels.items()):
+            if active_channel:
+                current_time = time.time()
+                if after.channel == active_channel and before.channel != active_channel:
+                    last_checks.setdefault(channel_id, {})
+                    last_checks[channel_id][member.id] = current_time
                     print(
-                        f"Member {member.display_name} left channel "
-                        f"{active_channel.name}, adding {duration:.2f}s "
-                        f"to total: {member_times[channel_id][member.id]:.2f}s"
+                        f"Member {member.display_name} joined channel "
+                        f"{active_channel.name} at {current_time}"
                     )
-                    del last_checks[channel_id][member.id]
+                elif before.channel == active_channel and after.channel != active_channel:
+                    if member.id in last_checks.get(channel_id, {}):
+                        duration = current_time - last_checks[channel_id][member.id]
+                        member_times.setdefault(channel_id, {})
+                        member_times[channel_id][member.id] = (
+                            member_times.get(channel_id, {}).get(member.id, 0) + duration
+                        )
+                        print(
+                            f"Member {member.display_name} left channel "
+                            f"{active_channel.name}, adding {duration:.2f}s "
+                            f"to total: {member_times[channel_id][member.id]:.2f}s"
+                        )
+                        del last_checks[channel_id][member.id]
+    except Exception as e:
+        print(f"ERROR in on_voice_state_update: {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
 
 @tasks.loop(seconds=60)
 async def log_members(bot):
@@ -50,8 +56,10 @@ async def log_members(bot):
             current_time = time.time()
             try:
                 for member_id in list(last_checks.get(channel_id, {}).keys()):
-                    member = bot.get_user(member_id)
-                    if member in active_channel.members:
+                    # Get member object from guild, not just user
+                    guild = active_channel.guild
+                    member = guild.get_member(member_id)
+                    if member and member in active_channel.members:
                         duration = current_time - last_checks[channel_id][member_id]
                         member_times.setdefault(channel_id, {})
                         member_times[channel_id][member_id] = (
@@ -77,6 +85,9 @@ async def log_members(bot):
                         )
             except Exception as e:
                 print(f"Error in log_members: {e}")
+                import traceback
+                print("Full traceback:")
+                print(traceback.format_exc())
 
 async def start_logging(bot, ctx):
     if not ctx.author.voice or not ctx.author.voice.channel:
@@ -139,7 +150,7 @@ async def start_logging(bot, ctx):
         except Exception as e:
             await ctx.send(f"Failed to connect to database: {e}")
             del active_voice_channels[channel_id]
-    except discord.ext.commands.errors.CommandInvokeError:
+    except commands.errors.CommandInvokeError:
         await ctx.send("Timed out waiting for event name. Please try again.")
         del active_voice_channels[channel_id]
 
@@ -289,11 +300,10 @@ async def log_mining_results(bot, ctx, event_id: int):
     try:
         # Pre-fetch UEX prices for pre-population
         price_cache = {}
-        async with aiohttp.ClientSession():
+        async with aiohttp.ClientSession() as session:
             for material in MINING_MATERIALS:
                 try:
-                    async with aiohttp.request(
-                        "GET",
+                    async with session.get(
                         f"https://api.uexcorp.space/commodities?code={material}",
                         headers={"api_key": UEX_API_KEY},
                         timeout=aiohttp.ClientTimeout(total=5)
@@ -446,19 +456,9 @@ async def list_open_events(bot, ctx):
     if not await has_org_role()(ctx):
         return
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        c = conn.cursor()
-        c.execute(
-            """
-            SELECT event_id, event_name, channel_name, start_time
-            FROM events
-            WHERE end_time IS NULL
-            ORDER BY start_time DESC
-            """
-        )
-        open_events = c.fetchall()
-        conn.close()
-
+        # Use the proper async database function instead of direct psycopg2 calls
+        open_events = get_open_events(DATABASE_URL, ctx.channel.id if hasattr(ctx, 'channel') else '0')
+        
         if not open_events:
             await ctx.send("No open events found.")
             return
@@ -473,3 +473,7 @@ async def list_open_events(bot, ctx):
         await ctx.send(embed=embed)
     except Exception as e:
         await ctx.send(f"Error fetching open events: {e}")
+        print(f"ERROR in list_open_events: {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())

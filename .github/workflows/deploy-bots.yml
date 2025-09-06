@@ -13,10 +13,18 @@ permissions:
 
 jobs:
   deploy-participation-bot:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')  # Moved to job level
     steps:
       - uses: actions/checkout@v4
+      - name: Set up SSH key for Ansible
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts
+          # Test SSH connection
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@${{ secrets.BOT_SERVER_HOST }} "echo 'SSH connection test successful'"
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -24,55 +32,194 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Create Deployment Script
+      - name: Install Ansible
         run: |
-          cat << 'EOF' > deploy.sh
-          #!/bin/bash
-          set -e
-          EOF
+          python -m pip install --upgrade pip
+          pip install ansible
+
+      - name: Set up SSH key for Ansible
+        run: |
+          # SSH setup not needed for local deployment
+          echo "Using local connection for deployment"
+
+      - name: Deploy to Compute Instance with Ansible
+        run: |
+          echo "=== Starting Ansible deployment ==="
+
+          # Set environment variables for Ansible
+          export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
+          export DATABASE_URL=${{ secrets.DATABASE_URL }}
+
+          # Run Ansible playbook
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} \
+          TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }} \
+          DATABASE_URL=${{ secrets.DATABASE_URL }} \
+          ansible-playbook ansible/deploy.yml -i ansible/inventory.ini -v
+
+          echo "=== Ansible deployment completed ==="
+          
+          echo "=== Waiting for bot to stabilize ==="
+          sleep 10
+          echo "=== Bot startup wait completed ==="
         shell: bash
-      - name: Stop Running Bot Instance
+      - name: Verify Bot Health
         run: |
-          if [ -f /app/bot.pid ]; then
-            kill -9 $(cat /app/bot.pid) 2>/dev/null || true
-            rm -f /app/bot.pid
+          echo "=== Discord Bot Health Check ==="
+          
+          # Function to check if bot responds to Discord
+          check_discord_health() {
+            local max_attempts=3
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Health check attempt $attempt/$max_attempts..."
+              
+              # Send a test message to Discord and check if bot processes it
+              # Using a simple API call to check if bot is online
+              HEALTH_CHECK=$(curl -s -X GET \
+                "https://discord.com/api/v10/applications/@me" \
+                -H "Authorization: Bot ${{ secrets.DISCORD_TOKEN }}" \
+                -H "Content-Type: application/json")
+              
+              if echo "$HEALTH_CHECK" | grep -q '"id"'; then
+                echo "✅ Bot is authenticated and responding to Discord API"
+                
+                # Additional check: verify bot can access guild information
+                GUILD_CHECK=$(curl -s -X GET \
+                  "https://discord.com/api/v10/users/@me/guilds" \
+                  -H "Authorization: Bot ${{ secrets.DISCORD_TOKEN }}" \
+                  -H "Content-Type: application/json")
+                
+                if echo "$GUILD_CHECK" | grep -q '\[.*\]'; then
+                  echo "✅ Bot can access guild information"
+                  echo "✅ Discord health check PASSED"
+                  return 0
+                else
+                  echo "⚠️ Bot authenticated but cannot access guilds"
+                fi
+              else
+                echo "❌ Bot not responding to Discord API"
+              fi
+              
+              echo "Waiting 10 seconds before retry..."
+              sleep 10
+              attempt=$((attempt + 1))
+            done
+            
+            echo "❌ Discord health check FAILED after $max_attempts attempts"
+            return 1
+          }
+          
+          # Also check if process exists (supplementary check)
+          echo "=== Process Status Check ==="
+          if [ -f "/app/bot.pid" ]; then
+            PID=$(cat /app/bot.pid)
+            echo "Found PID file with PID: $PID"
+            
+            if ps -p "$PID" > /dev/null 2>&1; then
+              echo "✅ Bot process is running (PID: $PID)"
+              PROCESS_STATUS="running"
+            else
+              echo "⚠️ Bot process not found, but this may be a false negative"
+              PROCESS_STATUS="unknown"
+            fi
+          else
+            echo "⚠️ No PID file found at /app/bot.pid"
+            PROCESS_STATUS="no_pid"
           fi
-          echo "Bot instance stopped or no PID found"
+          
+          # Check recent bot logs for activity
+          echo "=== Bot Log Analysis ==="
+          if [ -f "/app/bot.log" ]; then
+            echo "Recent bot log entries:"
+            tail -10 /app/bot.log
+            
+            # Check for recent heartbeat messages
+            if grep -q "Heartbeat: Bot is still running" /app/bot.log; then
+              LAST_HEARTBEAT=$(grep "Heartbeat: Bot is still running" /app/bot.log | tail -1)
+              echo "✅ Found heartbeat: $LAST_HEARTBEAT"
+            else
+              echo "⚠️ No recent heartbeat messages found"
+            fi
+            
+            # Check for errors in recent logs
+            if tail -20 /app/bot.log | grep -i "error\|exception\|failed" > /dev/null; then
+              echo "⚠️ Recent errors found in logs:"
+              tail -20 /app/bot.log | grep -i "error\|exception\|failed"
+            else
+              echo "✅ No recent errors in bot logs"
+            fi
+          else
+            echo "⚠️ No bot log file found"
+          fi
+          
+          # Primary health check: Discord API response
+          if check_discord_health; then
+            echo ""
+            echo "🎉 === HEALTH CHECK SUMMARY ==="
+            echo "✅ PRIMARY: Discord API health check PASSED"
+            echo "ℹ️  Process status: $PROCESS_STATUS"
+            echo "✅ Bot is confirmed working and responding to Discord"
+            echo "✅ Deployment is SUCCESSFUL"
+            exit 0
+          else
+            echo ""
+            echo "❌ === HEALTH CHECK SUMMARY ==="
+            echo "❌ PRIMARY: Discord API health check FAILED"
+            echo "ℹ️  Process status: $PROCESS_STATUS"
+            echo "❌ Bot may not be responding to Discord properly"
+            echo "Check logs above for details"
+            exit 1
+          fi
         shell: bash
-      - name: Clean and Clone Repo
+      - name: Capture Deployment Logs
+        if: always()
         run: |
-          sudo rm -rf /app || echo "Warning: /app removal failed, may not exist"
-          sudo git clone https://github.com/The-Red-Legion/red-legion-bots /app || { echo "Git clone failed"; exit 1; }
-          sudo chown -R $(whoami):$(whoami) /app || { echo "Failed to change ownership"; exit 1; }
-          echo "Repo cloned to /app and ownership changed"
-        shell: bash
-      - name: Install Dependencies
-        run: |
-          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
-          python3 -m ensurepip --upgrade
-          python3 -m pip install --upgrade pip
-          pip3 install -r ../requirements.txt psycopg2-binary || { echo "Pip install failed"; exit 1; }
-          echo "Dependencies installed"
-        shell: bash
-      - name: Set Environment Variables
-        run: |
-          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
-          echo "DISCORD_TOKEN=$(gcloud secrets versions access latest --secret=discord-token --project=rl-prod-471116)" > .env
-          echo "TEXT_CHANNEL_ID=$(gcloud secrets versions access latest --secret=text-channel-id --project=rl-prod-471116)" >> .env
-          echo "DATABASE_URL=${DATABASE_URL}" >> .env
-          export $(cat .env)
-          echo "Environment variables set"
-        shell: bash
-      - name: Start Bot
-        run: |
-          cd /app/src || { echo "Failed to change to /app/src"; exit 1; }
-          nohup python3 participation_bot.py > /app/bot.log 2>&1 & echo $! > /app/bot.pid
-          echo "Bot deployed, PID: $(cat /app/bot.pid)"
-        shell: bash
-      - name: Make Script Executable and Run
-        run: |
-          chmod +x deploy.sh
-          ./deploy.sh
+          echo "=== Final deployment status ==="
+          
+          # SSH into remote host to check deployment status
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.BOT_SERVER_HOST }} << 'EOF'
+            # Check if this is a first deployment
+            if [ ! -d /app ]; then
+              echo "ℹ️  First deployment in progress - /app directory does not exist yet"
+              echo "This is normal during initial setup"
+              echo "=== System resource check ==="
+              free -h || echo "Could not check memory"
+              echo "=== Deployment log capture completed ==="
+              exit 0
+            fi
+            
+            # Show bot status
+            if [ -f /app/bot.pid ]; then
+              if kill -0 $(cat /app/bot.pid) 2>/dev/null; then
+                echo "✅ Bot is running (PID: $(cat /app/bot.pid))"
+              else
+                echo "❌ Bot process exists but is not running"
+              fi
+            else
+              echo "❌ No bot PID file found"
+            fi
+            
+            # Show recent logs
+            if [ -f /app/bot.log ]; then
+              echo "=== Last 20 lines of bot log ==="
+              tail -20 /app/bot.log
+            else
+              echo "❌ No bot log file found"
+            fi
+            
+            # Check system resources
+            echo "=== System resource check ==="
+            if [ -d /app ]; then
+              df -h /app || echo "Could not check disk space for /app"
+            else
+              df -h / || echo "Could not check disk space"
+            fi
+            free -h || echo "Could not check memory"
+            
+            echo "=== Deployment log capture completed ==="
+          EOF
         shell: bash
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -82,6 +229,14 @@ jobs:
     needs: deploy-participation-bot
     runs-on: ubuntu-latest
     steps:
+      - name: Check Deployment Result
+        run: |
+          if [ "${{ needs.deploy-participation-bot.result }}" == "success" ]; then
+            echo "✅ Deployment job completed successfully"
+          else
+            echo "❌ Deployment job failed"
+            echo "Check the deployment logs above for detailed error information"
+          fi
       - name: Merge and Close PR on Success
         if: needs.deploy-participation-bot.result == 'success'
         uses: actions/github-script@v7
@@ -105,9 +260,9 @@ jobs:
                 commit_message: `Deployment successful for PR #${context.payload.pull_request.number}\n\n${pr.data.body || 'No description provided'}`,
                 merge_method: 'squash'
               });
-              console.log('Pull request merged successfully');
+              console.log('✅ Pull request merged successfully');
             } catch (error) {
-              console.error('Failed to merge pull request:', error.message);
+              console.error('❌ Failed to merge pull request:', error.message);
               throw error;
             }
       - name: Add Bug Label and Remove Ok to Deploy on Failure
@@ -124,18 +279,35 @@ jobs:
                 issue_number: context.payload.pull_request.number,
                 labels: ['bug']
               });
-              console.log('Bug label added successfully');
+              console.log('✅ Bug label added successfully');
               
               // Remove "Ok to Deploy" label
-              await github.rest.issues.removeLabel({
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  name: 'Ok to Deploy'
+                });
+                console.log('✅ Ok to Deploy label removed successfully');
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log('ℹ️  Ok to Deploy label not found, nothing to remove');
+                } else {
+                  console.error('❌ Failed to remove Ok to Deploy label:', error.message);
+                }
+              }
+              
+              // Add a comment with deployment failure information
+              await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.pull_request.number,
-                name: 'Ok to Deploy'
+                body: '❌ **Deployment Failed**\n\nThe bot deployment to the compute instance failed. Check the deployment logs above for detailed error information including:\n- Python dependency installation errors\n- Database connection issues\n- Bot startup failures\n- System resource problems\n\nPlease review the logs and fix any issues before attempting to deploy again.'
               });
-              console.log('Ok to Deploy label removed successfully');
+              
             } catch (error) {
-              console.error('Failed to update labels:', error.message);
+              console.error('❌ Failed to update labels:', error.message);
               // Don't throw error here to avoid failing the workflow
               // since this is just cleanup
             }

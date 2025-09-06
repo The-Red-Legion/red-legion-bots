@@ -1,0 +1,117 @@
+---
+- name: Deploy Participation Bot
+  hosts: participation-bot
+  become: yes
+  gather_facts: yes
+
+  vars:
+    app_dir: /app
+    repo_url: https://github.com/The-Red-Legion/red-legion-bots.git
+    python_version: "3.9"
+    gcp_project: "rl-prod-471116"
+
+  tasks:
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+      when: ansible_os_family == 'Debian'
+
+    - name: Install required system packages
+      apt:
+        name:
+          - python3
+          - python3-dev
+          - git
+          - build-essential
+          - postgresql-client
+          - libpq-dev
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install pip via package manager
+      apt:
+        name: python3-pip
+        state: present
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+
+    - name: Ensure pip3 is in PATH
+      command: pip3 --version
+      register: pip3_check
+      ignore_errors: true
+
+    - name: Check if Google Cloud SDK is available
+      command: which gcloud
+      register: gcloud_check
+      ignore_errors: true
+
+    - name: Install Google Cloud SDK
+      include_tasks: tasks/install_gcloud.yml
+      when: gcloud_check.rc != 0
+
+    - name: Stop existing bot process
+      include_tasks: tasks/stop_bot.yml
+
+    - name: Clean and prepare application directory
+      file:
+        path: "{{ app_dir }}"
+        state: absent
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Copy application code
+      copy:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ app_dir }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      ignore_errors: yes
+
+    - name: Install Python dependencies
+      pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        executable: pip3
+        extra_args: --user
+
+    - name: Install additional packages
+      pip:
+        name:
+          - psycopg2-binary
+        executable: pip3
+        extra_args: --user
+
+    - name: Set up environment variables
+      include_tasks: tasks/setup_environment.yml
+
+    - name: Test Python imports
+      command: python3 -c "import sys; print('Python path:', sys.path); import src.participation_bot"
+      args:
+        chdir: "{{ app_dir }}"
+      environment:
+        PYTHONPATH: "{{ app_dir }}:$PYTHONPATH"
+      register: import_test
+      failed_when: import_test.rc != 0
+      when: not ansible_check_mode
+
+    - name: Start bot service
+      include_tasks: tasks/start_bot.yml
+
+    - name: Verify bot is running
+      include_tasks: tasks/verify_bot.yml
+
+    - name: Clean up temporary files
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ app_dir }}/.git"
+        - "{{ app_dir }}/ansible"
+        - "{{ app_dir }}/tests"
