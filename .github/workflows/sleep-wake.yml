@@ -15,8 +15,8 @@ jobs:
       - name: Sleep Instance
         if: github.event.schedule == '0 7 * * *' || github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'sleep'
         run: |
-          gcloud compute instances stop participation-bot --zone=us-central1-a --project=rl-prod-471116
+          gcloud compute instances stop arccorp-compute --zone=us-central1-a --project=rl-prod-471116
       - name: Wake Instance
         if: github.event.schedule == '0 12 * * *' || github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'wake'
         run: |
-          gcloud compute instances start participation-bot --zone=us-central1-a --project=rl-prod-471116
+          gcloud compute instances start arccorp-compute --zone=us-central1-a --project=rl-prod-471116

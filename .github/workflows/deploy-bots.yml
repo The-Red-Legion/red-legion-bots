@@ -12,7 +12,7 @@ permissions:
   checks: read
 
 jobs:
-  deploy-participation-bot:
+  deploy-arccorp-compute:
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')  # Moved to job level
     steps:
@@ -226,19 +226,19 @@ jobs:
 
   post-deployment:
     if: always()  # Run regardless of deploy job success/failure
-    needs: deploy-participation-bot
+    needs: deploy-arccorp-compute
     runs-on: ubuntu-latest
     steps:
       - name: Check Deployment Result
         run: |
-          if [ "${{ needs.deploy-participation-bot.result }}" == "success" ]; then
+          if [ "${{ needs.deploy-arccorp-compute.result }}" == "success" ]; then
             echo "✅ Deployment job completed successfully"
           else
             echo "❌ Deployment job failed"
             echo "Check the deployment logs above for detailed error information"
           fi
       - name: Merge and Close PR on Success
-        if: needs.deploy-participation-bot.result == 'success'
+        if: needs.deploy-arccorp-compute.result == 'success'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -266,7 +266,7 @@ jobs:
               throw error;
             }
       - name: Add Bug Label and Remove Ok to Deploy on Failure
-        if: needs.deploy-participation-bot.result == 'failure'
+        if: needs.deploy-arccorp-compute.result == 'failure'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
