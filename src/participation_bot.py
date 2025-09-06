@@ -82,5 +82,14 @@ async def on_ready():
         init_db(DATABASE_URL)
         await setup_event_handlers()  # Register event handler
         setup_commands()  # Register commands
+        print("Bot setup completed successfully!")
     except Exception as e:
         print(f"Error during setup: {e}")
+
+if __name__ == "__main__":
+    from .config import DISCORD_TOKEN
+    print("Starting Discord bot...")
+    try:
+        bot.run(DISCORD_TOKEN)
+    except Exception as e:
+        print(f"Failed to start bot: {e}")
