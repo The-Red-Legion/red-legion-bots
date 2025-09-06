@@ -4,7 +4,8 @@ from .config import DATABASE_URL
 from .database import init_db, add_market_item, get_market_items, issue_loan
 from .event_handlers import (
     on_voice_state_update, start_logging, stop_logging, pick_winner,
-    log_mining_results, list_open_events
+    list_open_events
+    # log_mining_results temporarily disabled due to implementation issues
 )
 from .discord_utils import has_org_role
 
@@ -16,78 +17,94 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Dynamically register event handler
 async def setup_event_handlers():
-    bot.add_listener(on_voice_state_update, 'on_voice_state_update')
+    try:
+        bot.add_listener(on_voice_state_update, 'on_voice_state_update')
+        print("Voice state update handler registered successfully")
+    except Exception as e:
+        print(f"ERROR registering event handlers: {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
 
 # Dynamically register commands
 def setup_commands():
-    print("Registering basic commands...")
-    
-    # Command without role restriction - fix lambda issues
-    @bot.command(name="start_logging")
-    async def start_logging_cmd(ctx):
-        await start_logging(bot, ctx)
-    
-    @bot.command(name="stop_logging")
-    async def stop_logging_cmd(ctx):
-        await stop_logging(bot, ctx)
-    
-    @bot.command(name="pick_winner")
-    async def pick_winner_cmd(ctx):
-        await pick_winner(bot, ctx)
-    
-    print("Basic commands registered")
-    print("Registering role-restricted commands...")
-
-    # Commands with role restriction
-    @bot.command(name="list_market")
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def list_market(ctx):
-        items = get_market_items(DATABASE_URL)
-        if not items:
-            await ctx.send("No market items available.")
-            return
+    try:
+        print("Registering basic commands...")
         
-        embed = discord.Embed(title="Market Items", color=discord.Color.blue())
-        for item_id, name, price, stock in items:
-            embed.add_field(name=f"{name} (ID: {item_id})", value=f"Price: {price} credits\nStock: {stock}", inline=False)
-        await ctx.send(embed=embed)
+        # Command without role restriction - fix lambda issues
+        @bot.command(name="start_logging")
+        async def start_logging_cmd(ctx):
+            await start_logging(bot, ctx)
+        
+        @bot.command(name="stop_logging")
+        async def stop_logging_cmd(ctx):
+            await stop_logging(bot, ctx)
+        
+        @bot.command(name="pick_winner")
+        async def pick_winner_cmd(ctx):
+            await pick_winner(bot, ctx)
+        
+        print("Basic commands registered")
+        print("Registering role-restricted commands...")
 
-    @bot.command(name="add_market_item")
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def add_market_item_cmd(ctx, name: str, price: int, stock: int):
-        try:
-            add_market_item(DATABASE_URL, name, price, stock)
-            await ctx.send(f"Added {name} to market for {price} credits (Stock: {stock})")
-        except Exception as e:
-            await ctx.send(f"Failed to add market item: {e}")
+        # Commands with role restriction
+        @bot.command(name="list_market")
+        @has_org_role()
+        @commands.cooldown(1, 30, commands.BucketType.guild)
+        async def list_market(ctx):
+            items = get_market_items(DATABASE_URL)
+            if not items:
+                await ctx.send("No market items available.")
+                return
+            
+            embed = discord.Embed(title="Market Items", color=discord.Color.blue())
+            for item_id, name, price, stock in items:
+                embed.add_field(name=f"{name} (ID: {item_id})", value=f"Price: {price} credits\nStock: {stock}", inline=False)
+            await ctx.send(embed=embed)
 
-    @bot.command(name="request_loan")
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def request_loan(ctx, amount: int):
-        try:
-            from datetime import datetime, timedelta
-            issued_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            due_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
-            issue_loan(DATABASE_URL, ctx.author.id, amount, issued_date, due_date)
-            await ctx.send(f"Loan request submitted for {amount} credits. Due date: {due_date}")
-        except Exception as e:
-            await ctx.send(f"Failed to request loan: {e}")
+        @bot.command(name="add_market_item")
+        @has_org_role()
+        @commands.cooldown(1, 30, commands.BucketType.guild)
+        async def add_market_item_cmd(ctx, name: str, price: int, stock: int):
+            try:
+                add_market_item(DATABASE_URL, name, price, stock)
+                await ctx.send(f"Added {name} to market for {price} credits (Stock: {stock})")
+            except Exception as e:
+                await ctx.send(f"Failed to add market item: {e}")
 
-    @bot.command(name="log_mining_results")
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def log_mining_results_cmd(ctx, event_id: int):
-        await ctx.send("⚠️ Mining results logging is temporarily disabled due to implementation issues.")
-        # await log_mining_results(bot, ctx, event_id)
+        @bot.command(name="request_loan")
+        @has_org_role()
+        @commands.cooldown(1, 30, commands.BucketType.guild)
+        async def request_loan(ctx, amount: int):
+            try:
+                from datetime import datetime, timedelta
+                issued_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                due_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+                issue_loan(DATABASE_URL, ctx.author.id, amount, issued_date, due_date)
+                await ctx.send(f"Loan request submitted for {amount} credits. Due date: {due_date}")
+            except Exception as e:
+                await ctx.send(f"Failed to request loan: {e}")
 
-    @bot.command(name="list_open_events")
-    @has_org_role()
-    @commands.cooldown(1, 30, commands.BucketType.guild)
-    async def list_open_events_cmd(ctx):
-        await list_open_events(bot, ctx)
+        @bot.command(name="log_mining_results")
+        @has_org_role()
+        @commands.cooldown(1, 30, commands.BucketType.guild)
+        async def log_mining_results_cmd(ctx, event_id: int):
+            await ctx.send("⚠️ Mining results logging is temporarily disabled due to implementation issues.")
+            # await log_mining_results(bot, ctx, event_id)
+
+        @bot.command(name="list_open_events")
+        @has_org_role()
+        @commands.cooldown(1, 30, commands.BucketType.guild)
+        async def list_open_events_cmd(ctx):
+            await list_open_events(bot, ctx)
+            
+        print("All commands registered successfully")
+        
+    except Exception as e:
+        print(f"ERROR registering commands: {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
 
 @bot.event
 async def on_ready():
@@ -104,8 +121,18 @@ async def on_ready():
         import asyncio
         import functools
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, functools.partial(init_db, DATABASE_URL))
-        print("Database initialized successfully")
+        
+        # Add timeout to database initialization to prevent hanging
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(None, functools.partial(init_db, DATABASE_URL)),
+                timeout=30.0  # 30 second timeout
+            )
+            print("Database initialized successfully")
+        except asyncio.TimeoutError:
+            print("⚠️ Database initialization timed out after 30 seconds - continuing anyway")
+        except Exception as db_error:
+            print(f"⚠️ Database initialization failed: {db_error} - bot will continue without database")
         
         print("Setting up event handlers...")
         await setup_event_handlers()  # Register event handler
@@ -118,8 +145,21 @@ async def on_ready():
         print("Bot setup completed successfully!")
         print("Bot is fully operational and ready to receive commands")
         
-        # Add a simple heartbeat to ensure bot stays alive
+        # Add a simple heartbeat to ensure bot stays alive and log activity
         print("✅ Bot startup sequence completed - bot should remain running")
+        
+        # Start a simple heartbeat task to verify bot is still alive
+        async def heartbeat():
+            import asyncio
+            import datetime
+            while True:
+                await asyncio.sleep(300)  # Every 5 minutes
+                print(f"💓 Heartbeat: Bot is still running at {datetime.datetime.now()}")
+        
+        # Start heartbeat task
+        import asyncio
+        heartbeat_task = asyncio.create_task(heartbeat())
+        print("Heartbeat monitoring started")
         
     except Exception as e:
         print(f"CRITICAL ERROR during setup: {e}")
@@ -137,6 +177,20 @@ async def on_error(event, *args, **kwargs):
     import traceback
     print("Full traceback:")
     print(traceback.format_exc())
+    # DO NOT re-raise the exception - let the bot continue running
+
+# Add a command error handler to prevent command errors from crashing the bot
+@bot.event
+async def on_command_error(ctx, error):
+    print(f'COMMAND ERROR in command {ctx.command}: {error}')
+    import traceback
+    print("Full traceback:")
+    print(traceback.format_exc())
+    # Send error message to user but don't crash
+    try:
+        await ctx.send(f"⚠️ Command error: {str(error)}")
+    except:
+        pass  # Don't crash if we can't send the error message
 
 # Add a disconnect handler to log when bot disconnects
 @bot.event
