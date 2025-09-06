@@ -40,7 +40,7 @@ def register_commands(bot):
             )
             
             for item in items:
-                item_name, price, stock = item
+                _, item_name, price, stock = item
                 embed.add_field(
                     name=f"📦 {item_name}",
                     value=f"**Price**: {price} credits\n**Stock**: {stock}",
