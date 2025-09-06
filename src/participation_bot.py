@@ -78,6 +78,7 @@ def setup_commands():
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
+    print(f'Bot is ready and connected to {len(bot.guilds)} servers')
     try:
         init_db(DATABASE_URL)
         await setup_event_handlers()  # Register event handler
@@ -85,11 +86,22 @@ async def on_ready():
         print("Bot setup completed successfully!")
     except Exception as e:
         print(f"Error during setup: {e}")
+        import traceback
+        print(traceback.format_exc())
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    print(f'An error occurred in event {event}')
+    import traceback
+    print(traceback.format_exc())
 
 if __name__ == "__main__":
     from .config import DISCORD_TOKEN
     print("Starting Discord bot...")
+    print(f"Discord token length: {len(DISCORD_TOKEN) if DISCORD_TOKEN else 'None'}")
     try:
         bot.run(DISCORD_TOKEN)
     except Exception as e:
         print(f"Failed to start bot: {e}")
+        import traceback
+        print(traceback.format_exc())

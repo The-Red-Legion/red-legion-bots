@@ -6,7 +6,7 @@
   when: not ansible_check_mode
 
 - name: Verify bot process is running
-  command: kill -0 $(cat {{ app_dir }}/bot.pid)
+  shell: kill -0 $(cat {{ app_dir }}/bot.pid)
   when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
   register: process_check
   failed_when: process_check.rc != 0
@@ -22,7 +22,7 @@
   when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
 
 - name: Check for error patterns in log
-  command: grep -i "ERROR\|Exception\|Failed" {{ app_dir }}/bot.log
+  shell: grep -i "ERROR\|Exception\|Failed" {{ app_dir }}/bot.log
   register: error_check
   failed_when: error_check.rc == 0
   ignore_errors: true
