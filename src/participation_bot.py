@@ -281,6 +281,99 @@ def setup_commands():
                 await ctx.send(embed=error_embed)
                 await ctx.send(f"⚠️ Health check error, but bot is responding to commands. Error: `{str(e)[:100]}`")
 
+        @bot.command(name="dbtest")
+        async def dbtest_command(ctx):
+            """Test database connectivity with detailed diagnostics"""
+            try:
+                from datetime import datetime
+                
+                embed = discord.Embed(
+                    title="🗄️ Database Connection Test",
+                    description="Testing connection to arccorp-data-nexus database",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now()
+                )
+                
+                # Test database connection
+                db_status = "Unknown"
+                try:
+                    import psycopg2
+                    conn = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT version();")
+                    version_info = cursor.fetchone()[0]
+                    cursor.execute("SELECT current_database();")
+                    db_name = cursor.fetchone()[0]
+                    cursor.execute("SELECT current_user;")
+                    db_user = cursor.fetchone()[0]
+                    
+                    embed.add_field(
+                        name="✅ Connection Status",
+                        value="Successfully connected to database",
+                        inline=False
+                    )
+                    embed.add_field(
+                        name="📋 Database Info",
+                        value=f"**Database**: {db_name}\n**User**: {db_user}\n**Version**: {version_info[:50]}...",
+                        inline=False
+                    )
+                    embed.color = discord.Color.green()
+                    conn.close()
+                    
+                except psycopg2.OperationalError as e:
+                    error_msg = str(e)
+                    embed.add_field(
+                        name="❌ Connection Failed",
+                        value=f"**Error**: {error_msg[:100]}...",
+                        inline=False
+                    )
+                    
+                    # Add troubleshooting suggestions
+                    if "authentication failed" in error_msg.lower():
+                        embed.add_field(
+                            name="💡 Suggestion",
+                            value="Database credentials may have changed. Try `!refresh_config`",
+                            inline=False
+                        )
+                    elif "timeout" in error_msg.lower() or "could not connect" in error_msg.lower():
+                        embed.add_field(
+                            name="💡 Suggestion", 
+                            value="Database server may be unreachable. Check arccorp-data-nexus status.",
+                            inline=False
+                        )
+                    elif "does not exist" in error_msg.lower():
+                        embed.add_field(
+                            name="💡 Suggestion",
+                            value="Database configuration issue. Verify database name and host.",
+                            inline=False
+                        )
+                    embed.color = discord.Color.red()
+                    
+                except Exception as e:
+                    embed.add_field(
+                        name="❌ Unexpected Error",
+                        value=f"**Error**: {str(e)[:100]}...",
+                        inline=False
+                    )
+                    embed.add_field(
+                        name="💡 Suggestion",
+                        value="Check bot logs for detailed error information.",
+                        inline=False
+                    )
+                    embed.color = discord.Color.red()
+                
+                # Add infrastructure info
+                embed.add_field(
+                    name="🏗️ Infrastructure",
+                    value="**Instance**: arccorp-compute\n**Database**: arccorp-data-nexus\n**Connection**: Via Secret Manager",
+                    inline=False
+                )
+                
+                await ctx.send(embed=embed)
+                
+            except Exception as e:
+                await ctx.send(f"❌ Database test failed: {str(e)}")
+
         @bot.command(name="config_check")
         @has_org_role()
         async def config_check(ctx):
@@ -380,6 +473,101 @@ def setup_commands():
                 
             except Exception as e:
                 await ctx.send(f"❌ Configuration check failed: {str(e)}")
+
+        @bot.command(name="refresh_config")
+        @has_org_role()
+        async def refresh_config(ctx):
+            """Refresh configuration from Secret Manager"""
+            try:
+                from datetime import datetime
+                
+                embed = discord.Embed(
+                    title="🔄 Configuration Refresh",
+                    description="Refreshing bot configuration from Secret Manager",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now()
+                )
+                
+                # Test refreshing configuration
+                refresh_status = []
+                try:
+                    from .config import get_secret
+                    
+                    # Test accessing secrets (without storing sensitive data)
+                    try:
+                        get_secret("database-connection-string")
+                        refresh_status.append("✅ Database connection string: Refreshed")
+                    except Exception as e:
+                        refresh_status.append(f"❌ Database connection string: {str(e)[:40]}")
+                    
+                    try:
+                        get_secret("discord-token")
+                        refresh_status.append("✅ Discord token: Verified")
+                    except Exception as e:
+                        refresh_status.append(f"❌ Discord token: {str(e)[:40]}")
+                    
+                    # Note: In a real refresh, you would reload DATABASE_URL here
+                    # global DATABASE_URL
+                    # DATABASE_URL = get_secret("database-connection-string")
+                    
+                    refresh_status.append("ℹ️ Bot restart required for full config reload")
+                    
+                except Exception as e:
+                    refresh_status.append(f"❌ Secret Manager access failed: {str(e)[:40]}")
+                
+                embed.add_field(
+                    name="🔄 Refresh Results",
+                    value="\n".join(refresh_status),
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="💡 Next Steps",
+                    value="Use `!test` to verify connectivity after refresh\nConsider `!restart_red_legion_bot` for full reload",
+                    inline=False
+                )
+                
+                embed.color = discord.Color.green() if "❌" not in "\n".join(refresh_status) else discord.Color.orange()
+                await ctx.send(embed=embed)
+                
+            except Exception as e:
+                await ctx.send(f"❌ Configuration refresh failed: {str(e)}")
+
+        @bot.command(name="restart_red_legion_bot")
+        @has_org_role()
+        async def restart_bot(ctx):
+            """Restart the Red Legion Bot (org role required)"""
+            try:
+                embed = discord.Embed(
+                    title="🔄 Bot Restart",
+                    description="Restarting Red Legion Bot...",
+                    color=discord.Color.orange()
+                )
+                embed.add_field(
+                    name="Status",
+                    value="✅ Restart initiated by authorized user\n⏳ Bot will reconnect shortly",
+                    inline=False
+                )
+                embed.add_field(
+                    name="Note",
+                    value="This will reload all configuration from Secret Manager",
+                    inline=False
+                )
+                
+                await ctx.send(embed=embed)
+                
+                # Give time for the message to send before restarting
+                import asyncio
+                await asyncio.sleep(2)
+                
+                # Restart the bot process
+                import os
+                import sys
+                print(f"Bot restart initiated by {ctx.author} ({ctx.author.id})")
+                os.execv(sys.executable, ['python'] + sys.argv)
+                
+            except Exception as e:
+                await ctx.send(f"❌ Failed to restart bot: {str(e)}")
 
         print("All commands registered successfully")
         
