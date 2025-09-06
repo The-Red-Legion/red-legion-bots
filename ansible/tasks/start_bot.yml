@@ -33,6 +33,10 @@
       StandardOutput=journal
       StandardError=journal
       Environment=PYTHONUNBUFFERED=1
+      Environment=GOOGLE_CLOUD_PROJECT=rl-prod-471116
+      Environment=GITHUB_TOKEN=dummy-github-token
+      Environment=WEBHOOK_URL=https://default.webhook.url
+      Environment=UEX_API_KEY=dummy-uex-api-key
 
       [Install]
       WantedBy=multi-user.target
@@ -49,14 +53,12 @@
     name: red-legion-bot
     enabled: yes
     state: started
-  args:
-    executable: /bin/bash
   register: start_result
   when: not ansible_check_mode and (import_test is undefined or import_test.rc == 0)
 
 - name: Show startup debug info
   debug:
-    msg: "{{ start_result.stdout_lines }}"
+    msg: "Systemd service started: {{ start_result.status is defined }}"
   when: not ansible_check_mode and start_result is defined
 
 - name: Wait for bot to start
@@ -64,36 +66,24 @@
     seconds: 3
   when: not ansible_check_mode
 
-- name: Verify bot process is running
-  shell: |
-    #!/bin/bash
-    if [ -f "{{ app_dir }}/bot.pid" ]; then
-      kill -0 $(cat {{ app_dir }}/bot.pid) 2>/dev/null
-    else
-      exit 1
-    fi
-  args:
-    executable: /bin/bash
-  register: bot_check
-  failed_when: bot_check.rc != 0
-  ignore_errors: true
+- name: Verify bot service is running
+  systemd:
+    name: red-legion-bot
+  register: service_status
   when: not ansible_check_mode
 
-- name: Show bot log if startup failed
-  shell: |
-    #!/bin/bash
-    if [ -f "{{ app_dir }}/bot.log" ]; then
-      cat {{ app_dir }}/bot.log
-    else
-      echo "No bot log file found"
-    fi
-  args:
-    executable: /bin/bash
-  when: (bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)
-  register: bot_log
+- name: Show service status
+  debug:
+    msg: "Service status: {{ service_status.status.ActiveState if service_status.status is defined else 'Unknown' }}"
+  when: not ansible_check_mode and service_status is defined
+
+- name: Check service logs if failed
+  shell: journalctl -u red-legion-bot -n 20 --no-pager
+  register: service_logs
+  when: not ansible_check_mode and service_status is defined and service_status.status.ActiveState != 'active'
   failed_when: false
 
-- name: Fail with bot log
+- name: Fail with service logs if service not active
   fail:
-    msg: "Bot failed to start. Log output: {{ bot_log.stdout }}"
-  when: (bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)
+    msg: "Bot service failed to start. Logs: {{ service_logs.stdout }}"
+  when: not ansible_check_mode and service_status is defined and service_status.status.ActiveState != 'active'
