@@ -9,8 +9,10 @@ import sys
 import os
 from unittest.mock import Mock, MagicMock
 
-# Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add the project root and src directory to the path
+project_root = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'src'))
 
 class MockBot:
     """Mock Discord bot for testing."""

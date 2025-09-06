@@ -47,7 +47,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
           echo "🧪 Testing basic modular system functionality..."
-          python3 test_modular_system.py
+          python3 tests/test_modular_system.py
           echo "✅ Basic modular system tests completed!"
       - name: Test advanced system components
         env:
@@ -58,7 +58,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
           echo "🔬 Testing advanced system components..."
-          python3 test_advanced_system.py
+          python3 tests/test_advanced_system.py
           echo "✅ Advanced system tests completed!"
       - name: Run final validation tests
         env:
@@ -69,7 +69,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
           echo "🎯 Running final validation tests..."
-          python3 test_validation.py
+          python3 tests/test_validation.py
           echo "✅ All validation tests completed successfully!"
 
   test-connections:

@@ -10,8 +10,10 @@ import sys
 import os
 from unittest.mock import Mock, patch
 
-# Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add the project root and src directory to the path
+project_root = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'src'))
 
 def test_main_bot_file_syntax():
     """Test that the main bot file has valid syntax."""
