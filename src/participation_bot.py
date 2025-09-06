@@ -295,7 +295,6 @@ def setup_commands():
                 )
                 
                 # Test database connection
-                db_status = "Unknown"
                 try:
                     import psycopg2
                     conn = psycopg2.connect(DATABASE_URL, connect_timeout=10)
