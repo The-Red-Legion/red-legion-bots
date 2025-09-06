@@ -338,10 +338,6 @@ async def on_ready():
         await setup_event_handlers()  # Register event handler
         print("Event handlers registered successfully")
         
-        print("Setting up commands...")
-        setup_commands()  # Register commands
-        print("Commands registered successfully")
-        
         print("Bot setup completed successfully!")
         print("Bot is fully operational and ready to receive commands")
         
