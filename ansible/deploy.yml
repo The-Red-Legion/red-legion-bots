@@ -165,26 +165,24 @@
 
     - name: Install Python dependencies
       block:
-        - name: Install requirements with pip3
+        - name: Install requirements with pip3 (system-wide)
           pip:
             requirements: "{{ app_dir }}/requirements.txt"
             executable: pip3
-            extra_args: --user
       rescue:
-        - name: Install requirements with python3 -m pip
-          command: python3 -m pip install --user -r "{{ app_dir }}/requirements.txt"
+        - name: Install requirements with python3 -m pip (system-wide)
+          command: python3 -m pip install -r "{{ app_dir }}/requirements.txt"
 
     - name: Install additional packages
       block:
-        - name: Install psycopg2-binary with pip3
+        - name: Install psycopg2-binary with pip3 (system-wide)
           pip:
             name:
               - psycopg2-binary
             executable: pip3
-            extra_args: --user
       rescue:
-        - name: Install psycopg2-binary with python3 -m pip
-          command: python3 -m pip install --user psycopg2-binary
+        - name: Install psycopg2-binary with python3 -m pip (system-wide)
+          command: python3 -m pip install psycopg2-binary
 
     - name: Set up environment variables
       include_tasks: tasks/setup_environment.yml
