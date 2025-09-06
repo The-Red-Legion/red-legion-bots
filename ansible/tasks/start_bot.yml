@@ -1,13 +1,50 @@
 ---
-- name: Start bot process
-  command: >
-    nohup python3 -m src.participation_bot > {{ app_dir }}/bot.log 2>&1 &
-    echo $! > {{ app_dir }}/bot.pid
+- name: Test Python imports before starting bot
+  command: python3 -c "import src.participation_bot; print('Import successful')"
   args:
     chdir: "{{ app_dir }}"
   environment:
     PYTHONPATH: "{{ app_dir }}:$PYTHONPATH"
+  register: import_test
   when: not ansible_check_mode
+  ignore_errors: true
+
+- name: Show import test result
+  debug:
+    msg: "Import test result: {{ import_test.stdout if import_test.rc == 0 else import_test.stderr }}"
+  when: not ansible_check_mode and import_test is defined
+
+- name: Start bot process
+  shell: |
+    cd {{ app_dir }}
+    export PYTHONPATH="{{ app_dir }}:$PYTHONPATH"
+    source .env
+    echo "Starting bot with environment:"
+    echo "DISCORD_TOKEN: ${DISCORD_TOKEN:0:10}..."
+    echo "DATABASE_URL: ${DATABASE_URL:0:20}..."
+    echo "TEXT_CHANNEL_ID: $TEXT_CHANNEL_ID"
+    echo "PYTHONPATH: $PYTHONPATH"
+    nohup python3 -m src.participation_bot > {{ app_dir }}/bot.log 2>&1 &
+    BOT_PID=$!
+    echo $BOT_PID > {{ app_dir }}/bot.pid
+    echo "Bot started with PID: $BOT_PID"
+    sleep 1
+    if kill -0 $BOT_PID 2>/dev/null; then
+      echo "Bot process is running"
+    else
+      echo "Bot process failed to start or died immediately"
+      if [ -f {{ app_dir }}/bot.log ]; then
+        echo "Bot log contents:"
+        cat {{ app_dir }}/bot.log
+      fi
+    fi
+  register: start_result
+  when: not ansible_check_mode and (import_test is undefined or import_test.rc == 0)
+
+- name: Show startup debug info
+  debug:
+    msg: "{{ start_result.stdout_lines }}"
+  when: not ansible_check_mode and start_result is defined
 
 - name: Wait for bot to start
   pause:
@@ -15,14 +52,24 @@
   when: not ansible_check_mode
 
 - name: Verify bot process is running
-  command: kill -0 $(cat {{ app_dir }}/bot.pid)
+  shell: |
+    if [ -f "{{ app_dir }}/bot.pid" ]; then
+      kill -0 $(cat {{ app_dir }}/bot.pid) 2>/dev/null
+    else
+      exit 1
+    fi
   register: bot_check
   failed_when: bot_check.rc != 0
   ignore_errors: true
   when: not ansible_check_mode
 
 - name: Show bot log if startup failed
-  command: cat {{ app_dir }}/bot.log
+  shell: |
+    if [ -f "{{ app_dir }}/bot.log" ]; then
+      cat {{ app_dir }}/bot.log
+    else
+      echo "No bot log file found"
+    fi
   when: (bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)
   register: bot_log
   failed_when: false
