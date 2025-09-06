@@ -38,7 +38,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: python3 -m pytest tests/
-      - name: Run modular system validation tests
+      - name: Test modular system basic functionality
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -46,11 +46,31 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
-          echo "Running modular system tests..."
+          echo "🧪 Testing basic modular system functionality..."
           python3 test_modular_system.py
+          echo "✅ Basic modular system tests completed!"
+      - name: Test advanced system components
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "🔬 Testing advanced system components..."
           python3 test_advanced_system.py
+          echo "✅ Advanced system tests completed!"
+      - name: Run final validation tests
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "🎯 Running final validation tests..."
           python3 test_validation.py
-          echo "All modular system tests completed successfully!"
+          echo "✅ All validation tests completed successfully!"
 
   test-connections:
     needs: test-bots
