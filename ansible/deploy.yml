@@ -29,15 +29,17 @@
         state: present
       when: ansible_os_family == 'Debian'
 
-    - name: Install pip
-      command: curl -sS https://bootstrap.pypa.io/get-pip.py | python3
-      args:
-        creates: /usr/local/bin/pip3
+    - name: Install pip via package manager
+      apt:
+        name: python3-pip
+        state: present
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
 
     - name: Ensure pip3 is in PATH
-      command: ln -sf /usr/local/bin/pip3 /usr/bin/pip3
-      args:
-        creates: /usr/bin/pip3
+      command: pip3 --version
+      register: pip3_check
+      ignore_errors: true
 
     - name: Check if Google Cloud SDK is available
       command: which gcloud
@@ -76,14 +78,14 @@
     - name: Install Python dependencies
       pip:
         requirements: "{{ app_dir }}/requirements.txt"
-        executable: /usr/local/bin/pip3
+        executable: pip3
         extra_args: --user
 
     - name: Install additional packages
       pip:
         name:
           - psycopg2-binary
-        executable: /usr/local/bin/pip3
+        executable: pip3
         extra_args: --user
 
     - name: Set up environment variables
