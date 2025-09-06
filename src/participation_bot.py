@@ -200,26 +200,23 @@ def setup_commands():
                 # Test database connection
                 db_status = "Unknown"
                 try:
-                    # Quick database test
-                    import asyncpg
+                    # Use psycopg2 instead of asyncpg for consistency with dbtest
+                    import psycopg2
                     
-                    async def test_db():
-                        try:
-                            current_db_url = get_database_url()
-                            if not current_db_url:
-                                return "❌ Error: DATABASE_URL not configured"
-                            conn = await asyncpg.connect(current_db_url, timeout=5)
-                            await conn.execute('SELECT 1')
-                            await conn.close()
-                            return "✅ Connected"
-                        except Exception as e:
-                            return f"❌ Error: {str(e)[:50]}"
-                    
-                    db_status = await test_db()
+                    current_db_url = get_database_url()
+                    if not current_db_url:
+                        db_status = "❌ Error: DATABASE_URL not configured"
+                    else:
+                        conn = psycopg2.connect(current_db_url, connect_timeout=5)
+                        cursor = conn.cursor()
+                        cursor.execute('SELECT 1')
+                        cursor.close()
+                        conn.close()
+                        db_status = "✅ Connected"
                 except ImportError:
-                    db_status = "asyncpg not available"
+                    db_status = "psycopg2 not available"
                 except Exception as e:
-                    db_status = f"❌ Test failed: {str(e)[:30]}"
+                    db_status = f"❌ Error: {str(e)[:50]}"
                 
                 # Create comprehensive health embed
                 embed = discord.Embed(
