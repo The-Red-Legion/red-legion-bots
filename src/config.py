@@ -64,6 +64,23 @@ if not config['WEBHOOK_URL'] or config['WEBHOOK_URL'] == 'https://default.webhoo
 if not config['UEX_API_KEY'] or config['UEX_API_KEY'] == 'dummy-uex-api-key':
     print("Warning: UEX_API_KEY not set or using dummy value")
 
+def get_database_url():
+    """Get current database URL, refreshing from Secret Manager if needed"""
+    global DATABASE_URL
+    if not DATABASE_URL:
+        try:
+            DATABASE_URL = get_secret("database-connection-string")
+            print("Successfully refreshed DATABASE_URL from Secret Manager")
+        except Exception as e:
+            print(f"Failed to refresh DATABASE_URL: {e}")
+            # Try getting from config again
+            try:
+                fresh_config = get_config()
+                DATABASE_URL = fresh_config.get('DATABASE_URL')
+            except Exception as e2:
+                print(f"Failed to get DATABASE_URL from fresh config: {e2}")
+    return DATABASE_URL
+
 LOG_CHANNEL_ID = config['TEXT_CHANNEL_ID']
 ORG_ROLE_ID = config['ORG_ROLE_ID']
 DISCORD_TOKEN = config['DISCORD_TOKEN']
