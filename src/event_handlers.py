@@ -477,3 +477,11 @@ async def list_open_events(bot, ctx):
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
+
+
+async def setup_event_handlers():
+    """Set up event handlers - compatibility function for modular system."""
+    # This function is kept for backwards compatibility
+    # Most event handling is now done in the modular system
+    print("✅ Event handlers setup (compatibility mode)")
+    pass

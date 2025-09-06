@@ -10,7 +10,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  test-bots:
+  code-quality:
+    name: "Code Quality & Unit Tests"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +40,102 @@ jobs:
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: python3 -m pytest tests/
 
+  test-modular-architecture:
+    name: "Modular Architecture Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - name: Set GCP Project
+        run: echo "GOOGLE_CLOUD_PROJECT=rl-prod-471116" >> $GITHUB_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          check-latest: false
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+      - name: Test modular system functionality
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "🧪 Testing modular system architecture..."
+          python3 tests/test_modular_system.py
+          echo "✅ Modular architecture tests completed!"
+
+  test-advanced-components:
+    name: "Advanced Component Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - name: Set GCP Project
+        run: echo "GOOGLE_CLOUD_PROJECT=rl-prod-471116" >> $GITHUB_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          check-latest: false
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+      - name: Test advanced system components
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "🔬 Testing advanced system components..."
+          python3 tests/test_advanced_system.py
+          echo "✅ Advanced component tests completed!"
+
+  test-final-validation:
+    name: "Final System Validation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - name: Set GCP Project
+        run: echo "GOOGLE_CLOUD_PROJECT=rl-prod-471116" >> $GITHUB_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          check-latest: false
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+      - name: Run final validation tests
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "🎯 Running final system validation..."
+          python3 tests/test_validation.py
+          echo "✅ Final validation tests completed!"
+
   test-connections:
-    needs: test-bots
+    name: "Connection & Infrastructure Tests"
+    needs: code-quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,7 +197,8 @@ jobs:
     outputs:
       result: ${{ steps.test.outputs.result }}
 
-  test-ansible-dry-run:
+  test-ansible-deployment:
+    name: "Ansible Deployment Tests"
     needs: test-connections
     runs-on: ubuntu-latest
     steps:
@@ -155,11 +251,11 @@ jobs:
 
   post-test:
     if: always()  # Run regardless of test job success/failure
-    needs: [test-bots, test-connections, test-ansible-dry-run]
+    needs: [code-quality, test-modular-architecture, test-advanced-components, test-final-validation, test-connections, test-ansible-deployment]
     runs-on: ubuntu-latest
     steps:
       - name: Add Ready to Deploy Label on Success
-        if: needs.test-bots.result == 'success' && needs.test-connections.result == 'success' && needs.test-ansible-dry-run.result == 'success'
+        if: needs.code-quality.result == 'success' && needs.test-modular-architecture.result == 'success' && needs.test-advanced-components.result == 'success' && needs.test-final-validation.result == 'success' && needs.test-connections.result == 'success' && needs.test-ansible-deployment.result == 'success'
         uses: actions/github-script@v7
         with:
           script: |
@@ -195,7 +291,7 @@ jobs:
             }
       
       - name: Add Bug Label on Failure
-        if: needs.test-bots.result == 'failure' || needs.test-connections.result == 'failure' || needs.test-ansible-dry-run.result == 'failure'
+        if: needs.code-quality.result == 'failure' || needs.test-modular-architecture.result == 'failure' || needs.test-advanced-components.result == 'failure' || needs.test-final-validation.result == 'failure' || needs.test-connections.result == 'failure' || needs.test-ansible-deployment.result == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
