@@ -1,6 +1,6 @@
 ---
 - name: Deploy Participation Bot
-  hosts: participation-bot
+  hosts: arccorp_compute
   become: yes
   gather_facts: yes
 
@@ -11,10 +11,10 @@
     gcp_project: "rl-prod-471116"
 
   tasks:
-    - name: Update system packages
+    - name: Update apt cache
       apt:
         update_cache: yes
-        upgrade: yes
+        cache_valid_time: 3600
       when: ansible_os_family == 'Debian'
 
     - name: Install required system packages
@@ -24,22 +24,110 @@
           - python3-dev
           - git
           - build-essential
-          - postgresql-client
-          - libpq-dev
+          - curl
+          - wget
+          - software-properties-common
         state: present
       when: ansible_os_family == 'Debian'
 
-    - name: Install pip via package manager
-      apt:
-        name: python3-pip
-        state: present
-        update_cache: yes
+    - name: Install PostgreSQL client packages
+      block:
+        - name: Try installing postgresql-client
+          apt:
+            name:
+              - postgresql-client
+              - libpq-dev
+            state: present
+          ignore_errors: yes
+          register: pg_client_install
+        
+        - name: Try alternative PostgreSQL client package names
+          apt:
+            name:
+              - postgresql-client-14
+              - libpq-dev
+            state: present
+          when: pg_client_install.failed | default(false)
+          ignore_errors: yes
+          register: pg_client_alt_install
+        
+        - name: Install minimal PostgreSQL development files if others failed
+          apt:
+            name:
+              - libpq-dev
+            state: present
+          when: 
+            - pg_client_install.failed | default(false)
+            - pg_client_alt_install.failed | default(false)
       when: ansible_os_family == 'Debian'
 
-    - name: Ensure pip3 is in PATH
-      command: pip3 --version
-      register: pip3_check
-      ignore_errors: true
+    - name: Ensure pip is installed (Ubuntu 22.04 method)
+      block:
+        - name: Install pip using ensurepip (built into Python 3.4+)
+          command: python3 -m ensurepip --upgrade
+          become: yes
+          register: ensurepip_result
+          ignore_errors: yes
+        
+        - name: Install pip via apt if ensurepip failed
+          apt:
+            name: python3-pip
+            state: present
+          when: ensurepip_result.failed | default(false)
+          ignore_errors: yes
+          register: apt_pip_result
+        
+        - name: Final fallback - install pip manually
+          block:
+            - name: Download get-pip.py
+              get_url:
+                url: https://bootstrap.pypa.io/get-pip.py
+                dest: /tmp/get-pip.py
+                mode: '0755'
+            
+            - name: Install pip using get-pip.py
+              command: python3 /tmp/get-pip.py
+              become: yes
+            
+            - name: Clean up get-pip.py
+              file:
+                path: /tmp/get-pip.py
+                state: absent
+          when: 
+            - ensurepip_result.failed | default(false)
+            - apt_pip_result.failed | default(false)
+      when: ansible_os_family == 'Debian'
+
+    - name: Verify pip installation
+      block:
+        - name: Check pip3 command
+          command: pip3 --version
+          register: pip3_check
+          ignore_errors: true
+        
+        - name: Check python3 -m pip
+          command: python3 -m pip --version
+          register: pip_module_check
+          ignore_errors: true
+          when: pip3_check.failed | default(false)
+        
+        - name: Display pip status
+          debug:
+            msg: |
+              pip3 command: {{ 'Available' if not (pip3_check.failed | default(false)) else 'Not available' }}
+              python3 -m pip: {{ 'Available' if not (pip_module_check.failed | default(false)) else 'Not available' }}
+        
+        - name: Fail if no pip method works
+          fail:
+            msg: "Neither pip3 nor python3 -m pip is available"
+          when: 
+            - pip3_check.failed | default(false)
+            - pip_module_check.failed | default(false)
+        
+        - name: Upgrade pip to latest version
+          command: python3 -m pip install --user --upgrade pip
+          ignore_errors: yes
+          when: not (pip_module_check.failed | default(false)) or not (pip3_check.failed | default(false))
 
     - name: Check if Google Cloud SDK is available
       command: which gcloud
@@ -76,20 +164,34 @@
       ignore_errors: yes
 
     - name: Install Python dependencies
-      pip:
-        requirements: "{{ app_dir }}/requirements.txt"
-        executable: pip3
-        extra_args: --user
+      block:
+        - name: Install requirements with pip3 (system-wide)
+          pip:
+            requirements: "{{ app_dir }}/requirements.txt"
+            executable: pip3
+      rescue:
+        - name: Install requirements with python3 -m pip (system-wide)
+          command: python3 -m pip install -r "{{ app_dir }}/requirements.txt"
 
     - name: Install additional packages
-      pip:
-        name:
-          - psycopg2-binary
-        executable: pip3
-        extra_args: --user
+      block:
+        - name: Install psycopg2-binary with pip3 (system-wide)
+          pip:
+            name:
+              - psycopg2-binary
+            executable: pip3
+      rescue:
+        - name: Install psycopg2-binary with python3 -m pip (system-wide)
+          command: python3 -m pip install psycopg2-binary
 
     - name: Set up environment variables
       include_tasks: tasks/setup_environment.yml
+
+    - name: Remove any cached .env files that might cause conflicts
+      file:
+        path: "{{ app_dir }}/.env"
+        state: absent
+      ignore_errors: true
 
     - name: Test Python imports
       command: python3 -c "import sys; print('Python path:', sys.path); import src.participation_bot"
@@ -115,3 +217,8 @@
         - "{{ app_dir }}/.git"
         - "{{ app_dir }}/ansible"
         - "{{ app_dir }}/tests"
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes

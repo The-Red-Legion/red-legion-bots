@@ -14,48 +14,51 @@
     msg: "Import test result: {{ import_test.stdout if import_test.rc == 0 else import_test.stderr }}"
   when: not ansible_check_mode and import_test is defined
 
-- name: Start bot process
-  shell: |
-    #!/bin/bash
-    cd {{ app_dir }}
-    export PYTHONPATH="{{ app_dir }}:$PYTHONPATH"
-    
-    # Load environment variables from .env file
-    if [ -f .env ]; then
-      set -a  # automatically export all variables
-      . .env  # use . instead of source for compatibility
-      set +a
-    fi
-    
-    echo "Starting bot with environment:"
-    echo "DISCORD_TOKEN: ${DISCORD_TOKEN:0:10}..."
-    echo "DATABASE_URL: ${DATABASE_URL:0:20}..."
-    echo "TEXT_CHANNEL_ID: $TEXT_CHANNEL_ID"
-    echo "PYTHONPATH: $PYTHONPATH"
-    
-    nohup python3 -m src.participation_bot > {{ app_dir }}/bot.log 2>&1 &
-    BOT_PID=$!
-    echo $BOT_PID > {{ app_dir }}/bot.pid
-    echo "Bot started with PID: $BOT_PID"
-    sleep 2
-    
-    if kill -0 $BOT_PID 2>/dev/null; then
-      echo "Bot process is running"
-    else
-      echo "Bot process failed to start or died immediately"
-      if [ -f {{ app_dir }}/bot.log ]; then
-        echo "Bot log contents:"
-        cat {{ app_dir }}/bot.log
-      fi
-    fi
-  args:
-    executable: /bin/bash
+- name: Create systemd service file
+  copy:
+    content: |
+      [Unit]
+      Description=Red Legion Discord Bot
+      After=network.target
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory={{ app_dir }}
+      ExecStart=/usr/bin/python3 -m src.participation_bot
+      Restart=always
+      RestartSec=10
+      StandardOutput=journal
+      StandardError=journal
+      Environment=PYTHONUNBUFFERED=1
+      Environment=GOOGLE_CLOUD_PROJECT=rl-prod-471116
+      Environment=GITHUB_TOKEN=dummy-github-token
+      Environment=WEBHOOK_URL=https://default.webhook.url
+      Environment=UEX_API_KEY=dummy-uex-api-key
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/red-legion-bot.service
+    mode: '0644'
+  notify: reload systemd
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start systemd service
+  systemd:
+    name: red-legion-bot
+    enabled: yes
+    state: started
   register: start_result
   when: not ansible_check_mode and (import_test is undefined or import_test.rc == 0)
 
 - name: Show startup debug info
   debug:
-    msg: "{{ start_result.stdout_lines }}"
+    msg: "Systemd service started: {{ start_result.status is defined }}"
   when: not ansible_check_mode and start_result is defined
 
 - name: Wait for bot to start
@@ -63,36 +66,24 @@
     seconds: 3
   when: not ansible_check_mode
 
-- name: Verify bot process is running
-  shell: |
-    #!/bin/bash
-    if [ -f "{{ app_dir }}/bot.pid" ]; then
-      kill -0 $(cat {{ app_dir }}/bot.pid) 2>/dev/null
-    else
-      exit 1
-    fi
-  args:
-    executable: /bin/bash
-  register: bot_check
-  failed_when: bot_check.rc != 0
-  ignore_errors: true
+- name: Verify bot service is running
+  systemd:
+    name: red-legion-bot
+  register: service_status
   when: not ansible_check_mode
 
-- name: Show bot log if startup failed
-  shell: |
-    #!/bin/bash
-    if [ -f "{{ app_dir }}/bot.log" ]; then
-      cat {{ app_dir }}/bot.log
-    else
-      echo "No bot log file found"
-    fi
-  args:
-    executable: /bin/bash
-  when: (bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)
-  register: bot_log
+- name: Show service status
+  debug:
+    msg: "Service status: {{ service_status.status.ActiveState if service_status.status is defined else 'Unknown' }}"
+  when: not ansible_check_mode and service_status is defined
+
+- name: Check service logs if failed
+  shell: journalctl -u red-legion-bot -n 20 --no-pager
+  register: service_logs
+  when: not ansible_check_mode and service_status is defined and service_status.status.ActiveState != 'active'
   failed_when: false
 
-- name: Fail with bot log
+- name: Fail with service logs if service not active
   fail:
-    msg: "Bot failed to start. Log output: {{ bot_log.stdout }}"
-  when: (bot_check is defined and (bot_check.rc | default(0)) != 0 and not ansible_check_mode) or (ansible_check_mode and false)
+    msg: "Bot service failed to start. Logs: {{ service_logs.stdout }}"
+  when: not ansible_check_mode and service_status is defined and service_status.status.ActiveState != 'active'
