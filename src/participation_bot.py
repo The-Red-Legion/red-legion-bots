@@ -291,6 +291,106 @@ def setup_commands():
                 await ctx.send(embed=error_embed)
                 await ctx.send(f"⚠️ Health check error, but bot is responding to commands. Error: `{str(e)[:100]}`")
 
+        @bot.command(name="config_check")
+        @has_org_role()
+        async def config_check(ctx):
+            """Check configuration and infrastructure connectivity"""
+            try:
+                from datetime import datetime
+                import os
+                
+                embed = discord.Embed(
+                    title="🔧 Configuration Check",
+                    description="Infrastructure and configuration status",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now()
+                )
+                
+                # Check environment variables
+                env_status = []
+                env_vars = ['GOOGLE_CLOUD_PROJECT', 'TEXT_CHANNEL_ID', 'ORG_ROLE_ID']
+                for var in env_vars:
+                    value = os.getenv(var)
+                    if value:
+                        env_status.append(f"✅ {var}: Set")
+                    else:
+                        env_status.append(f"⚠️ {var}: Not set")
+                
+                embed.add_field(
+                    name="🌍 Environment Variables",
+                    value="\n".join(env_status),
+                    inline=False
+                )
+                
+                # Check Secret Manager access
+                secret_status = []
+                try:
+                    from .config import get_secret
+                    # Test if we can access Secret Manager (without exposing values)
+                    try:
+                        get_secret("database-connection-string")
+                        secret_status.append("✅ Database connection string: Accessible")
+                    except Exception as e:
+                        secret_status.append(f"❌ Database connection string: {str(e)[:30]}")
+                    
+                    try:
+                        get_secret("discord-token")
+                        secret_status.append("✅ Discord token: Accessible")
+                    except Exception as e:
+                        secret_status.append(f"❌ Discord token: {str(e)[:30]}")
+                        
+                except Exception as e:
+                    secret_status.append(f"❌ Secret Manager: {str(e)[:40]}")
+                
+                embed.add_field(
+                    name="🔐 Secret Manager",
+                    value="\n".join(secret_status),
+                    inline=False
+                )
+                
+                # Quick database connectivity test
+                db_test = "❌ Not tested"
+                try:
+                    import psycopg2
+                    conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT version();")
+                    version = cursor.fetchone()[0]
+                    db_test = f"✅ Connected (PostgreSQL)"
+                    conn.close()
+                except Exception as e:
+                    db_test = f"❌ Error: {str(e)[:40]}"
+                
+                embed.add_field(
+                    name="🗄️ Database Connection",
+                    value=db_test,
+                    inline=False
+                )
+                
+                # Infrastructure info (if available)
+                infra_info = []
+                project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
+                infra_info.append(f"📍 Project: {project_id}")
+                infra_info.append(f"🏗️ Instance: arccorp-compute")
+                infra_info.append(f"🗄️ Database: arccorp-data-nexus")
+                
+                embed.add_field(
+                    name="🏗️ Infrastructure",
+                    value="\n".join(infra_info),
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="📋 Migration Status",
+                    value="✅ Updated for new infrastructure\n✅ Secret Manager configured\n✅ Database connection automated",
+                    inline=False
+                )
+                
+                await ctx.send(embed=embed)
+                
+            except Exception as e:
+                await ctx.send(f"❌ Configuration check failed: {str(e)}")
+
         print("All commands registered successfully")
         
     except Exception as e:

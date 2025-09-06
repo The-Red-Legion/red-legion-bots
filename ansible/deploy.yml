@@ -1,6 +1,6 @@
 ---
 - name: Deploy Participation Bot
-  hosts: participation-bot
+  hosts: arccorp-compute
   become: yes
   gather_facts: yes
 
