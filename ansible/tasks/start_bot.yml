@@ -15,7 +15,7 @@
   when: not ansible_check_mode and import_test is defined
 
 - name: Create systemd service file
-  template:
+  copy:
     content: |
       [Unit]
       Description=Red Legion Discord Bot
