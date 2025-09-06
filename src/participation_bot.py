@@ -47,6 +47,12 @@ def setup_commands():
         async def pick_winner_cmd(ctx):
             await pick_winner(bot, ctx)
         
+        @bot.command(name="ping")
+        async def ping_cmd(ctx):
+            """Simple ping command to test bot responsiveness"""
+            latency = round(bot.latency * 1000, 2)
+            await ctx.send(f"🏓 Pong! Latency: {latency}ms")
+        
         print("Basic commands registered")
         print("Registering role-restricted commands...")
 
@@ -144,9 +150,7 @@ def setup_commands():
         async def test_command(ctx):
             """Comprehensive bot health and status test command"""
             try:
-                import psutil
-                import os
-                from datetime import datetime, timedelta
+                from datetime import datetime
                 
                 # Calculate uptime
                 if hasattr(bot, 'start_time'):
@@ -155,20 +159,32 @@ def setup_commands():
                 else:
                     uptime_str = "Unknown"
                 
-                # Get system info
-                process = psutil.Process(os.getpid())
-                memory_mb = process.memory_info().rss / 1024 / 1024
-                cpu_percent = process.cpu_percent()
-                
                 # Get Discord connection info
                 guild_count = len(bot.guilds)
                 total_members = sum(guild.member_count for guild in bot.guilds if guild.member_count)
+                
+                # Try to get system info if psutil is available
+                memory_info = "N/A"
+                cpu_info = "N/A"
+                try:
+                    import psutil
+                    import os
+                    process = psutil.Process(os.getpid())
+                    memory_mb = process.memory_info().rss / 1024 / 1024
+                    cpu_percent = process.cpu_percent()
+                    memory_info = f"{memory_mb:.1f} MB"
+                    cpu_info = f"{cpu_percent:.1f}%"
+                except ImportError:
+                    memory_info = "psutil not available"
+                    cpu_info = "psutil not available"
+                except Exception as e:
+                    memory_info = f"Error: {str(e)[:20]}"
+                    cpu_info = f"Error: {str(e)[:20]}"
                 
                 # Test database connection
                 db_status = "Unknown"
                 try:
                     # Quick database test
-                    import asyncio
                     import asyncpg
                     
                     async def test_db():
@@ -181,22 +197,10 @@ def setup_commands():
                             return f"❌ Error: {str(e)[:50]}"
                     
                     db_status = await test_db()
+                except ImportError:
+                    db_status = "asyncpg not available"
                 except Exception as e:
                     db_status = f"❌ Test failed: {str(e)[:30]}"
-                
-                # Check recent errors in logs (if accessible)
-                recent_errors = "No recent errors detected"
-                try:
-                    if os.path.exists("/app/bot.log"):
-                        with open("/app/bot.log", "r") as f:
-                            log_lines = f.readlines()[-20:]  # Last 20 lines
-                            error_lines = [line for line in log_lines if any(term in line.lower() for term in ['error', 'exception', 'failed'])]
-                            if error_lines:
-                                recent_errors = f"⚠️ {len(error_lines)} recent errors found"
-                            else:
-                                recent_errors = "✅ No recent errors"
-                except:
-                    recent_errors = "Unable to check logs"
                 
                 # Create comprehensive health embed
                 embed = discord.Embed(
@@ -216,14 +220,14 @@ def setup_commands():
                 # System Resources Section
                 embed.add_field(
                     name="💻 System Resources",
-                    value=f"**Memory**: {memory_mb:.1f} MB\n**CPU**: {cpu_percent:.1f}%\n**PID**: {os.getpid()}\n**Process**: Running",
+                    value=f"**Memory**: {memory_info}\n**CPU**: {cpu_info}\n**Process**: Running",
                     inline=True
                 )
                 
                 # Database & Services Section
                 embed.add_field(
                     name="🗄️ Services",
-                    value=f"**Database**: {db_status}\n**Discord API**: ✅ Connected\n**Logs**: {recent_errors}",
+                    value=f"**Database**: {db_status}\n**Discord API**: ✅ Connected\n**Voice Tracking**: Ready",
                     inline=True
                 )
                 
@@ -231,7 +235,7 @@ def setup_commands():
                 latency_ms = round(bot.latency * 1000, 2)
                 embed.add_field(
                     name="📊 Performance",
-                    value=f"**Latency**: {latency_ms}ms\n**Commands**: Responsive\n**Events**: Active\n**Voice Tracking**: Ready",
+                    value=f"**Latency**: {latency_ms}ms\n**Commands**: Responsive\n**Events**: Active",
                     inline=True
                 )
                 
@@ -243,9 +247,10 @@ def setup_commands():
                     guild = ctx.guild
                     if guild:
                         test_results.append("✅ Guild access")
+                        test_results.append(f"✅ Voice channels ({len(guild.voice_channels)})")
                     else:
                         test_results.append("⚠️ No guild context")
-                except:
+                except Exception as e:
                     test_results.append("❌ Guild access failed")
                 
                 # Test 2: Can check user permissions
@@ -256,13 +261,6 @@ def setup_commands():
                         test_results.append("⚠️ No user context")
                 except:
                     test_results.append("❌ User permission check failed")
-                
-                # Test 3: Can access voice channels
-                try:
-                    voice_channels = len(ctx.guild.voice_channels) if ctx.guild else 0
-                    test_results.append(f"✅ Voice channels ({voice_channels})")
-                except:
-                    test_results.append("❌ Voice channel access failed")
                 
                 embed.add_field(
                     name="🧪 Function Tests",
