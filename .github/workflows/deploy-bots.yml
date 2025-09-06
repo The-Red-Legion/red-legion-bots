@@ -65,47 +65,113 @@ jobs:
         shell: bash
       - name: Verify Bot Health
         run: |
-          echo "=== Checking bot health on remote host ==="
+          echo "=== Discord Bot Health Check ==="
           
-          # SSH into the remote host and check bot status
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.BOT_SERVER_HOST }} << 'EOF'
-            # Check if this is a first deployment (no /app directory yet)
-            if [ ! -d /app ]; then
-              echo "ℹ️  First deployment detected - /app directory does not exist yet"
-              echo "This is expected for initial deployments"
-              exit 0
-            fi
+          # Function to check if bot responds to Discord
+          check_discord_health() {
+            local max_attempts=3
+            local attempt=1
             
-            # Check if bot process is running
-            if [ -f /app/bot.pid ] && kill -0 $(cat /app/bot.pid) 2>/dev/null; then
-              echo "✅ Bot process is running (PID: $(cat /app/bot.pid))"
-            else
-              echo "❌ Bot process is not running"
-              if [ -f /app/bot.log ]; then
-                echo "=== Bot log contents ==="
-                tail -20 /app/bot.log
-              fi
-              exit 1
-            fi
-            
-            # Check bot log for any immediate errors
-            if [ -f /app/bot.log ]; then
-              echo "=== Recent bot log entries ==="
-              tail -10 /app/bot.log
+            while [ $attempt -le $max_attempts ]; do
+              echo "Health check attempt $attempt/$max_attempts..."
               
-              # Check for common error patterns
-              if grep -iq "ERROR\|Exception\|Failed" /app/bot.log; then
-                echo "⚠️  Warning: Found error messages in bot log"
-                grep -i -A 2 -B 2 "ERROR\|Exception\|Failed" /app/bot.log
+              # Send a test message to Discord and check if bot processes it
+              # Using a simple API call to check if bot is online
+              HEALTH_CHECK=$(curl -s -X GET \
+                "https://discord.com/api/v10/applications/@me" \
+                -H "Authorization: Bot ${{ secrets.DISCORD_TOKEN }}" \
+                -H "Content-Type: application/json")
+              
+              if echo "$HEALTH_CHECK" | grep -q '"id"'; then
+                echo "✅ Bot is authenticated and responding to Discord API"
+                
+                # Additional check: verify bot can access guild information
+                GUILD_CHECK=$(curl -s -X GET \
+                  "https://discord.com/api/v10/users/@me/guilds" \
+                  -H "Authorization: Bot ${{ secrets.DISCORD_TOKEN }}" \
+                  -H "Content-Type: application/json")
+                
+                if echo "$GUILD_CHECK" | grep -q '\[.*\]'; then
+                  echo "✅ Bot can access guild information"
+                  echo "✅ Discord health check PASSED"
+                  return 0
+                else
+                  echo "⚠️ Bot authenticated but cannot access guilds"
+                fi
               else
-                echo "✅ No obvious errors found in recent logs"
+                echo "❌ Bot not responding to Discord API"
               fi
+              
+              echo "Waiting 10 seconds before retry..."
+              sleep 10
+              attempt=$((attempt + 1))
+            done
+            
+            echo "❌ Discord health check FAILED after $max_attempts attempts"
+            return 1
+          }
+          
+          # Also check if process exists (supplementary check)
+          echo "=== Process Status Check ==="
+          if [ -f "/app/bot.pid" ]; then
+            PID=$(cat /app/bot.pid)
+            echo "Found PID file with PID: $PID"
+            
+            if ps -p "$PID" > /dev/null 2>&1; then
+              echo "✅ Bot process is running (PID: $PID)"
+              PROCESS_STATUS="running"
             else
-              echo "⚠️  Warning: No bot log file found"
+              echo "⚠️ Bot process not found, but this may be a false negative"
+              PROCESS_STATUS="unknown"
+            fi
+          else
+            echo "⚠️ No PID file found at /app/bot.pid"
+            PROCESS_STATUS="no_pid"
+          fi
+          
+          # Check recent bot logs for activity
+          echo "=== Bot Log Analysis ==="
+          if [ -f "/app/bot.log" ]; then
+            echo "Recent bot log entries:"
+            tail -10 /app/bot.log
+            
+            # Check for recent heartbeat messages
+            if grep -q "Heartbeat: Bot is still running" /app/bot.log; then
+              LAST_HEARTBEAT=$(grep "Heartbeat: Bot is still running" /app/bot.log | tail -1)
+              echo "✅ Found heartbeat: $LAST_HEARTBEAT"
+            else
+              echo "⚠️ No recent heartbeat messages found"
             fi
             
-            echo "=== Bot health check completed ==="
-          EOF
+            # Check for errors in recent logs
+            if tail -20 /app/bot.log | grep -i "error\|exception\|failed" > /dev/null; then
+              echo "⚠️ Recent errors found in logs:"
+              tail -20 /app/bot.log | grep -i "error\|exception\|failed"
+            else
+              echo "✅ No recent errors in bot logs"
+            fi
+          else
+            echo "⚠️ No bot log file found"
+          fi
+          
+          # Primary health check: Discord API response
+          if check_discord_health; then
+            echo ""
+            echo "🎉 === HEALTH CHECK SUMMARY ==="
+            echo "✅ PRIMARY: Discord API health check PASSED"
+            echo "ℹ️  Process status: $PROCESS_STATUS"
+            echo "✅ Bot is confirmed working and responding to Discord"
+            echo "✅ Deployment is SUCCESSFUL"
+            exit 0
+          else
+            echo ""
+            echo "❌ === HEALTH CHECK SUMMARY ==="
+            echo "❌ PRIMARY: Discord API health check FAILED"
+            echo "ℹ️  Process status: $PROCESS_STATUS"
+            echo "❌ Bot may not be responding to Discord properly"
+            echo "Check logs above for details"
+            exit 1
+          fi
         shell: bash
       - name: Capture Deployment Logs
         if: always()

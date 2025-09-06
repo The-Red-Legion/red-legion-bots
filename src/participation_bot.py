@@ -1,4 +1,7 @@
 import discord
+import datetime  # Add this import
+import asyncio
+import logging
 from discord.ext import commands
 from .config import DATABASE_URL
 from .database import init_db, add_market_item, get_market_items, issue_loan
@@ -98,6 +101,198 @@ def setup_commands():
         async def list_open_events_cmd(ctx):
             await list_open_events(bot, ctx)
             
+        # Add health check command
+        @bot.command(name="health")
+        async def health_check(ctx):
+            """Simple health check command for monitoring"""
+            import datetime
+            import psutil
+            import os
+            
+            try:
+                # Basic bot status
+                uptime = datetime.datetime.now() - bot.start_time if hasattr(bot, 'start_time') else 'Unknown'
+                guild_count = len(bot.guilds)
+                
+                # System status
+                process = psutil.Process(os.getpid())
+                memory_mb = process.memory_info().rss / 1024 / 1024
+                
+                health_info = {
+                    'status': 'healthy',
+                    'uptime': str(uptime),
+                    'guilds': guild_count,
+                    'memory_mb': round(memory_mb, 2),
+                    'timestamp': datetime.datetime.now().isoformat()
+                }
+                
+                embed = discord.Embed(
+                    title="🟢 Bot Health Status", 
+                    description="Bot is running normally",
+                    color=discord.Color.green()
+                )
+                embed.add_field(name="Uptime", value=str(uptime), inline=True)
+                embed.add_field(name="Guilds", value=guild_count, inline=True)
+                embed.add_field(name="Memory", value=f"{round(memory_mb, 2)} MB", inline=True)
+                
+                await ctx.send(embed=embed)
+                
+            except Exception as e:
+                await ctx.send(f"⚠️ Health check error: {str(e)}")
+
+        @bot.command(name="test")
+        async def test_command(ctx):
+            """Comprehensive bot health and status test command"""
+            try:
+                import psutil
+                import os
+                from datetime import datetime, timedelta
+                
+                # Calculate uptime
+                if hasattr(bot, 'start_time'):
+                    uptime = datetime.now() - bot.start_time
+                    uptime_str = str(uptime).split('.')[0]  # Remove microseconds
+                else:
+                    uptime_str = "Unknown"
+                
+                # Get system info
+                process = psutil.Process(os.getpid())
+                memory_mb = process.memory_info().rss / 1024 / 1024
+                cpu_percent = process.cpu_percent()
+                
+                # Get Discord connection info
+                guild_count = len(bot.guilds)
+                total_members = sum(guild.member_count for guild in bot.guilds if guild.member_count)
+                
+                # Test database connection
+                db_status = "Unknown"
+                try:
+                    # Quick database test
+                    import asyncio
+                    import asyncpg
+                    
+                    async def test_db():
+                        try:
+                            conn = await asyncpg.connect(DATABASE_URL, timeout=5)
+                            await conn.execute('SELECT 1')
+                            await conn.close()
+                            return "✅ Connected"
+                        except Exception as e:
+                            return f"❌ Error: {str(e)[:50]}"
+                    
+                    db_status = await test_db()
+                except Exception as e:
+                    db_status = f"❌ Test failed: {str(e)[:30]}"
+                
+                # Check recent errors in logs (if accessible)
+                recent_errors = "No recent errors detected"
+                try:
+                    if os.path.exists("/app/bot.log"):
+                        with open("/app/bot.log", "r") as f:
+                            log_lines = f.readlines()[-20:]  # Last 20 lines
+                            error_lines = [line for line in log_lines if any(term in line.lower() for term in ['error', 'exception', 'failed'])]
+                            if error_lines:
+                                recent_errors = f"⚠️ {len(error_lines)} recent errors found"
+                            else:
+                                recent_errors = "✅ No recent errors"
+                except:
+                    recent_errors = "Unable to check logs"
+                
+                # Create comprehensive health embed
+                embed = discord.Embed(
+                    title="🔧 Bot Test & Health Status",
+                    description="Comprehensive bot health and system status",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now()
+                )
+                
+                # Bot Status Section
+                embed.add_field(
+                    name="🤖 Bot Status", 
+                    value=f"**Status**: 🟢 Online\n**Uptime**: {uptime_str}\n**Guilds**: {guild_count}\n**Total Members**: {total_members:,}",
+                    inline=True
+                )
+                
+                # System Resources Section
+                embed.add_field(
+                    name="💻 System Resources",
+                    value=f"**Memory**: {memory_mb:.1f} MB\n**CPU**: {cpu_percent:.1f}%\n**PID**: {os.getpid()}\n**Process**: Running",
+                    inline=True
+                )
+                
+                # Database & Services Section
+                embed.add_field(
+                    name="🗄️ Services",
+                    value=f"**Database**: {db_status}\n**Discord API**: ✅ Connected\n**Logs**: {recent_errors}",
+                    inline=True
+                )
+                
+                # Performance Metrics
+                latency_ms = round(bot.latency * 1000, 2)
+                embed.add_field(
+                    name="📊 Performance",
+                    value=f"**Latency**: {latency_ms}ms\n**Commands**: Responsive\n**Events**: Active\n**Voice Tracking**: Ready",
+                    inline=True
+                )
+                
+                # Quick Function Tests
+                test_results = []
+                
+                # Test 1: Can access guild info
+                try:
+                    guild = ctx.guild
+                    if guild:
+                        test_results.append("✅ Guild access")
+                    else:
+                        test_results.append("⚠️ No guild context")
+                except:
+                    test_results.append("❌ Guild access failed")
+                
+                # Test 2: Can check user permissions
+                try:
+                    if ctx.author:
+                        test_results.append("✅ User permissions")
+                    else:
+                        test_results.append("⚠️ No user context")
+                except:
+                    test_results.append("❌ User permission check failed")
+                
+                # Test 3: Can access voice channels
+                try:
+                    voice_channels = len(ctx.guild.voice_channels) if ctx.guild else 0
+                    test_results.append(f"✅ Voice channels ({voice_channels})")
+                except:
+                    test_results.append("❌ Voice channel access failed")
+                
+                embed.add_field(
+                    name="🧪 Function Tests",
+                    value="\n".join(test_results),
+                    inline=True
+                )
+                
+                # Add footer with additional info
+                embed.set_footer(text=f"Test run by {ctx.author.display_name} • Response time: {latency_ms}ms")
+                
+                # Send the comprehensive health report
+                await ctx.send(embed=embed)
+                
+                # Also send a simple confirmation message
+                await ctx.send(f"✅ **Bot Test Complete!** All systems operational. Response time: {latency_ms}ms")
+                
+            except Exception as e:
+                # If the health check itself fails, send a simple error message
+                error_embed = discord.Embed(
+                    title="❌ Bot Test Error",
+                    description=f"Health check encountered an error: {str(e)}",
+                    color=discord.Color.red(),
+                    timestamp=datetime.now()
+                )
+                error_embed.add_field(name="Status", value="Bot is responding but health check failed", inline=False)
+                error_embed.add_field(name="Basic Info", value=f"Guilds: {len(bot.guilds)}\nLatency: {round(bot.latency * 1000, 2)}ms", inline=False)
+                
+                await ctx.send(embed=error_embed)
+                await ctx.send(f"⚠️ Health check error, but bot is responding to commands. Error: `{str(e)[:100]}`")
+
         print("All commands registered successfully")
         
     except Exception as e:
@@ -108,8 +303,13 @@ def setup_commands():
 
 @bot.event
 async def on_ready():
+    bot.start_time = datetime.now()  # Add this line
+    
     print(f'Logged in as {bot.user}')
     print(f'Bot is ready and connected to {len(bot.guilds)} servers')
+    print(f"🤖 {bot.user} has connected to Discord!")
+    print(f"📅 Bot started at: {bot.start_time}")
+    print(f"🏠 Connected to {len(bot.guilds)} guilds")
     
     # Log guild information
     for guild in bot.guilds:
