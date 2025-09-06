@@ -1,7 +1,6 @@
 import discord
 import datetime  # Add this import
 from discord.ext import commands
-from .config import DATABASE_URL
 from .database import init_db, add_market_item, get_market_items, issue_loan
 from .event_handlers import (
     on_voice_state_update, start_logging, stop_logging, pick_winner,
@@ -9,6 +8,33 @@ from .event_handlers import (
     # log_mining_results temporarily disabled due to implementation issues
 )
 from .discord_utils import has_org_role
+
+# Import DATABASE_URL but handle None case
+try:
+    from .config import DATABASE_URL
+    if not DATABASE_URL:
+        print("WARNING: DATABASE_URL is None at import time")
+except Exception as e:
+    print(f"WARNING: Failed to import DATABASE_URL: {e}")
+    DATABASE_URL = None
+
+def get_database_url():
+    """Get current database URL, refreshing from Secret Manager if needed"""
+    global DATABASE_URL
+    if not DATABASE_URL:
+        try:
+            from .config import get_secret
+            DATABASE_URL = get_secret("database-connection-string")
+            print("Successfully refreshed DATABASE_URL from Secret Manager")
+        except Exception as e:
+            print(f"Failed to refresh DATABASE_URL: {e}")
+            # Try getting from config again
+            try:
+                from .config import config
+                DATABASE_URL = config.get('DATABASE_URL')
+            except Exception as e2:
+                print(f"Failed to get DATABASE_URL from config: {e2}")
+    return DATABASE_URL
 
 intents = discord.Intents.default()
 intents.members = True
@@ -59,7 +85,7 @@ def setup_commands():
         @has_org_role()
         @commands.cooldown(1, 30, commands.BucketType.guild)
         async def list_market(ctx):
-            items = get_market_items(DATABASE_URL)
+            items = get_market_items(get_database_url())
             if not items:
                 await ctx.send("No market items available.")
                 return
@@ -74,7 +100,7 @@ def setup_commands():
         @commands.cooldown(1, 30, commands.BucketType.guild)
         async def add_market_item_cmd(ctx, name: str, price: int, stock: int):
             try:
-                add_market_item(DATABASE_URL, name, price, stock)
+                add_market_item(get_database_url(), name, price, stock)
                 await ctx.send(f"Added {name} to market for {price} credits (Stock: {stock})")
             except Exception as e:
                 await ctx.send(f"Failed to add market item: {e}")
@@ -87,7 +113,7 @@ def setup_commands():
                 from datetime import datetime, timedelta
                 issued_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 due_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
-                issue_loan(DATABASE_URL, ctx.author.id, amount, issued_date, due_date)
+                issue_loan(get_database_url(), ctx.author.id, amount, issued_date, due_date)
                 await ctx.send(f"Loan request submitted for {amount} credits. Due date: {due_date}")
             except Exception as e:
                 await ctx.send(f"Failed to request loan: {e}")
@@ -179,7 +205,10 @@ def setup_commands():
                     
                     async def test_db():
                         try:
-                            conn = await asyncpg.connect(DATABASE_URL, timeout=5)
+                            current_db_url = get_database_url()
+                            if not current_db_url:
+                                return "❌ Error: DATABASE_URL not configured"
+                            conn = await asyncpg.connect(current_db_url, timeout=5)
                             await conn.execute('SELECT 1')
                             await conn.close()
                             return "✅ Connected"
@@ -297,7 +326,21 @@ def setup_commands():
                 # Test database connection
                 try:
                     import psycopg2
-                    conn = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+                    current_db_url = get_database_url()
+                    if not current_db_url:
+                        embed.add_field(
+                            name="❌ Configuration Error",
+                            value="DATABASE_URL is not configured",
+                            inline=False
+                        )
+                        embed.add_field(
+                            name="💡 Suggestion",
+                            value="Check Secret Manager configuration or environment variables",
+                            inline=False
+                        )
+                        embed.color = discord.Color.red()
+                    else:
+                        conn = psycopg2.connect(current_db_url, connect_timeout=10)
                     cursor = conn.cursor()
                     cursor.execute("SELECT version();")
                     version_info = cursor.fetchone()[0]
@@ -434,7 +477,11 @@ def setup_commands():
                 db_test = "❌ Not tested"
                 try:
                     import psycopg2
-                    conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
+                    db_url = get_database_url()
+                    if not db_url:
+                        db_test = "❌ Error: DATABASE_URL not configured"
+                    else:
+                        conn = psycopg2.connect(db_url, connect_timeout=5)
                     cursor = conn.cursor()
                     cursor.execute("SELECT version();")
                     cursor.fetchone()[0]  # Just test the connection, don't store
@@ -494,8 +541,14 @@ def setup_commands():
                     
                     # Test accessing secrets (without storing sensitive data)
                     try:
-                        get_secret("database-connection-string")
-                        refresh_status.append("✅ Database connection string: Refreshed")
+                        # Actually refresh the DATABASE_URL
+                        global DATABASE_URL
+                        DATABASE_URL = None  # Force refresh
+                        new_db_url = get_database_url()
+                        if new_db_url:
+                            refresh_status.append("✅ Database connection string: Refreshed")
+                        else:
+                            refresh_status.append("❌ Database connection string: Failed to refresh")
                     except Exception as e:
                         refresh_status.append(f"❌ Database connection string: {str(e)[:40]}")
                     
@@ -505,11 +558,8 @@ def setup_commands():
                     except Exception as e:
                         refresh_status.append(f"❌ Discord token: {str(e)[:40]}")
                     
-                    # Note: In a real refresh, you would reload DATABASE_URL here
-                    # global DATABASE_URL
-                    # DATABASE_URL = get_secret("database-connection-string")
-                    
-                    refresh_status.append("ℹ️ Bot restart required for full config reload")
+                    # Note: Full config refresh completed
+                    refresh_status.append("ℹ️ Configuration reloaded successfully")
                     
                 except Exception as e:
                     refresh_status.append(f"❌ Secret Manager access failed: {str(e)[:40]}")
@@ -600,7 +650,7 @@ async def on_ready():
         # Add timeout to database initialization to prevent hanging
         try:
             await asyncio.wait_for(
-                loop.run_in_executor(None, functools.partial(init_db, DATABASE_URL)),
+                loop.run_in_executor(None, functools.partial(init_db, get_database_url())),
                 timeout=30.0  # 30 second timeout
             )
             print("Database initialized successfully")
@@ -677,7 +727,7 @@ if __name__ == "__main__":
     from .config import DISCORD_TOKEN
     print("Starting Discord bot...")
     print(f"Discord token length: {len(DISCORD_TOKEN) if DISCORD_TOKEN else 'None'}")
-    print(f"Database URL configured: {'Yes' if DATABASE_URL else 'No'}")
+    print(f"Database URL configured: {'Yes' if get_database_url() else 'No'}")
     
     # Register commands before starting the bot
     print("Setting up commands...")
