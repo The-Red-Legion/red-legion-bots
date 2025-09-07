@@ -232,12 +232,6 @@ jobs:
         run: |
           echo "=== Starting Ansible Validation ==="
           
-          # Set environment variables for Ansible
-          export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
-          export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
-          export DATABASE_URL=${{ secrets.DATABASE_URL }}
-          export GOOGLE_CLOUD_PROJECT=rl-prod-471116
-          
           # First, validate Ansible playbook syntax
           echo "🔍 Validating Ansible playbook syntax..."
           if ansible-playbook --syntax-check ansible/deploy.yml; then
