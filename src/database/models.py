@@ -24,7 +24,7 @@ def retry_db_operation(max_retries=3):
 @retry_db_operation()
 def init_database(database_url):
     """Initialize database tables if they don't exist."""
-    print(f"🔗 Attempting database connection...")
+    print("🔗 Attempting database connection...")
     print(f"🔗 URL (first 50 chars): {database_url[:50]}...")
     print(f"🔗 URL contains '#': {'#' in database_url}")
     print(f"🔗 URL contains '%23': {'%23' in database_url}")
