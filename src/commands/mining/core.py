@@ -26,7 +26,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from config import (
+from config.settings import (
     get_sunday_mining_channels,
     ORE_TYPES, 
     UEX_API_CONFIG
