@@ -10,7 +10,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import DISCORD_CONFIG, validate_config
+from config.settings import DISCORD_CONFIG, validate_config
 
 class RedLegionBot(commands.Bot):
     """Red Legion Discord Bot with enhanced mining system."""
@@ -75,7 +75,7 @@ class RedLegionBot(commands.Bot):
         # Initialize database for new guild
         try:
             from ..database import init_database
-            from ..config import get_database_url
+            from ..config.settings import get_database_url
             
             db_url = get_database_url()
             if db_url:
