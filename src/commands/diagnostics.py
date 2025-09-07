@@ -11,7 +11,17 @@ import os
 import sys
 from pathlib import Path
 
-# Add src to path for imports
+# Add src to p            secret_status = []
+            try:
+                from config.settings import get_secret
+                # Test if we can access Secret Manager (without exposing values)
+                try:
+                    get_secret("database-connection-string")
+                    secret_status.append("✅ Database connection string: Accessible")
+                except Exception as e:
+                    secret_status.append(f"❌ Database connection string: {str(e)[:30]}")
+                
+                try:orts
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.decorators import has_org_role, error_handler
@@ -90,7 +100,7 @@ def register_commands(bot):
             # Test database connection
             db_status = "❌ Not tested"
             try:
-                from ..config.settings import get_database_url
+                from config.settings import get_database_url
                 
                 # Try to get database URL from config
                 db_url = get_database_url()
@@ -175,7 +185,7 @@ def register_commands(bot):
             # Test database connection
             try:
                 import psycopg2
-                from ..config.settings import get_database_url
+                from config.settings import get_database_url
                 
                 current_db_url = get_database_url()
                 if not current_db_url:
@@ -326,7 +336,7 @@ def register_commands(bot):
             db_test = "❌ Not tested"
             try:
                 import psycopg2
-                from ..config.settings import get_database_url
+                from config.settings import get_database_url
                 
                 db_url = get_database_url()
                 if not db_url:
