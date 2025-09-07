@@ -20,7 +20,7 @@ def register_all_commands(bot):
     """
     try:
         from . import market, loans, events, diagnostics, general
-        from .mining import SundayMiningCommands
+        from .mining import SundayMiningCommands, register_commands as register_mining_commands
         from .admin import register_commands as register_admin_commands
         
         # Register commands from each module
@@ -36,6 +36,8 @@ def register_all_commands(bot):
         print("  ⛏️ Registering mining commands...")
         # Mining uses cog pattern, add it directly
         bot.add_cog(SundayMiningCommands(bot))
+        # Also register legacy commands for test compatibility
+        register_mining_commands(bot)
         
         print("  🔍 Registering diagnostic commands...")
         diagnostics.register_commands(bot)
