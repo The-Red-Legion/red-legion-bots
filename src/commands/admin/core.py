@@ -121,7 +121,7 @@ def register_commands(bot):
     async def add_mining_channel(ctx, channel: discord.VoiceChannel, *, description=None):
         """Add a voice channel to Sunday mining tracking"""
         try:
-            from database import add_mining_channel
+            from database.operations import add_mining_channel
             from config.settings import get_database_url
             
             db_url = get_database_url()
@@ -154,7 +154,7 @@ def register_commands(bot):
     async def remove_mining_channel(ctx, channel: discord.VoiceChannel):
         """Remove a voice channel from Sunday mining tracking"""
         try:
-            from database import remove_mining_channel
+            from database.operations import remove_mining_channel
             from config.settings import get_database_url
             
             db_url = get_database_url()
@@ -192,7 +192,7 @@ def register_commands(bot):
     async def list_mining_channels(ctx):
         """List all Sunday mining channels"""
         try:
-            from database import get_mining_channels
+            from database.operations import get_mining_channels
             from config.settings import get_database_url, SUNDAY_MINING_CHANNELS_FALLBACK
             
             db_url = get_database_url()
@@ -317,7 +317,7 @@ def register_commands(bot):
         await interaction.response.defer()
         
         try:
-            from database import get_database_url
+            from config.settings import get_database_url
             import psycopg2
             
             # Get database connection

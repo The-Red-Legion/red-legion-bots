@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.decorators import has_org_role, standard_cooldown, error_handler
-from database import issue_loan
+from database.operations import issue_loan
 
 
 def register_commands(bot):

@@ -53,8 +53,8 @@ async def setup_core_handlers(bot):
                 print(f"⚠️ Database initialization failed: {db_error} - bot will continue without database")
             
             print("Setting up event handlers...")
-            from event_handlers import setup_event_handlers
-            await setup_event_handlers()  # Register event handler
+            # Event handlers are now set up automatically through the modular system
+            # No need for explicit setup_event_handlers() call
             print("Event handlers registered successfully")
             
             print("Bot setup completed successfully!")

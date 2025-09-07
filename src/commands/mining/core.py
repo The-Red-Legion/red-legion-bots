@@ -272,7 +272,7 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
         """Calculate how much each participant should receive based on time."""
         try:
             # Get participation data from enhanced mining tracking
-            from database import get_mining_session_participants
+            from database.operations import get_mining_session_participants
             from config.settings import get_database_url
             
             db_url = get_database_url()
@@ -410,7 +410,7 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
     async def _finalize_event(self, total_value, ore_amounts, interaction):
         """Close the event and generate PDF report."""
         try:
-            from database import close_mining_event, mark_pdf_generated
+            from database.operations import close_mining_event, mark_pdf_generated
             from config.settings import get_database_url
             
             db_url = get_database_url()
@@ -468,7 +468,7 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
                 return None
             
             # Get event-specific participation data
-            from database import get_mining_session_participants
+            from database.operations import get_mining_session_participants
             participants_data = get_mining_session_participants(db_url, hours_back=24)
             
             if not participants_data:
@@ -559,6 +559,10 @@ class SundayMiningCommands(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
+        # Set bot instance for voice tracking
+        from handlers.voice_tracking import set_bot_instance
+        set_bot_instance(bot)
+        print("✅ Mining commands initialized with bot instance")
     
     @app_commands.command(name="sunday_mining_start", description="Start Sunday mining session with voice tracking")
     async def sunday_mining_start(self, interaction: discord.Interaction):
@@ -578,7 +582,7 @@ class SundayMiningCommands(commands.Cog):
             session_id = f"sunday_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
             # Create event in database
-            from database import create_mining_event
+            from database.operations import create_mining_event
             from config.settings import get_database_url
             db_url = get_database_url()
             event_id = None
@@ -608,6 +612,10 @@ class SundayMiningCommands(commands.Cog):
                 'event_id': event_id,  # Store event_id for later use
                 'participants': {}
             })
+            
+            # Set bot instance for voice tracking before starting channels
+            from handlers.voice_tracking import set_bot_instance
+            set_bot_instance(self.bot)
             
             # Start voice tracking for all Sunday mining channels
             from handlers.voice_tracking import set_bot_instance
@@ -762,19 +770,35 @@ class SundayMiningCommands(commands.Cog):
                 events = await self._get_mining_events(db_url, interaction.guild.id)
                 
                 if not events:
-                    await interaction.followup.send(
-                        "❌ No recent Sunday mining events found",
-                        ephemeral=True
+                    # No events found - provide helpful message
+                    embed = discord.Embed(
+                        title="❌ No Mining Events Found",
+                        description="No recent Sunday mining events found. Start a mining session first with `/sunday_mining_start`",
+                        color=0xff0000
                     )
+                    embed.add_field(
+                        name="Troubleshooting", 
+                        value="• Make sure you've started a mining session\n• Check if events are being created in the database\n• Verify guild ID matches", 
+                        inline=False
+                    )
+                    await interaction.followup.send(embed=embed)
                     return
                 
-                # Show event selection view
+                # Show event selection view with enhanced info
                 view = EventSelectionView(events)
                 embed = discord.Embed(
-                    title="📋 Select Mining Event",
+                    title="📋 Select Mining Event for Payroll",
                     description="Choose which Sunday mining event to process payroll for:",
                     color=0x3498db
                 )
+                # Add event info to embed
+                if events:
+                    event_list = ""
+                    for i, event in enumerate(events[:5], 1):  # Show first 5 events
+                        event_id, event_name, event_time, *rest = event
+                        event_list += f"{i}. **{event_name}** - {event_time}\n"
+                    embed.add_field(name="Available Events", value=event_list, inline=False)
+                
                 await interaction.followup.send(embed=embed, view=view)
             
             elif action == "summary":
@@ -824,7 +848,7 @@ class SundayMiningCommands(commands.Cog):
     async def _create_participation_summary(self) -> Optional[discord.Embed]:
         """Create a summary of current participation without calculating payroll."""
         try:
-            from database import get_mining_session_participants
+            from database.operations import get_mining_session_participants
             from config.settings import get_database_url
             
             db_url = get_database_url()
@@ -1023,10 +1047,13 @@ class SundayMiningCommands(commands.Cog):
     async def _get_mining_events(self, db_url, guild_id):
         """Get open Sunday mining events for a specific guild."""
         try:
-            from database import get_open_mining_events
+            from database.operations import get_open_mining_events
+            
+            print(f"🔍 Looking for mining events in guild {guild_id}")
             
             # Get open mining events for this guild
             events = get_open_mining_events(db_url, guild_id)
+            print(f"📋 Found {len(events)} open mining events")
             
             if not events:
                 # If no open events, get recent closed events as fallback for this guild
@@ -1035,35 +1062,43 @@ class SundayMiningCommands(commands.Cog):
                 c = conn.cursor()
                 c.execute(
                     """
-                    SELECT event_id, event_name, start_time, channel_name
+                    SELECT id, event_name, event_time, created_at
                     FROM events 
                     WHERE guild_id = %s 
-                       AND (event_name ILIKE '%sunday%mining%' OR event_name ILIKE '%mining%')
-                       AND start_time >= NOW() - INTERVAL '7 days'
-                    ORDER BY start_time DESC
+                       AND (event_name ILIKE '%%sunday%%mining%%' OR event_name ILIKE '%%mining%%')
+                       AND created_at >= NOW() - INTERVAL '7 days'
+                    ORDER BY created_at DESC
                     LIMIT 10
                     """,
                     (guild_id,)
                 )
                 events = c.fetchall()
                 conn.close()
+                print(f"📋 Found {len(events)} recent events as fallback")
             
             return events
             
         except Exception as e:
-            print(f"Error getting mining events: {e}")
+            print(f"❌ Error getting mining events: {e}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
             return []
     
     async def _get_event_participants(self, db_url, event_id):
         """Get participants for a specific event."""
         try:
-            from database import get_mining_session_participants
+            from database.operations import get_mining_session_participants
             
+            print(f"🔍 Getting participants for event {event_id}")
             # Use the unified function with event_id parameter
-            return get_mining_session_participants(db_url, event_id=event_id)
+            participants = get_mining_session_participants(db_url, event_id=event_id)
+            print(f"👥 Found {len(participants)} participants for event {event_id}")
+            return participants
             
         except Exception as e:
-            print(f"Error getting event participants: {e}")
+            print(f"❌ Error getting event participants: {e}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
             return []
     
     async def _generate_pdf_report(self):
@@ -1076,7 +1111,7 @@ class SundayMiningCommands(commands.Cog):
             from reportlab.lib.styles import getSampleStyleSheet
             
             # Get recent participation data
-            from database import get_mining_session_participants
+            from database.operations import get_mining_session_participants
             from config.settings import get_database_url
             
             db_url = get_database_url()

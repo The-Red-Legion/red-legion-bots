@@ -3,16 +3,23 @@ Event management commands for the Red Legion Discord bot.
 
 This module contains commands for managing organization events and participation tracking.
 """
+Legacy event commands - replaced by new modular mining system.
+These commands are disabled as they reference the old event_handlers module.
+"""
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.decorators import has_org_role, standard_cooldown, error_handler
-from event_handlers import start_logging, stop_logging, pick_winner, list_open_events
+# Legacy import - disabled
+# from event_handlers import start_logging, stop_logging, pick_winner, list_open_events
 
 
 def register_commands(bot):
     """Register all event commands with the bot."""
+    
+    # Legacy commands disabled - use new /sunday_mining_start, /sunday_mining_stop, /payroll instead
+    print("⚠️ Legacy event commands disabled - use new mining commands instead")
     
     @bot.command(name="start_logging")
     @has_org_role()

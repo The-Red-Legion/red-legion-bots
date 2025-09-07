@@ -10,7 +10,7 @@ __author__ = "Red Legion"
 __description__ = "Enhanced Sunday Mining Discord Bot"
 
 from .bot import RedLegionBot
-from .config import validate_config
+from .config.settings import validate_config
 from .database import init_database
 
 __all__ = [
