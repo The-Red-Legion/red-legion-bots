@@ -33,5 +33,5 @@ def stop_voice_tracking(*args, **kwargs):
     print("⚠️ Voice tracking moved to handlers.voice_tracking")
 
 # Note: The actual implementations are now in:
-# - handlers.voice_tracking for voice state management  
+# - handlers.voice_tracking for voice state management
 # - handlers.core for core Discord event handling
