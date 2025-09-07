@@ -161,15 +161,17 @@ This document provides a comprehensive reference for all available commands in t
 - System status
 
 ### `/test`
-**Description:** Comprehensive bot health and connectivity test  
+**Description:** 🔧 Bot Test & Health Status - Comprehensive bot health and system status  
 **Usage:** `/test`  
 **Permissions:** Anyone  
 **Features:**
-- Complete system diagnostics
-- Database connectivity check
-- Discord API status
-- Memory and CPU usage
-- Guild and member statistics
+- **🤖 Bot Status**: Online status, uptime, guilds, total members
+- **💻 System Resources**: Memory usage, CPU usage, process status  
+- **🗄️ Services**: Database connectivity, Discord API status, voice tracking
+- **📊 Performance**: Latency, command responsiveness, event status
+- **🧪 Function Tests**: Guild access, voice channels count, user permissions
+- **Enhanced Display**: Professional embed with comprehensive diagnostics
+- **Error Handling**: Graceful fallback with detailed error reporting
 
 ### `/dbtest`
 **Description:** Test database connectivity and operations  

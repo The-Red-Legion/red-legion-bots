@@ -112,11 +112,41 @@ def init_db(database_url):
         primary_channel_id BIGINT,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
+    
+    # Run database migrations
+    migrate_schema(c)
+    
     conn.commit()
     conn.close()
 
+def migrate_schema(cursor):
+    """Handle database schema migrations for backward compatibility"""
+    try:
+        # Check if guild_id column exists in events table
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'events' AND column_name = 'guild_id'
+        """)
+        guild_id_exists = cursor.fetchone()
+        
+        if not guild_id_exists:
+            print("🔧 Adding missing guild_id column to events table...")
+            cursor.execute("ALTER TABLE events ADD COLUMN guild_id BIGINT")
+            print("✅ guild_id column added successfully")
+            
+        # Add other future migrations here as needed
+        
+    except Exception as e:
+        print(f"⚠️  Migration warning: {e}")
+        # Don't fail the entire init if migration has issues
+
 @retry_db_operation()
 def save_event(database_url, channel_id, channel_name, event_name, start_time):
+    """
+    DEPRECATED: Legacy event saving function - use create_mining_event() instead.
+    This function does not support guild_id and may fail on new schema.
+    """
     conn = psycopg2.connect(database_url)
     c = conn.cursor()
     c.execute(
