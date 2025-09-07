@@ -222,7 +222,7 @@ jobs:
       - name: Test GCloud SSH connection
         run: |
           echo "� Testing GCloud SSH connection..."
-          gcloud compute ssh red-legion-arccorp-scout --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30" || echo "GCloud SSH test failed - continuing anyway"
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30" || echo "GCloud SSH test failed - continuing anyway"
       - name: Install Ansible
         run: |
           python3 -m pip install --upgrade pip
@@ -250,7 +250,7 @@ jobs:
           
           # Test deployment with gcloud (simplified check)
           echo "🚀 Testing deployment readiness with GCloud..."
-          if gcloud compute ssh red-legion-arccorp-scout --zone=us-central1-a --project=rl-prod-471116 --command="echo 'Deployment target accessible'" --ssh-flag="-o ConnectTimeout=30"; then
+          if gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'Deployment target accessible'" --ssh-flag="-o ConnectTimeout=30"; then
             echo "✅ Deployment target is accessible via GCloud"
             echo "result=success" >> $GITHUB_OUTPUT
           else
