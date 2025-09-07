@@ -13,6 +13,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils import send_embed, has_org_role
+
+# Global datetime reference to avoid scope issues
+from datetime import datetime as dt
 from database import (
     save_mining_participation, save_event, update_event_end_time, update_entries, get_entries,
     update_mining_results, get_open_events
@@ -235,7 +238,7 @@ async def stop_logging(bot, ctx):
             event_name = next(e[1] for e in open_events if e[0] == event_id)
 
             current_time = time.time()
-            current_month = datetime.now().strftime("%B-%Y")
+            current_month = dt.now().strftime("%B-%Y")
             try:
                 # Save final durations
                 for member_id in list(member_times.get(channel_id, {}).keys()):

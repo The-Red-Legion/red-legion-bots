@@ -64,6 +64,9 @@ def get_discord_config():
 
 DISCORD_CONFIG = get_discord_config()
 
+# Backward compatibility exports
+DISCORD_TOKEN = DISCORD_CONFIG['TOKEN']
+
 # Validate essential configurations
 def validate_config():
     """Validate that required configuration is available."""
