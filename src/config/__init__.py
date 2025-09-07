@@ -7,6 +7,7 @@ from .settings import (
     ORE_TYPES,
     UEX_API_CONFIG,
     DISCORD_CONFIG,
+    DISCORD_TOKEN,
     validate_config
 )
 from .channels import (
@@ -21,5 +22,6 @@ __all__ = [
     'ORE_TYPES',
     'UEX_API_CONFIG',
     'DISCORD_CONFIG',
+    'DISCORD_TOKEN',
     'validate_config'
 ]
