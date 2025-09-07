@@ -272,7 +272,8 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
         """Calculate how much each participant should receive based on time."""
         try:
             # Get participation data from enhanced mining tracking
-            from database import get_mining_session_participants, get_database_url
+            from database import get_mining_session_participants
+from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url:
@@ -409,7 +410,8 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
     async def _finalize_event(self, total_value, ore_amounts, interaction):
         """Close the event and generate PDF report."""
         try:
-            from database import close_mining_event, mark_pdf_generated, get_database_url
+            from database import close_mining_event, mark_pdf_generated
+from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url or not self.event_id:
@@ -459,7 +461,7 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
             from reportlab.lib import colors
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
             from reportlab.lib.styles import getSampleStyleSheet
-            from database import get_database_url
+            from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url or not self.event_id:
@@ -576,7 +578,8 @@ class SundayMiningCommands(commands.Cog):
             session_id = f"sunday_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
             # Create event in database
-            from database import create_mining_event, get_database_url
+            from database import create_mining_event
+from config.settings import get_database_url
             db_url = get_database_url()
             event_id = None
             
@@ -732,7 +735,7 @@ class SundayMiningCommands(commands.Cog):
                 await interaction.response.defer()
                 
                 # Get open mining events
-                from database import get_database_url
+                from config.settings import get_database_url
                 db_url = get_database_url()
                 
                 if not db_url:
@@ -808,7 +811,8 @@ class SundayMiningCommands(commands.Cog):
     async def _create_participation_summary(self) -> Optional[discord.Embed]:
         """Create a summary of current participation without calculating payroll."""
         try:
-            from database import get_mining_session_participants, get_database_url
+            from database import get_mining_session_participants
+from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url:
@@ -1059,7 +1063,8 @@ class SundayMiningCommands(commands.Cog):
             from reportlab.lib.styles import getSampleStyleSheet
             
             # Get recent participation data
-            from database import get_mining_session_participants, get_database_url
+            from database import get_mining_session_participants
+from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url:
