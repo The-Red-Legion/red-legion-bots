@@ -193,7 +193,7 @@ def register_commands(bot):
         """List all Sunday mining channels"""
         try:
             from database import get_mining_channels
-            from config.settings import get_database_url
+            from config.settings import get_database_url, SUNDAY_MINING_CHANNELS_FALLBACK
             
             db_url = get_database_url()
             if not db_url:
@@ -203,9 +203,26 @@ def register_commands(bot):
             # Get channels from database for this guild
             channels = get_mining_channels(db_url, ctx.guild.id, active_only=True)
             
+            # If no channels in database, use hardcoded fallback
+            if not channels:
+                # Convert fallback channels to the expected format: (channel_id, channel_name, description, created_at)
+                channel_descriptions = {
+                    'dispatch': 'Main coordination channel for Sunday mining operations',
+                    'alpha': 'Alpha squad mining operations',
+                    'bravo': 'Bravo squad mining operations',
+                    'charlie': 'Charlie squad mining operations',
+                    'delta': 'Delta squad mining operations',
+                    'echo': 'Echo squad mining operations',
+                    'foxtrot': 'Foxtrot squad mining operations'
+                }
+                channels = [
+                    (channel_id, channel_name.title(), channel_descriptions.get(channel_name, f"{channel_name.title()} mining channel"), "Hardcoded")
+                    for channel_name, channel_id in SUNDAY_MINING_CHANNELS_FALLBACK.items()
+                ]
+            
             embed = discord.Embed(
                 title="🎤 Sunday Mining Channels",
-                description=f"Currently tracking {len(channels)} voice channels",
+                description=f"Currently tracking {len(channels)} voice channels" + (" (using fallback configuration)" if not get_mining_channels(db_url, ctx.guild.id, active_only=True) else ""),
                 color=discord.Color.blue(),
                 timestamp=datetime.now()
             )
@@ -264,7 +281,13 @@ def register_commands(bot):
                     inline=False
                 )
             
-            embed.set_footer(text="Use !add_mining_channel <channel> [description] to add channels")
+            # Update footer message based on whether we're using fallback channels
+            is_using_fallback = not get_mining_channels(db_url, ctx.guild.id, active_only=True)
+            footer_text = "Use !add_mining_channel <channel> [description] to add channels"
+            if is_using_fallback:
+                footer_text = "Showing hardcoded fallback channels. " + footer_text
+            
+            embed.set_footer(text=footer_text)
             await ctx.send(embed=embed)
             
         except Exception as e:
