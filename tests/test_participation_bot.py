@@ -26,7 +26,7 @@ def test_init_db(mock_db):
     conn, cursor = mock_db
     init_db("postgresql://test:test@localhost:5432/testdb")
     cursor.execute.assert_called()
-    assert cursor.execute.call_count == 6
+    assert cursor.execute.call_count == 8
     conn.commit.assert_called_once()
     conn.close.assert_called_once()
 

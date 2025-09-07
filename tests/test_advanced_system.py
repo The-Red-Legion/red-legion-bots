@@ -24,6 +24,8 @@ class MockBot:
         self.latency = 0.050  # 50ms mock latency
         self.user = Mock()
         self.user.name = "Red Legion Bot (Test)"
+        self.tree = Mock()  # Mock tree for slash commands
+        self.tree.command = self.command  # Redirect tree commands to regular commands
         
     def command(self, name=None, **kwargs):
         """Mock command decorator."""
@@ -41,6 +43,23 @@ class MockBot:
         """Mock listener registration."""
         self.listeners[name] = func
         print(f"    ✅ Registered listener: {name}")
+    
+    def add_cog(self, cog):
+        """Mock add_cog method for discord.py cogs."""
+        cog_name = cog.__class__.__name__
+        print(f"    ✅ Registered cog: {cog_name}")
+        
+        # Count commands in the cog
+        command_count = 0
+        for attr_name in dir(cog):
+            attr = getattr(cog, attr_name)
+            if hasattr(attr, '__discord_commands__'):
+                command_count += len(attr.__discord_commands__)
+            elif callable(attr) and hasattr(attr, 'callback'):
+                command_count += 1
+        
+        if command_count > 0:
+            print(f"      📝 Cog contains {command_count} commands")
 
 
 def test_command_registration_with_mock_bot():
@@ -53,7 +72,7 @@ def test_command_registration_with_mock_bot():
         print("  🤖 Created mock bot instance")
         
         # Import and run command registration
-        from commands import register_all_commands
+        from src.commands import register_all_commands
         
         print("  📋 Running command registration...")
         register_all_commands(mock_bot)
@@ -113,7 +132,7 @@ def test_decorator_functionality():
     print("\n🧪 Testing decorator functionality...")
     
     try:
-        from core.decorators import has_org_role, standard_cooldown, error_handler, admin_only
+        from src.core.decorators import has_org_role, standard_cooldown, error_handler, admin_only
         
         print("  🎯 Testing has_org_role decorator...")
         decorator = has_org_role()
@@ -161,7 +180,7 @@ def test_bot_setup_functionality():
     print("\n🧪 Testing bot setup functionality...")
     
     try:
-        from core.bot_setup import create_bot_instance, setup_heartbeat
+        from src.core.bot_setup import create_bot_instance, setup_heartbeat
         
         print("  🤖 Testing create_bot_instance...")
         # We can't actually create a real bot without Discord.py being available

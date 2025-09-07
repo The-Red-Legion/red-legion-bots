@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Syntax and import validation test.
+Comprehensive validation test for the Red Legion Discord bot.
 
 This test validates that the main bot file can be imported and 
 all critical functions are available without actually starting Discord.
@@ -13,6 +13,37 @@ from unittest.mock import Mock, patch
 # Add the project root and src directory to the path
 project_root = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'src'))
+
+
+def test_main_bot_syntax():
+    """Test main bot file syntax."""
+    print("\n🧪 Testing main bot file syntax...")
+    
+    # Test both the new main.py and legacy participation_bot.py
+    test_files = ['src/main.py', 'src/participation_bot.py']
+    
+    for file_path in test_files:
+        try:
+            if not os.path.exists(file_path):
+                print(f"  ⚠️ {file_path} not found (may be expected for reorganized structure)")
+                continue
+                
+            with open(file_path, 'r') as f:
+                code = f.read()
+            
+            compile(code, file_path, 'exec')
+            print(f"  ✅ {file_path} syntax is valid")
+            
+        except SyntaxError as e:
+            print(f"  ❌ Syntax error in {file_path}: {e}")
+            print(f"     Line {e.lineno}: {e.text}")
+            return False
+        except Exception as e:
+            print(f"  ❌ Error reading {file_path}: {e}")
+            return False
+    
+    return True
 sys.path.insert(0, os.path.join(project_root, 'src'))
 
 def test_main_bot_file_syntax():
@@ -81,12 +112,26 @@ def test_command_count_validation():
         class CommandCounter:
             def __init__(self):
                 self.command_count = 0
+                self.cog_count = 0
+                self.tree = Mock()  # Mock tree for slash commands
+                self.tree.command = self.command  # Redirect tree commands to regular commands
                 
             def command(self, name=None, **kwargs):
                 def decorator(func):
                     self.command_count += 1
                     return func
                 return decorator
+            
+            def add_cog(self, cog):
+                """Mock add_cog method for discord.py cogs."""
+                self.cog_count += 1
+                # Count commands in the cog
+                for attr_name in dir(cog):
+                    attr = getattr(cog, attr_name)
+                    if hasattr(attr, '__discord_commands__'):
+                        self.command_count += len(attr.__discord_commands__)
+                    elif callable(attr) and hasattr(attr, 'callback'):
+                        self.command_count += 1
         
         counter = CommandCounter()
         register_all_commands(counter)
@@ -136,22 +181,44 @@ def test_file_structure():
     print("\n🧪 Testing file structure...")
     
     expected_files = [
-        'src/participation_bot.py',
-        'src/config.py',
-        'src/database.py',
-        'src/discord_utils.py',
-        'src/event_handlers.py',
+        'src/main.py',  # New entry point
+        'src/participation_bot.py',  # Legacy file (still exists)
+        'src/config.py',  # Legacy file (still exists)
+        'src/database.py',  # Legacy file (still exists) 
+        'src/event_handlers.py',  # Legacy file (still exists)
+        
+        # New modular structure
+        'src/config/__init__.py',
+        'src/config/settings.py',
+        'src/config/channels.py',
+        'src/database/__init__.py',
+        'src/database/models.py',
+        'src/database/operations.py',
+        'src/bot/__init__.py',
+        'src/bot/client.py',
+        'src/bot/utils.py',
+        'src/utils/__init__.py',
+        'src/utils/decorators.py',
+        'src/utils/discord_helpers.py',
+        
+        # Core modules
         'src/core/__init__.py',
         'src/core/bot_setup.py',
         'src/core/decorators.py',
+        
+        # Commands (modular)
         'src/commands/__init__.py',
         'src/commands/market.py',
         'src/commands/loans.py',
         'src/commands/events.py',
-        'src/commands/mining.py',
         'src/commands/diagnostics.py',
-        'src/commands/admin.py',
         'src/commands/general.py',
+        'src/commands/mining/__init__.py',
+        'src/commands/mining/core.py',
+        'src/commands/admin/__init__.py',
+        'src/commands/admin/core.py',
+        
+        # Handlers
         'src/handlers/__init__.py',
         'src/handlers/voice_tracking.py',
         'src/handlers/core.py',
