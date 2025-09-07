@@ -20,10 +20,47 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Test GCloud SSH connection
+      - name: Test GCloud SSH connection and get current IP
+        id: vm_info
         run: |
           echo "🔗 Testing GCloud SSH connection to arccorp-compute..."
-          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30" || echo "GCloud SSH test failed - continuing anyway"
+          if gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30"; then
+            echo "✅ GCloud SSH connection successful"
+          else
+            echo "⚠️ GCloud SSH test failed - continuing anyway"
+          fi
+          
+          # Get current VM IP for Ansible
+          echo "🔍 Getting current VM IP address..."
+          VM_IP=$(gcloud compute instances describe arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --format="get(networkInterfaces[0].accessConfigs[0].natIP)" || echo "")
+          if [ -z "$VM_IP" ]; then
+            echo "❌ Could not get VM IP address, using fallback"
+            VM_IP="34.30.73.146"
+          fi
+          echo "📍 Current VM IP: $VM_IP"
+          echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
+      - name: Set up SSH key for Ansible
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # Add host key for the current IP
+          ssh-keyscan -H ${{ steps.vm_info.outputs.vm_ip }} >> ~/.ssh/known_hosts || true
+          echo "🔍 Testing SSH connection for Ansible to ${{ steps.vm_info.outputs.vm_ip }}..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@${{ steps.vm_info.outputs.vm_ip }} "echo 'Ansible SSH connection test successful'" || echo "SSH test failed - continuing anyway"
+      - name: Create dynamic inventory for Ansible
+        run: |
+          # Create a temporary inventory file with the current IP
+          mkdir -p /tmp/ansible
+          cat > /tmp/ansible/inventory.ini << EOF
+          [arccorp_compute]
+          ${{ steps.vm_info.outputs.vm_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+          [arccorp_compute:vars]
+          ansible_python_interpreter=/usr/bin/python3
+          EOF
+          echo "📋 Dynamic inventory file created:"
+          cat /tmp/ansible/inventory.ini
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -45,11 +82,11 @@ jobs:
           export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
           export DATABASE_URL=${{ secrets.DATABASE_URL }}
 
-          # Run Ansible playbook
+          # Run Ansible playbook with dynamic inventory
           DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} \
           TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }} \
           DATABASE_URL=${{ secrets.DATABASE_URL }} \
-          ansible-playbook ansible/deploy.yml -i ansible/inventory.ini -v
+          ansible-playbook ansible/deploy.yml -i /tmp/ansible/inventory.ini -v
 
           echo "=== Ansible deployment completed ==="
           
