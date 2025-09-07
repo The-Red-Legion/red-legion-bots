@@ -76,8 +76,10 @@ async def on_ready():
         await setup_event_handlers()
         print("✅ Event handlers registered successfully")
         
-        # Start voice tracking
-        start_voice_tracking()
+        # Set up voice tracking with proper bot instance
+        from .handlers.voice_tracking import setup as setup_voice_tracking
+        await setup_voice_tracking(bot)
+        print("✅ Voice tracking setup completed")
         
         print("Bot setup completed successfully!")
         print("Bot is fully operational and ready to receive commands")

@@ -21,7 +21,7 @@ bot_voice_connections = {}  # Track bot's voice connections
 member_session_data = {}  # {member_id: {'total_time': int, 'channels': {channel_id: time}, 'primary_channel': channel_id, 'session_start': datetime}}
 
 
-async def on_voice_state_update(member, before, after):
+async def on_voice_state_update_handler(member, before, after):
     """
     Handle voice state updates for participation tracking.
     Enhanced to handle channel switching during mining sessions.
@@ -398,8 +398,8 @@ async def setup(bot):
     
     # Register the voice state update handler
     @bot.event
-    async def on_voice_state_update_handler(member, before, after):
-        await on_voice_state_update(member, before, after)
+    async def on_voice_state_update(member, before, after):
+        await on_voice_state_update_handler(member, before, after)
     
     # Start the logging task
     if not log_members.is_running():
