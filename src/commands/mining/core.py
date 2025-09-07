@@ -18,9 +18,8 @@ from discord.ext import commands
 from discord import app_commands
 import asyncio
 import aiohttp
-from datetime import datetime, timedelta
-import json
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, Optional
 import sys
 from pathlib import Path
 
@@ -30,17 +29,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from config import (
     get_sunday_mining_channels,
     ORE_TYPES, 
-    UEX_API_CONFIG,
-    get_database_url
+    UEX_API_CONFIG
 )
 from handlers.voice_tracking import (
     add_tracked_channel, 
     remove_tracked_channel, 
     start_voice_tracking,
-    stop_voice_tracking,
-    get_tracking_status
+    stop_voice_tracking
 )
-from utils import has_org_role, can_manage_payroll
+from utils import can_manage_payroll
 
 # Global state for Sunday mining sessions
 current_session = {
@@ -133,8 +130,7 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
         self.ore_prices = ore_prices or {}
         self.event_id = event_id
         
-        # Pre-calculate total value from ore prices
-        total_calculated = 0
+        # Pre-calculate price display from ore prices
         price_display = []
         
         for ore_name, ore_display in ORE_TYPES.items():
@@ -167,13 +163,11 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
         try:
             # First, try to auto-calculate from ore amounts
             total_value = 0
-            auto_calculated = False
             
             if self.ore_amounts.value:
                 # Calculate from SCU amounts using current UEX prices
                 calculated_value = await self._calculate_total_value_from_ores(self.ore_amounts.value)
                 if calculated_value and calculated_value > 0:
-                    auto_calculated = True
                     # If total_value field is empty or "calculate", use auto-calculated
                     if not self.total_value.value or self.total_value.value.lower() == "calculate":
                         total_value = calculated_value
@@ -461,7 +455,6 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
         """Generate enhanced PDF report for this specific event."""
         try:
             import io
-            from reportlab.pdfgen import canvas
             from reportlab.lib.pagesizes import letter
             from reportlab.lib import colors
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -856,7 +849,7 @@ class SundayMiningCommands(commands.Cog):
                 try:
                     primary_channel = self.bot.get_channel(int(primary_channel_id))
                     channel_name = primary_channel.name if primary_channel else "Unknown"
-                except:
+                except (ValueError, TypeError, AttributeError):
                     channel_name = "Unknown"
                 
                 if hours >= 1:
@@ -1060,7 +1053,6 @@ class SundayMiningCommands(commands.Cog):
         """Generate PDF report for Sunday mining session."""
         try:
             import io
-            from reportlab.pdfgen import canvas
             from reportlab.lib.pagesizes import letter
             from reportlab.lib import colors
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer

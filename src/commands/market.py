@@ -5,7 +5,6 @@ This module contains commands for managing the organization market system.
 """
 
 import discord
-from discord.ext import commands
 import sys
 from pathlib import Path
 

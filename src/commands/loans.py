@@ -5,7 +5,6 @@ This module contains commands for managing the organization loan system.
 """
 
 import discord
-from discord.ext import commands
 from datetime import datetime, timedelta
 import sys
 from pathlib import Path

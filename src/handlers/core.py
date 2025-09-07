@@ -4,7 +4,6 @@ Core Discord event handlers for the Red Legion Discord bot.
 This module contains basic Discord event handlers that don't fit in other specific categories.
 """
 
-import discord
 from datetime import datetime
 
 

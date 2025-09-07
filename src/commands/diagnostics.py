@@ -6,7 +6,6 @@ and checking configuration status.
 """
 
 import discord
-from discord.ext import commands
 from datetime import datetime
 import os
 import sys
@@ -15,7 +14,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.decorators import has_org_role, standard_cooldown, error_handler
+from core.decorators import has_org_role, error_handler
 
 
 def register_commands(bot):

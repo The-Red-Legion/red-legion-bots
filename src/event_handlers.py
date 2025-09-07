@@ -1,6 +1,6 @@
 import discord
 from discord.ext import tasks, commands
-import datetime
+from datetime import datetime
 import time
 import random
 import aiohttp
@@ -155,7 +155,7 @@ async def start_logging(bot, ctx):
                 channel_id,
                 ctx.author.voice.channel.name,
                 event_name,
-                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             )
             log_channel = bot.get_channel(int(LOG_CHANNEL_ID))
             if log_channel:
@@ -164,7 +164,7 @@ async def start_logging(bot, ctx):
                     "Logging Started",
                     f"**Event**: {event_name}\n**Channel**: {active_voice_channels[channel_id].name}",
                     discord.Color.green(),
-                    datetime.datetime.now()
+                    datetime.now()
                 )
             else:
                 await ctx.send(f"Text channel ID {LOG_CHANNEL_ID} not found")
@@ -222,7 +222,7 @@ async def stop_logging(bot, ctx):
             title="Stop Logging - Select Event",
             description="Choose an event to stop logging.",
             color=discord.Color.red(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.now()
         )
         await ctx.send(embed=embed, view=view)
 
@@ -235,7 +235,7 @@ async def stop_logging(bot, ctx):
             event_name = next(e[1] for e in open_events if e[0] == event_id)
 
             current_time = time.time()
-            current_month = datetime.datetime.now().strftime("%B-%Y")
+            current_month = datetime.now().strftime("%B-%Y")
             try:
                 # Save final durations
                 for member_id in list(member_times.get(channel_id, {}).keys()):
@@ -278,7 +278,7 @@ async def stop_logging(bot, ctx):
                 update_event_end_time(
                     DATABASE_URL,
                     channel_id,
-                    datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 )
                 log_channel = bot.get_channel(int(LOG_CHANNEL_ID))
                 if log_channel:
@@ -287,7 +287,7 @@ async def stop_logging(bot, ctx):
                         "Logging Stopped",
                         f"**Event**: {event_name}\n**Channel**: {active_voice_channels[channel_id].name}",
                         discord.Color.red(),
-                        datetime.datetime.now()
+                        datetime.now()
                     )
                 del active_voice_channels[channel_id]
                 del event_names[channel_id]
@@ -309,9 +309,9 @@ async def stop_logging(bot, ctx):
         await ctx.send(f"Failed to connect to database: {e}")
 
 async def pick_winner(bot, ctx):
-    print(f"pick_winner invoked by {ctx.author.display_name} at {datetime.datetime.now()}")
+    print(f"pick_winner invoked by {ctx.author.display_name} at {datetime.now()}")
     try:
-        current_month = datetime.datetime.now().strftime("%B-%Y")
+        current_month = datetime.now().strftime("%B-%Y")
         entries = get_entries(DATABASE_URL, current_month)
         if not entries:
             await ctx.send("No entries available for this month.")
@@ -359,7 +359,7 @@ async def log_mining_results(bot, ctx, event_id: int):
             title=f"Log Mining Results (Event {event_id})",
             description="Enter SCUs and overwrite prices if needed. Use 0 or leave blank for materials not mined.",
             color=discord.Color.blue(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.now()
         )
         await ctx.send(embed=embed)
 
@@ -478,7 +478,7 @@ async def log_mining_results(bot, ctx, event_id: int):
                 for material, scu_refined, _ in materials_data:
                     embed.add_field(name=f"{material} (SCUs)", value=scu_refined, inline=True)
                 embed.add_field(name="Total Value", value=f"{total_value:.2f} credits", inline=True)
-                await send_embed(interaction.channel, embed.title, embed.description, embed.color, datetime.datetime.now())
+                await send_embed(interaction.channel, embed.title, embed.description, embed.color, datetime.now())
                 await interaction.response.send_message("Payroll calculated successfully.", ephemeral=True)
 
             except ValueError:
@@ -506,7 +506,7 @@ async def list_open_events(bot, ctx):
             await ctx.send("No open events found.")
             return
 
-        embed = discord.Embed(title="Open Events", color=discord.Color.blue(), timestamp=datetime.datetime.now())
+        embed = discord.Embed(title="Open Events", color=discord.Color.blue(), timestamp=datetime.now())
         for event_id, event_name, channel_name, start_time in open_events:
             embed.add_field(
                 name=f"Event ID: {event_id} - {event_name}",

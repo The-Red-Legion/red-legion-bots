@@ -5,8 +5,10 @@ This module contains basic bot commands and utilities.
 """
 
 import discord
-from discord.ext import commands
-import sys; from pathlib import Path; sys.path.insert(0, str(Path(__file__).parent.parent)); from core.decorators import error_handler
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from core.decorators import error_handler
 
 
 def register_commands(bot):
@@ -20,7 +22,7 @@ def register_commands(bot):
         
         embed = discord.Embed(
             title="🏓 Pong!",
-            description=f"Bot is responding normally",
+            description="Bot is responding normally",
             color=discord.Color.green()
         )
         embed.add_field(name="Latency", value=f"{latency_ms}ms", inline=True)

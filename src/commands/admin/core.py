@@ -5,7 +5,6 @@ This module contains commands for bot administration and configuration managemen
 """
 
 import discord
-from discord.ext import commands
 from datetime import datetime, timedelta
 import os
 import sys
@@ -15,7 +14,6 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils import has_org_role
 from core.decorators import admin_only, error_handler
 
 
@@ -298,8 +296,6 @@ def register_commands(bot):
         try:
             from ...database import get_database_url
             import psycopg2
-            import random
-            from datetime import datetime, timedelta
             
             # Get database connection
             db_url = get_database_url()
@@ -524,9 +520,12 @@ async def _show_test_data(interaction, cursor, guild_id):
             event_list = []
             for event_id, date, participants, payout, is_open, payroll, pdf in events:
                 status = []
-                if is_open: status.append("🟢 OPEN")
-                if payroll: status.append("💰 PAYROLL")
-                if pdf: status.append("📄 PDF")
+                if is_open:
+                    status.append("🟢 OPEN")
+                if payroll:
+                    status.append("💰 PAYROLL")
+                if pdf:
+                    status.append("📄 PDF")
                 status_str = " ".join(status) if status else "⚪ CREATED"
                 
                 payout_str = f"{payout:,.0f} aUEC" if payout else "No payout"
