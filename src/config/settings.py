@@ -49,7 +49,7 @@ def _fix_database_url_encoding(db_url):
     try:
         # For PostgreSQL URLs with problematic characters, use regex to extract and fix
         import re
-        from urllib.parse import quote
+        from urllib.parse import quote, unquote
         
         # Pattern to match: postgresql://username:password@host:port/database
         pattern = r'^(postgresql://)(.*?):(.*?)@(.*)$'
@@ -61,14 +61,21 @@ def _fix_database_url_encoding(db_url):
             password = match.group(3)  # password (may contain special chars)
             host_port_db = match.group(4)  # host:port/database
             
-            # URL-encode only the password
-            encoded_password = quote(password, safe='')
+            # Check if password is already URL-encoded by looking for % patterns
+            if '%' in password and any(c in password for c in ['%23', '%2A', '%3F', '%21']):
+                print("Database URL encoding: Password already URL-encoded, using as-is")
+                return db_url
             
-            # Reconstruct the URL
-            fixed_url = f"{protocol}{username}:{encoded_password}@{host_port_db}"
-            
-            print("Database URL encoding: Fixed special characters in password")
-            return fixed_url
+            # URL-encode only the password if it contains special characters
+            if any(char in password for char in ['#', '*', '?', '!', '&', '<', '>', ';', ':', ',', '(', ')', '[', ']', '{', '}', '|']):
+                encoded_password = quote(password, safe='')
+                # Reconstruct the URL
+                fixed_url = f"{protocol}{username}:{encoded_password}@{host_port_db}"
+                print("Database URL encoding: Fixed special characters in password")
+                return fixed_url
+            else:
+                print("Database URL encoding: No special characters found, using as-is")
+                return db_url
         else:
             # If the regex doesn't match, return the original URL
             print("Database URL encoding: Could not parse URL format, using as-is")
