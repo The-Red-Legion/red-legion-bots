@@ -38,12 +38,12 @@ def test_main_bot_syntax():
         except SyntaxError as e:
             print(f"  ❌ Syntax error in {file_path}: {e}")
             print(f"     Line {e.lineno}: {e.text}")
-            return False
+            assert False, f"Syntax error in {file_path}: {e}"
         except Exception as e:
             print(f"  ❌ Error reading {file_path}: {e}")
-            return False
+            assert False, f"Error reading {file_path}: {e}"
     
-    return True
+    assert True  # All files passed syntax validation
 sys.path.insert(0, os.path.join(project_root, 'src'))
 
 def test_main_bot_file_syntax():
@@ -57,15 +57,15 @@ def test_main_bot_file_syntax():
         
         compile(code, 'src/participation_bot.py', 'exec')
         print("  ✅ Main bot file syntax is valid")
-        return True
+        assert True  # File syntax is valid
         
     except SyntaxError as e:
         print(f"  ❌ Syntax error in main bot file: {e}")
         print(f"     Line {e.lineno}: {e.text}")
-        return False
+        assert False, f"Syntax error in main bot file: {e}"
     except Exception as e:
         print(f"  ❌ Error reading main bot file: {e}")
-        return False
+        assert False, f"Error reading main bot file: {e}"
 
 
 def test_critical_imports():
@@ -156,19 +156,16 @@ def test_command_count_validation():
         
         if actual_count == expected_count:
             print("  ✅ Command count matches expected")
-            return True
+            assert True  # Test passed
         else:
             print(f"  ❌ Command count mismatch (expected {expected_count}, got {actual_count})")
-            return False
-            
+            assert False, "Test failed"
     except Exception as e:
         print(f"  ❌ Command count validation failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def test_database_function_availability():
     """Test that database functions are available."""
     print("\n🧪 Testing database function availability...")
@@ -181,13 +178,10 @@ def test_database_function_availability():
         from config import get_database_url
         print("  ✅ get_database_url function available")
         
-        return True
-        
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Database function test failed: {e}")
-        return False
-
-
+        assert False, "Test failed"
 def test_file_structure():
     """Test that all expected files exist."""
     print("\n🧪 Testing file structure...")
@@ -247,12 +241,9 @@ def test_file_structure():
     
     if missing_files:
         print(f"  ❌ Missing files: {missing_files}")
-        return False
-    
+        assert False, "Test failed"
     print(f"  ✅ All {len(expected_files)} expected files present")
-    return True
-
-
+    assert True  # Test passed
 def main():
     """Run validation tests."""
     print("🚀 Starting syntax and import validation tests...\n")

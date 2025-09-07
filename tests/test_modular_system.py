@@ -48,16 +48,13 @@ def test_command_imports():
         from commands import general
         print("  ✅ General module imported successfully")
         
-        return True
-        
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Import failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def test_command_registration():
     """Test the command registration system."""
     print("\n🧪 Testing command registration system...")
@@ -73,18 +70,14 @@ def test_command_registration():
             print("  ✅ register_all_commands is callable")
         else:
             print("  ❌ register_all_commands is not callable")
-            return False
-            
-        return True
-        
+            assert False, "Test failed"
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Registration test failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def test_core_modules():
     """Test core module imports."""
     print("\n🧪 Testing core module imports...")
@@ -103,18 +96,14 @@ def test_core_modules():
             print("  ✅ create_bot_instance function found")
         else:
             print("  ❌ create_bot_instance function not found")
-            return False
-            
-        return True
-        
+            assert False, "Test failed"
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Core module test failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def test_handler_modules():
     """Test handler module imports."""
     print("\n🧪 Testing handler module imports...")
@@ -128,16 +117,13 @@ def test_handler_modules():
         from handlers import core
         print("  ✅ Core handlers module imported successfully")
         
-        return True
-        
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Handler module test failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def main():
     """Run all tests."""
     print("🚀 Starting modular command system tests...\n")

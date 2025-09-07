@@ -114,19 +114,15 @@ def test_command_registration_with_mock_bot():
         
         if missing_commands:
             print(f"  ❌ Missing commands: {missing_commands}")
-            return False
-        
+            assert False, "Test failed"
         print(f"  ✅ All {len(expected_commands)} expected commands registered successfully")
-        return True
-        
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Command registration test failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def test_decorator_functionality():
     """Test that decorators are working properly."""
     print("\n🧪 Testing decorator functionality...")
@@ -140,41 +136,34 @@ def test_decorator_functionality():
             print("    ✅ has_org_role returns callable decorator")
         else:
             print("    ❌ has_org_role does not return callable")
-            return False
-        
+            assert False, "Test failed"
         print("  ⏱️ Testing standard_cooldown decorator...")
         cooldown = standard_cooldown()
         if hasattr(cooldown, '__call__'):
             print("    ✅ standard_cooldown returns callable decorator")
         else:
             print("    ❌ standard_cooldown does not return callable")
-            return False
-        
+            assert False, "Test failed"
         print("  🛡️ Testing admin_only decorator...")
         admin_dec = admin_only()
         if callable(admin_dec):
             print("    ✅ admin_only returns callable decorator")
         else:
             print("    ❌ admin_only does not return callable")
-            return False
-        
+            assert False, "Test failed"
         print("  🔧 Testing error_handler decorator...")
         if callable(error_handler):
             print("    ✅ error_handler is callable")
         else:
             print("    ❌ error_handler is not callable")
-            return False
-        
-        return True
-        
+            assert False, "Test failed"
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Decorator test failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def test_bot_setup_functionality():
     """Test bot setup functionality."""
     print("\n🧪 Testing bot setup functionality...")
@@ -189,25 +178,20 @@ def test_bot_setup_functionality():
             print("    ✅ create_bot_instance is callable")
         else:
             print("    ❌ create_bot_instance is not callable")
-            return False
-        
+            assert False, "Test failed"
         print("  💓 Testing setup_heartbeat...")
         if callable(setup_heartbeat):
             print("    ✅ setup_heartbeat is callable")
         else:
             print("    ❌ setup_heartbeat is not callable")
-            return False
-        
-        return True
-        
+            assert False, "Test failed"
+        assert True  # Test passed
     except Exception as e:
         print(f"  ❌ Bot setup test failed: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        return False
-
-
+        assert False, "Test failed"
 def main():
     """Run advanced tests."""
     print("🚀 Starting advanced modular system tests...\n")
