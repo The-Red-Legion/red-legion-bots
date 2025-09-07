@@ -273,7 +273,7 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
         try:
             # Get participation data from enhanced mining tracking
             from database import get_mining_session_participants
-from config.settings import get_database_url
+            from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url:
@@ -411,7 +411,7 @@ from config.settings import get_database_url
         """Close the event and generate PDF report."""
         try:
             from database import close_mining_event, mark_pdf_generated
-from config.settings import get_database_url
+            from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url or not self.event_id:
@@ -579,7 +579,7 @@ class SundayMiningCommands(commands.Cog):
             
             # Create event in database
             from database import create_mining_event
-from config.settings import get_database_url
+            from config.settings import get_database_url
             db_url = get_database_url()
             event_id = None
             
@@ -812,7 +812,7 @@ from config.settings import get_database_url
         """Create a summary of current participation without calculating payroll."""
         try:
             from database import get_mining_session_participants
-from config.settings import get_database_url
+            from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url:
@@ -1064,7 +1064,7 @@ from config.settings import get_database_url
             
             # Get recent participation data
             from database import get_mining_session_participants
-from config.settings import get_database_url
+            from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url:
