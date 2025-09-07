@@ -1,2 +1,0 @@
-﻿2025-09-07T16:10:10.4209308Z Post job cleanup.
-2025-09-07T16:10:10.5063692Z Removed exported credentials at "/home/runner/work/red-legion-bots/red-legion-bots/gha-creds-710a04cc13d8758d.json".

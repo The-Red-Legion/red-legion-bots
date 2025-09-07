@@ -586,6 +586,7 @@ class SundayMiningCommands(commands.Cog):
             if db_url:
                 try:
                     # Use interaction.guild.id for proper guild-aware event creation
+                    print(f"🔍 Creating mining event for guild {interaction.guild.id} ({interaction.guild.name})")
                     event_id = create_mining_event(
                         db_url, 
                         interaction.guild.id, 
@@ -595,6 +596,10 @@ class SundayMiningCommands(commands.Cog):
                     print(f"✅ Created mining event {event_id} for session {session_id} in guild {interaction.guild.name}")
                 except Exception as e:
                     print(f"⚠️ Could not create database event: {e}")
+                    import traceback
+                    print(f"Full traceback: {traceback.format_exc()}")
+            else:
+                print(f"❌ No database URL available, cannot create mining event")
             
             current_session.update({
                 'active': True,
@@ -605,10 +610,16 @@ class SundayMiningCommands(commands.Cog):
             })
             
             # Start voice tracking for all Sunday mining channels
+            from handlers.voice_tracking import set_bot_instance
+            
+            # Ensure bot instance is set for voice operations
+            set_bot_instance(interaction.client)
+            
             mining_channels = get_sunday_mining_channels()
             for channel_name, channel_id in mining_channels.items():
                 # Only join the dispatch channel, track all others
                 should_join = channel_name.lower() == 'dispatch'
+                print(f"Adding channel {channel_name} ({channel_id}) to tracking, join={should_join}")
                 await add_tracked_channel(int(channel_id), should_join=should_join)
             
             start_voice_tracking()

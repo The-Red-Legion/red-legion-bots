@@ -34,6 +34,11 @@ async def _handle_voice_state_update(member, before, after):
     # Get current time
     now = datetime.now()
     
+    print(f"🎙️ Voice state update: {member.display_name}")
+    print(f"   Before: {before.channel.name if before.channel else 'None'}")
+    print(f"   After: {after.channel.name if after.channel else 'None'}")
+    print(f"   Active channels: {list(active_voice_channels.keys())}")
+    
     # Handle member leaving voice channel
     if before.channel and before.channel.id in active_voice_channels:
         if member.id in member_times:
@@ -276,6 +281,8 @@ async def join_voice_channel(channel_id):
     """Join a voice channel to indicate active tracking."""
     global bot_instance, bot_voice_connections
     
+    print(f"🎤 Attempting to join voice channel {channel_id}")
+    
     if not bot_instance:
         print("❌ Bot instance not set, cannot join voice channels")
         return False
@@ -286,8 +293,10 @@ async def join_voice_channel(channel_id):
             print(f"❌ Could not find channel {channel_id}")
             return False
         
+        print(f"🔍 Found channel: {channel.name} (type: {type(channel)})")
+        
         if not isinstance(channel, discord.VoiceChannel):
-            print(f"❌ Channel {channel_id} is not a voice channel")
+            print(f"❌ Channel {channel_id} ({channel.name}) is not a voice channel")
             return False
         
         # Check if bot is already connected to this channel
@@ -295,21 +304,25 @@ async def join_voice_channel(channel_id):
             print(f"✅ Bot already connected to {channel.name}")
             return True
         
+        print(f"🎵 Attempting to connect to voice channel: {channel.name}")
+        
         # Connect to the voice channel
         voice_client = await channel.connect()
         bot_voice_connections[channel_id] = voice_client
         
-        print(f"🎤 Bot joined voice channel: {channel.name}")
+        print(f"🎤 Bot successfully joined voice channel: {channel.name}")
         return True
         
     except discord.errors.ClientException as e:
         if "already connected" in str(e):
             print("⚠️ Bot already connected to a voice channel")
             return True
-        print(f"❌ Error joining voice channel {channel_id}: {e}")
+        print(f"❌ ClientException joining voice channel {channel_id}: {e}")
         return False
     except Exception as e:
         print(f"❌ Unexpected error joining voice channel {channel_id}: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return False
 
 
