@@ -17,8 +17,6 @@ def get_secret(secret_name, project_id=None):
 
 def get_database_url():
     """Get database URL from environment or secret manager."""
-    import urllib.parse
-    
     # Try environment first
     db_url = os.getenv('DATABASE_URL')
     if db_url:
@@ -69,11 +67,11 @@ def _fix_database_url_encoding(db_url):
             # Reconstruct the URL
             fixed_url = f"{protocol}{username}:{encoded_password}@{host_port_db}"
             
-            print(f"Database URL encoding: Fixed special characters in password")
+            print("Database URL encoding: Fixed special characters in password")
             return fixed_url
         else:
             # If the regex doesn't match, return the original URL
-            print(f"Database URL encoding: Could not parse URL format, using as-is")
+            print("Database URL encoding: Could not parse URL format, using as-is")
             return db_url
             
     except Exception as e:
