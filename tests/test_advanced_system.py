@@ -210,10 +210,10 @@ def main():
         print(f"{'='*60}")
         
         try:
-            result = test_func()
-            results[test_name] = result
+            test_func()  # pytest-style test functions use assertions, don't return values
+            results[test_name] = True  # If no exception, test passed
         except Exception as e:
-            print(f"❌ Test '{test_name}' crashed: {e}")
+            print(f"❌ Test '{test_name}' failed: {e}")
             results[test_name] = False
     
     # Print summary
