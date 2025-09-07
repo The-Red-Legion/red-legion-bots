@@ -98,7 +98,7 @@ def test_critical_imports():
             print(f"    ❌ Failed to import {module_name}: {e}")
             all_passed = False
     
-    return all_passed
+    assert all_passed, "Some critical imports failed"
 
 
 def test_command_count_validation():
