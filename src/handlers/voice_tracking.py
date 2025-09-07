@@ -67,10 +67,10 @@ async def on_voice_state_update(member, before, after):
             # Save participation if they were in for more than 30 seconds
             if duration > 30:
                 try:
-                    from ..database import save_mining_participation
-                    from ..config import get_database_url
-                    from ..utils import has_org_role
-                    from ..commands.mining import current_session
+                    from database import save_mining_participation
+                    from config.settings import get_database_url
+                    from utils import has_org_role
+                    from commands.mining import current_session
                     
                     db_url = get_database_url()
                     if db_url:

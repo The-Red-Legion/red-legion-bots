@@ -23,7 +23,7 @@ def get_sunday_mining_channels(guild_id=None):
     Falls back to hardcoded values if database is unavailable.
     """
     try:
-        from ..database import get_mining_channels_dict
+        from database import get_mining_channels_dict
         db_url = get_database_url()
         if db_url:
             channels = get_mining_channels_dict(db_url, guild_id)

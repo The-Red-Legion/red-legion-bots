@@ -74,7 +74,7 @@ class RedLegionBot(commands.Bot):
         
         # Initialize database for new guild
         try:
-            from ..database import init_database
+            from database import init_database
             from ..config.settings import get_database_url
             
             db_url = get_database_url()

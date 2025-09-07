@@ -31,7 +31,7 @@ def register_commands(bot):
             amount: Amount to request in credits
         """
         try:
-            from ..config import get_database_url
+            from config.settings import get_database_url
             
             db_url = get_database_url()
             if not db_url:

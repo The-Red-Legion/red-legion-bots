@@ -9,7 +9,7 @@ import datetime
 import asyncio
 
 # Import configuration and database utilities
-from .config import DISCORD_TOKEN, get_database_url
+from config.settings import DISCORD_TOKEN, get_database_url
 from .database import init_db
 
 # Import our new modular components
