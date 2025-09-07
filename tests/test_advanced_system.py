@@ -53,7 +53,7 @@ def test_command_registration_with_mock_bot():
         print("  🤖 Created mock bot instance")
         
         # Import and run command registration
-        from src.commands import register_all_commands
+        from commands import register_all_commands
         
         print("  📋 Running command registration...")
         register_all_commands(mock_bot)
@@ -113,7 +113,7 @@ def test_decorator_functionality():
     print("\n🧪 Testing decorator functionality...")
     
     try:
-        from src.core.decorators import has_org_role, standard_cooldown, error_handler, admin_only
+        from core.decorators import has_org_role, standard_cooldown, error_handler, admin_only
         
         print("  🎯 Testing has_org_role decorator...")
         decorator = has_org_role()
@@ -161,7 +161,7 @@ def test_bot_setup_functionality():
     print("\n🧪 Testing bot setup functionality...")
     
     try:
-        from src.core.bot_setup import create_bot_instance, setup_heartbeat
+        from core.bot_setup import create_bot_instance, setup_heartbeat
         
         print("  🤖 Testing create_bot_instance...")
         # We can't actually create a real bot without Discord.py being available

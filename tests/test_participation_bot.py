@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from src.database import init_db
-from src.event_handlers import start_logging
+from database import init_db
+from event_handlers import start_logging
 
 @pytest.fixture
 def mock_db():

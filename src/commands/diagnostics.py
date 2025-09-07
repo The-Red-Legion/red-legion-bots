@@ -9,7 +9,13 @@ import discord
 from discord.ext import commands
 from datetime import datetime
 import os
-from ..core.decorators import has_org_role, standard_cooldown, error_handler
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.decorators import has_org_role, standard_cooldown, error_handler
 
 
 def register_commands(bot):
@@ -361,3 +367,8 @@ def register_commands(bot):
             await ctx.send(f"❌ Configuration check failed: {str(e)}")
 
     print("✅ Diagnostic commands registered")
+
+
+async def setup(bot):
+    """Setup function for discord.py extension loading."""
+    register_commands(bot)

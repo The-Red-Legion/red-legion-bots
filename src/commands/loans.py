@@ -7,8 +7,14 @@ This module contains commands for managing the organization loan system.
 import discord
 from discord.ext import commands
 from datetime import datetime, timedelta
-from ..core.decorators import has_org_role, standard_cooldown, error_handler
-from ..database import issue_loan
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.decorators import has_org_role, standard_cooldown, error_handler
+from database import issue_loan
 
 
 def register_commands(bot):
@@ -70,3 +76,8 @@ def register_commands(bot):
             await ctx.send(f"❌ Failed to request loan: {e}")
 
     print("✅ Loan commands registered")
+
+
+async def setup(bot):
+    """Setup function for discord.py extension loading."""
+    register_commands(bot)

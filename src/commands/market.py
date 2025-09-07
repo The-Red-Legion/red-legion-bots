@@ -6,8 +6,14 @@ This module contains commands for managing the organization market system.
 
 import discord
 from discord.ext import commands
-from ..core.decorators import has_org_role, standard_cooldown, error_handler
-from ..database import get_market_items, add_market_item
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.decorators import has_org_role, standard_cooldown, error_handler
+from database import get_market_items, add_market_item
 
 
 def register_commands(bot):
@@ -102,3 +108,8 @@ def register_commands(bot):
             await ctx.send(f"❌ Failed to add market item: {e}")
 
     print("✅ Market commands registered")
+
+
+async def setup(bot):
+    """Setup function for discord.py extension loading."""
+    register_commands(bot)

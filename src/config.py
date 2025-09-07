@@ -10,6 +10,67 @@ def get_secret(secret_id, project_id=os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-
     response = client.access_secret_version(name=name)
     return response.payload.data.decode("UTF-8")
 
+# Sunday Mining Configuration
+# Note: Channel IDs are now managed in the database
+# Use get_sunday_mining_channels() to retrieve current channels
+SUNDAY_MINING_CHANNELS_FALLBACK = {
+    'dispatch': '1385774416755163247',
+    'alpha': '1386367354753257583',
+    'bravo': '1386367395643449414',
+    'charlie': '1386367464279478313',
+    'delta': '1386368182421635224',
+    'echo': '1386368221877272616',
+    'foxtrot': '1386368253712375828'
+}
+
+def get_sunday_mining_channels(guild_id=None):
+    """
+    Get Sunday mining channels from database for a specific guild.
+    Falls back to hardcoded values if database is unavailable.
+    """
+    try:
+        from .database import get_mining_channels_dict
+        db_url = get_database_url()
+        if db_url:
+            channels = get_mining_channels_dict(db_url, guild_id)
+            if channels:
+                return channels
+    except Exception as e:
+        print(f"Warning: Could not get mining channels from database: {e}")
+    
+    # Fallback to hardcoded channels
+    print("Using fallback mining channels")
+    return SUNDAY_MINING_CHANNELS_FALLBACK
+
+# 21 ore types for mining operations
+ORES = {
+    'QUANTANIUM': 'Quantanium',
+    'TARANITE': 'Taranite',
+    'BEXALITE': 'Bexalite',
+    'BORASE': 'Borase',
+    'LARANITE': 'Laranite',
+    'BERYL': 'Beryl',
+    'AGRICIUM': 'Agricium',
+    'HEPHAESTANITE': 'Hephaestanite',
+    'TUNGSTEN': 'Tungsten',
+    'TITANIUM': 'Titanium',
+    'COPPER': 'Copper',
+    'CORUNDUM': 'Corundum',
+    'ALUMINIUM': 'Aluminium',
+    'IRON': 'Iron',
+    'QUARTZ': 'Quartz',
+    'SILICON': 'Silicon',
+    'TIN': 'Tin',
+    'GOLD': 'Gold',
+    'RICCITE': 'Riccite',
+    'STILERON': 'Stileron',
+    'ICE': 'Ice'
+}
+
+# UEX API Configuration
+UEX_API_BASE_URL = 'https://uexcorp.space/api/2.0/commodities'
+UEX_BEARER_TOKEN = '4ae9c984f69da2ad759776529b37a3dabdf99db4'
+
 MINING_MATERIALS = [
     "Stileron", "Quantainium", "Riccite", "Taranite", "Bexalite",
     "Gold", "Borase", "Laranite", "Beryl", "Agricium",

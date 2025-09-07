@@ -117,3 +117,8 @@ async def setup_core_handlers(bot):
         print("✅ Bot resumed connection to Discord!")
 
     print("✅ Core event handlers registered")
+
+
+async def setup(bot):
+    """Setup function for discord.py extension loading."""
+    await setup_core_handlers(bot)

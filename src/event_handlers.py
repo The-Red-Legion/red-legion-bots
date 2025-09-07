@@ -6,12 +6,25 @@ import random
 import aiohttp
 import psycopg2
 import asyncio
-from .discord_utils import send_embed, has_org_role
-from .database import (
-    save_participation, save_event, update_event_end_time, update_entries, get_entries,
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
+
+from utils import send_embed, has_org_role
+from database import (
+    save_mining_participation, save_event, update_event_end_time, update_entries, get_entries,
     update_mining_results, get_open_events
 )
-from .config import LOG_CHANNEL_ID, ORG_ROLE_ID, DATABASE_URL, MINING_MATERIALS, UEX_API_KEY
+from config import DISCORD_CONFIG, ORE_TYPES, get_database_url, UEX_API_CONFIG
+
+# Extract commonly used values
+ORG_ROLE_ID = DISCORD_CONFIG['ORG_ROLE_ID']
+LOG_CHANNEL_ID = DISCORD_CONFIG['TEXT_CHANNEL_ID']
+DATABASE_URL = get_database_url()
+MINING_MATERIALS = ORE_TYPES  # Alias for compatibility
+UEX_API_KEY = UEX_API_CONFIG.get('api_key', 'dummy-key')  # Fallback
 
 active_voice_channels = {}
 event_names = {}
@@ -75,14 +88,29 @@ async def log_members(bot):
                         is_org_member = str(ORG_ROLE_ID) in [
                             str(role.id) for role in member.roles
                         ]
-                        save_participation(
-                            DATABASE_URL,
-                            channel_id,
-                            member_id,
-                            member.display_name,
-                            member_times[channel_id][member_id],
-                            is_org_member
-                        )
+                        # Legacy participation tracking - consider updating to use event-based tracking
+                        # For now, create a temporary event if none exists
+                        try:
+                            from datetime import datetime
+                            current_time = datetime.now()
+                            # Use channel_id as a temporary event_id for legacy compatibility
+                            temp_event_id = 1  # Default event ID for legacy tracking
+                            
+                            save_mining_participation(
+                                DATABASE_URL,
+                                temp_event_id,  # event_id
+                                member_id,
+                                member.display_name,
+                                channel_id,
+                                active_channel.name,
+                                current_time,  # start_time
+                                current_time,  # end_time (will be updated)
+                                int(member_times[channel_id][member_id]),  # duration_seconds
+                                is_org_member
+                            )
+                        except Exception as save_error:
+                            print(f"Error saving participation: {save_error}")
+                            # Continue without failing the tracking
             except Exception as e:
                 print(f"Error in log_members: {e}")
                 import traceback
@@ -225,14 +253,27 @@ async def stop_logging(bot, ctx):
                         is_org_member = str(ORG_ROLE_ID) in [
                             str(role.id) for role in member.roles
                         ]
-                        save_participation(
-                            DATABASE_URL,
-                            channel_id,
-                            member_id,
-                            member.display_name,
-                            total_duration,
-                            is_org_member
-                        )
+                        # Legacy participation tracking - consider updating to use event-based tracking
+                        try:
+                            from datetime import datetime
+                            current_time = datetime.now()
+                            temp_event_id = 1  # Default event ID for legacy tracking
+                            
+                            save_mining_participation(
+                                DATABASE_URL,
+                                temp_event_id,  # event_id
+                                member_id,
+                                member.display_name,
+                                channel_id,
+                                active_voice_channels[channel_id].name,
+                                current_time,  # start_time
+                                current_time,  # end_time
+                                int(total_duration),  # duration_seconds
+                                is_org_member
+                            )
+                        except Exception as save_error:
+                            print(f"Error saving final participation: {save_error}")
+                            # Continue without failing
                         update_entries(DATABASE_URL, member_id, current_month)
                 update_event_end_time(
                     DATABASE_URL,
@@ -405,13 +446,15 @@ async def log_mining_results(bot, ctx, event_id: int):
 
                 update_mining_results(DATABASE_URL, event_id, materials_data)
 
+                # Get participation data from the enhanced mining_participation table
                 conn = psycopg2.connect(DATABASE_URL)
                 c = conn.cursor()
                 c.execute(
                     """
-                    SELECT member_id, duration
-                    FROM participation
-                    WHERE channel_id = (SELECT channel_id FROM events WHERE event_id = %s)
+                    SELECT member_id, SUM(duration_seconds) as total_duration
+                    FROM mining_participation
+                    WHERE event_id = %s
+                    GROUP BY member_id
                     """,
                     (event_id,)
                 )

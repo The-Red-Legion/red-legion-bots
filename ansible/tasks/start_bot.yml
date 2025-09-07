@@ -1,6 +1,6 @@
 ---
 - name: Test Python imports before starting bot
-  command: python3 -c "import src.participation_bot; print('Import successful')"
+  command: python3 -c "import sys; sys.path.insert(0, 'src'); from bot import RedLegionBot; print('Import successful')"
   args:
     chdir: "{{ app_dir }}"
   environment:
@@ -27,7 +27,7 @@
       Type=simple
       User=root
       WorkingDirectory={{ app_dir }}
-      ExecStart=/usr/bin/python3 -m src.participation_bot
+      ExecStart=/usr/bin/python3 src/main.py
       Restart=always
       RestartSec=10
       StandardOutput=journal

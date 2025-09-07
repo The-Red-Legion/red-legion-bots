@@ -21,31 +21,31 @@ def test_command_imports():
     try:
         # Test individual command module imports
         print("  📦 Testing market module...")
-        from src.commands import market
+        from commands import market
         print("  ✅ Market module imported successfully")
         
         print("  💰 Testing loans module...")
-        from src.commands import loans
+        from commands import loans
         print("  ✅ Loans module imported successfully")
         
         print("  🎯 Testing events module...")
-        from src.commands import events
+        from commands import events
         print("  ✅ Events module imported successfully")
         
         print("  ⛏️ Testing mining module...")
-        from src.commands import mining
+        from commands import mining
         print("  ✅ Mining module imported successfully")
         
         print("  🔍 Testing diagnostics module...")
-        from src.commands import diagnostics
+        from commands import diagnostics
         print("  ✅ Diagnostics module imported successfully")
         
         print("  🛡️ Testing admin module...")
-        from src.commands import admin
+        from commands import admin
         print("  ✅ Admin module imported successfully")
         
         print("  🏓 Testing general module...")
-        from src.commands import general
+        from commands import general
         print("  ✅ General module imported successfully")
         
         return True
@@ -65,7 +65,7 @@ def test_command_registration():
     try:
         # Import the registration function
         print("  📋 Testing commands.__init__ import...")
-        from src.commands import register_all_commands
+        from commands import register_all_commands
         print("  ✅ Command registration function imported successfully")
         
         # Test that the function exists and is callable
@@ -91,11 +91,11 @@ def test_core_modules():
     
     try:
         print("  🏗️ Testing bot_setup module...")
-        from src.core import bot_setup
+        from core import bot_setup
         print("  ✅ Bot setup module imported successfully")
         
         print("  🎯 Testing decorators module...")
-        from src.core import decorators
+        from core import decorators
         print("  ✅ Decorators module imported successfully")
         
         print("  🔧 Testing core functions...")
@@ -121,11 +121,11 @@ def test_handler_modules():
     
     try:
         print("  🎙️ Testing voice_tracking module...")
-        from src.handlers import voice_tracking
+        from handlers import voice_tracking
         print("  ✅ Voice tracking module imported successfully")
         
         print("  🏠 Testing core handlers module...")
-        from src.handlers import core
+        from handlers import core
         print("  ✅ Core handlers module imported successfully")
         
         return True

@@ -6,7 +6,7 @@ This module contains basic bot commands and utilities.
 
 import discord
 from discord.ext import commands
-from ..core.decorators import error_handler
+import sys; from pathlib import Path; sys.path.insert(0, str(Path(__file__).parent.parent)); from core.decorators import error_handler
 
 
 def register_commands(bot):
@@ -29,3 +29,8 @@ def register_commands(bot):
         await ctx.send(embed=embed)
 
     print("✅ General commands registered")
+
+
+async def setup(bot):
+    """Setup function for discord.py extension loading."""
+    register_commands(bot)

@@ -75,7 +75,7 @@ def test_command_count_validation():
     print("\n🧪 Testing command count validation...")
     
     try:
-        from src.commands import register_all_commands
+        from commands import register_all_commands
         
         # Create a simple mock to count commands
         class CommandCounter:
@@ -117,11 +117,11 @@ def test_database_function_availability():
     print("\n🧪 Testing database function availability...")
     
     try:
-        from src.database import init_db
+        from database import init_db
         print("  ✅ init_db function available")
         
         # Test config database URL function
-        from src.config import get_database_url
+        from config import get_database_url
         print("  ✅ get_database_url function available")
         
         return True
