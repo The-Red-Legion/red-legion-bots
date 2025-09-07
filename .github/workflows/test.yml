@@ -152,6 +152,11 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          # Verify SSH key format
+          echo "🔍 Checking SSH key format..."
+          head -1 ~/.ssh/id_rsa
+          echo "🔍 SSH key file size: $(wc -c < ~/.ssh/id_rsa) bytes"
+          # Add host key
           ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts || true
       - uses: actions/setup-python@v5
         with:
@@ -216,9 +221,15 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          # Verify SSH key format
+          echo "🔍 Checking SSH key format..."
+          head -1 ~/.ssh/id_rsa
+          echo "🔍 SSH key file size: $(wc -c < ~/.ssh/id_rsa) bytes"
+          # Add host key
           ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts || true
-          # Test SSH connection
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@${{ secrets.BOT_SERVER_HOST }} "echo 'SSH connection test successful'" || echo "SSH test failed - continuing anyway"
+          # Test SSH connection with more verbose output
+          echo "🔗 Testing SSH connection..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -v ubuntu@${{ secrets.BOT_SERVER_HOST }} "echo 'SSH connection test successful'" || echo "SSH test failed - continuing anyway"
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
