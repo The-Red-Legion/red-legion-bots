@@ -25,6 +25,9 @@ async def main():
             return
         
         print("📊 Initializing database...")
+        print(f"📋 Database URL (masked): {db_url[:30]}...{db_url[-20:] if len(db_url) > 50 else db_url}")
+        print(f"🔍 URL contains '#': {'#' in db_url}")
+        print(f"🔍 URL contains '%23': {'%23' in db_url}")
         init_database(db_url)
         print("✅ Database initialized successfully")
         
