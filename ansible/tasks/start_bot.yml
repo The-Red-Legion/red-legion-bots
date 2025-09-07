@@ -1,6 +1,19 @@
 ---
+- name: Run configuration validation
+  command: python3 scripts/validate_config.py
+  args:
+    chdir: "{{ app_dir }}"
+  register: config_validation
+  when: not ansible_check_mode
+  ignore_errors: true
+
+- name: Show configuration validation result
+  debug:
+    msg: "Configuration validation: {{ 'PASSED' if config_validation.rc == 0 else 'FAILED' }} - {{ config_validation.stdout if config_validation.rc == 0 else config_validation.stderr }}"
+  when: not ansible_check_mode and config_validation is defined
+
 - name: Test Python imports before starting bot
-  command: python3 -c "import sys; sys.path.insert(0, 'src'); from bot import RedLegionBot; print('Import successful')"
+  command: python3 -c "import sys; sys.path.insert(0, 'src'); from config.settings import get_database_url; print('Import successful, DB URL configured:', bool(get_database_url()))"
   args:
     chdir: "{{ app_dir }}"
   environment:
@@ -13,6 +26,13 @@
   debug:
     msg: "Import test result: {{ import_test.stdout if import_test.rc == 0 else import_test.stderr }}"
   when: not ansible_check_mode and import_test is defined
+
+- name: Create environment file from template
+  template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    mode: '0600'
+  when: not ansible_check_mode
 
 - name: Create systemd service file
   copy:
@@ -34,9 +54,7 @@
       StandardError=journal
       Environment=PYTHONUNBUFFERED=1
       Environment=GOOGLE_CLOUD_PROJECT=rl-prod-471116
-      Environment=GITHUB_TOKEN=dummy-github-token
-      Environment=WEBHOOK_URL=https://default.webhook.url
-      Environment=UEX_API_KEY=dummy-uex-api-key
+      EnvironmentFile={{ app_dir }}/.env
 
       [Install]
       WantedBy=multi-user.target
@@ -54,7 +72,7 @@
     enabled: yes
     state: started
   register: start_result
-  when: not ansible_check_mode and (import_test is undefined or import_test.rc == 0)
+  when: not ansible_check_mode and (import_test is undefined or import_test.rc == 0) and (config_validation is undefined or config_validation.rc == 0)
 
 - name: Show startup debug info
   debug:

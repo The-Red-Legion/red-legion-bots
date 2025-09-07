@@ -17,26 +17,68 @@ def get_secret(secret_name, project_id=None):
 
 def get_database_url():
     """Get database URL from environment or secret manager."""
+    import urllib.parse
+    
     # Try environment first
     db_url = os.getenv('DATABASE_URL')
     if db_url:
-        return db_url
+        return _fix_database_url_encoding(db_url)
     
-    # Try reading from file
+    # Try reading from file (skip comments and empty lines)
     try:
         with open('db_url.txt', 'r') as f:
-            db_url = f.read().strip()
-            if db_url:
-                return db_url
+            for line in f:
+                line = line.strip()
+                # Skip empty lines and comments
+                if line and not line.startswith('#'):
+                    return _fix_database_url_encoding(line)
     except FileNotFoundError:
         pass
     
     # Try secret manager as fallback
     try:
-        return get_secret("database-connection-string")
+        db_url = get_secret("database-connection-string")
+        return _fix_database_url_encoding(db_url) if db_url else None
     except Exception as e:
         print(f"Warning: Could not get database URL: {e}")
         return None
+
+def _fix_database_url_encoding(db_url):
+    """Fix URL encoding issues in database connection strings."""
+    if not db_url:
+        return db_url
+    
+    try:
+        # For PostgreSQL URLs with problematic characters, use regex to extract and fix
+        import re
+        from urllib.parse import quote
+        
+        # Pattern to match: postgresql://username:password@host:port/database
+        pattern = r'^(postgresql://)(.*?):(.*?)@(.*)$'
+        match = re.match(pattern, db_url)
+        
+        if match:
+            protocol = match.group(1)  # postgresql://
+            username = match.group(2)  # username
+            password = match.group(3)  # password (may contain special chars)
+            host_port_db = match.group(4)  # host:port/database
+            
+            # URL-encode only the password
+            encoded_password = quote(password, safe='')
+            
+            # Reconstruct the URL
+            fixed_url = f"{protocol}{username}:{encoded_password}@{host_port_db}"
+            
+            print(f"Database URL encoding: Fixed special characters in password")
+            return fixed_url
+        else:
+            # If the regex doesn't match, return the original URL
+            print(f"Database URL encoding: Could not parse URL format, using as-is")
+            return db_url
+            
+    except Exception as e:
+        print(f"Warning: Could not fix database URL encoding: {e}")
+        return db_url
 
 # UEX API Configuration
 UEX_API_CONFIG = {
