@@ -1,0 +1,34 @@
+﻿2025-09-07T15:56:46.5367151Z Current runner version: '2.328.0'
+2025-09-07T15:56:46.5395542Z ##[group]Runner Image Provisioner
+2025-09-07T15:56:46.5397341Z Hosted Compute Agent
+2025-09-07T15:56:46.5398727Z Version: 20250829.383
+2025-09-07T15:56:46.5400160Z Commit: 27cb235aab5b0e52e153a26cd86b4742e89dac5d
+2025-09-07T15:56:46.5401686Z Build Date: 2025-08-29T13:48:48Z
+2025-09-07T15:56:46.5403358Z ##[endgroup]
+2025-09-07T15:56:46.5404770Z ##[group]Operating System
+2025-09-07T15:56:46.5406152Z Ubuntu
+2025-09-07T15:56:46.5407409Z 24.04.3
+2025-09-07T15:56:46.5408733Z LTS
+2025-09-07T15:56:46.5409967Z ##[endgroup]
+2025-09-07T15:56:46.5411295Z ##[group]Runner Image
+2025-09-07T15:56:46.5412784Z Image: ubuntu-24.04
+2025-09-07T15:56:46.5414178Z Version: 20250831.1.0
+2025-09-07T15:56:46.5416117Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250831.1/images/ubuntu/Ubuntu2404-Readme.md
+2025-09-07T15:56:46.5418422Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250831.1
+2025-09-07T15:56:46.5420493Z ##[endgroup]
+2025-09-07T15:56:46.5423574Z ##[group]GITHUB_TOKEN Permissions
+2025-09-07T15:56:46.5426336Z Actions: read
+2025-09-07T15:56:46.5427760Z Checks: read
+2025-09-07T15:56:46.5429025Z Contents: write
+2025-09-07T15:56:46.5430339Z Issues: write
+2025-09-07T15:56:46.5431654Z Metadata: read
+2025-09-07T15:56:46.5433831Z PullRequests: write
+2025-09-07T15:56:46.5435309Z ##[endgroup]
+2025-09-07T15:56:46.5438329Z Secret source: Actions
+2025-09-07T15:56:46.5440185Z Prepare workflow directory
+2025-09-07T15:56:46.6081748Z Prepare all required actions
+2025-09-07T15:56:46.6120254Z Getting action download info
+2025-09-07T15:56:47.0564165Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+2025-09-07T15:56:47.2185404Z Download action repository 'google-github-actions/auth@v2' (SHA:c200f3691d83b41bf9bbd8638997a462592937ed)
+2025-09-07T15:56:47.7208057Z Download action repository 'actions/setup-python@v4' (SHA:7f4fc3e22c37d6ff65e88745f38bd3157c663f7c)
+2025-09-07T15:56:47.9746858Z Complete job name: deploy-arccorp-compute

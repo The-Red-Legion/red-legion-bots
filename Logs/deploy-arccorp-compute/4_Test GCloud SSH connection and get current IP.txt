@@ -1,0 +1,64 @@
+﻿2025-09-07T15:56:48.9240974Z ##[group]Run echo "🔗 Testing GCloud SSH connection to arccorp-compute..."
+2025-09-07T15:56:48.9244111Z [36;1mecho "🔗 Testing GCloud SSH connection to arccorp-compute..."[0m
+2025-09-07T15:56:48.9248195Z [36;1mif gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30"; then[0m
+2025-09-07T15:56:48.9251985Z [36;1m  echo "✅ GCloud SSH connection successful"[0m
+2025-09-07T15:56:48.9254205Z [36;1melse[0m
+2025-09-07T15:56:48.9256067Z [36;1m  echo "⚠️ GCloud SSH test failed - continuing anyway"[0m
+2025-09-07T15:56:48.9258230Z [36;1mfi[0m
+2025-09-07T15:56:48.9259795Z [36;1m[0m
+2025-09-07T15:56:48.9261427Z [36;1m# Get current VM IP for Ansible[0m
+2025-09-07T15:56:48.9263690Z [36;1mecho "🔍 Getting current VM IP address..."[0m
+2025-09-07T15:56:48.9267525Z [36;1mVM_IP=$(gcloud compute instances describe arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --format="get(networkInterfaces[0].accessConfigs[0].natIP)" || echo "")[0m
+2025-09-07T15:56:48.9271202Z [36;1mif [ -z "$VM_IP" ]; then[0m
+2025-09-07T15:56:48.9273521Z [36;1m  echo "❌ Could not get VM IP address, using fallback"[0m
+2025-09-07T15:56:48.9275705Z [36;1m  VM_IP="34.30.73.146"[0m
+2025-09-07T15:56:48.9277473Z [36;1mfi[0m
+2025-09-07T15:56:48.9279125Z [36;1mecho "📍 Current VM IP: $VM_IP"[0m
+2025-09-07T15:56:48.9281156Z [36;1mecho "vm_ip=$VM_IP" >> $GITHUB_OUTPUT[0m
+2025-09-07T15:56:48.9341987Z shell: /usr/bin/bash -e ***0***
+2025-09-07T15:56:48.9344106Z env:
+2025-09-07T15:56:48.9346623Z   DATABASE_URL: ***
+2025-09-07T15:56:48.9349383Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-72c2f76e0034e39b.json
+2025-09-07T15:56:48.9354021Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-72c2f76e0034e39b.json
+2025-09-07T15:56:48.9358771Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/red-legion-bots/red-legion-bots/gha-creds-72c2f76e0034e39b.json
+2025-09-07T15:56:48.9361839Z   CLOUDSDK_CORE_PROJECT: rl-prod-471116
+2025-09-07T15:56:48.9364030Z   CLOUDSDK_PROJECT: rl-prod-471116
+2025-09-07T15:56:48.9365948Z   GCLOUD_PROJECT: rl-prod-471116
+2025-09-07T15:56:48.9367812Z   GCP_PROJECT: rl-prod-471116
+2025-09-07T15:56:48.9369679Z   GOOGLE_CLOUD_PROJECT: rl-prod-471116
+2025-09-07T15:56:48.9371573Z ##[endgroup]
+2025-09-07T15:56:48.9462842Z 🔗 Testing GCloud SSH connection to arccorp-compute...
+2025-09-07T15:56:59.6800428Z WARNING: The private SSH key file for gcloud does not exist.
+2025-09-07T15:56:59.6803540Z WARNING: The public SSH key file for gcloud does not exist.
+2025-09-07T15:56:59.6805226Z WARNING: You do not have an SSH key for gcloud.
+2025-09-07T15:56:59.6806564Z WARNING: SSH keygen will be executed to generate a key.
+2025-09-07T15:56:59.6807767Z This tool needs to create the directory [/home/runner/.ssh] before being able to
+2025-09-07T15:56:59.6808888Z  generate SSH keys.
+2025-09-07T15:56:59.6809348Z 
+2025-09-07T15:56:59.6809787Z Do you want to continue (Y/n)?  
+2025-09-07T15:57:00.7956237Z Generating public/private rsa key pair.
+2025-09-07T15:57:00.7957507Z Your identification has been saved in /home/runner/.ssh/google_compute_engine
+2025-09-07T15:57:00.7958537Z Your public key has been saved in /home/runner/.ssh/google_compute_engine.pub
+2025-09-07T15:57:00.7959208Z The key fingerprint is:
+2025-09-07T15:57:00.7959865Z SHA256:ZiDbH89Yi3Y1UVS2w9ph8Uew+3O4EV3EKV1M8wn+510 runner@pkrvm7jw40e0xgp
+2025-09-07T15:57:00.7960543Z The key's randomart image is:
+2025-09-07T15:57:00.7961032Z +---[RSA 3072]----+
+2025-09-07T15:57:00.7961563Z |             o=OX|
+2025-09-07T15:57:00.7961973Z |            .ooBX|
+2025-09-07T15:57:00.7962713Z |    . .     ..oB=|
+2025-09-07T15:57:00.7963382Z |     + .     .=o=|
+2025-09-07T15:57:00.7963854Z |    . . S . o.ooE|
+2025-09-07T15:57:00.7964280Z |       + B o . =+|
+2025-09-07T15:57:00.7964680Z |        = =   o.=|
+2025-09-07T15:57:00.7965110Z |       . .     oo|
+2025-09-07T15:57:00.7965520Z |              .  |
+2025-09-07T15:57:00.7966242Z +----[SHA256]-----+
+2025-09-07T15:57:01.2605372Z Updating project ssh metadata...
+2025-09-07T15:57:11.2740831Z ..................................................Updated [https://www.googleapis.com/compute/v1/projects/rl-prod-471116].
+2025-09-07T15:57:11.4988144Z .done.
+2025-09-07T15:57:11.6670210Z Waiting for SSH key to propagate.
+2025-09-07T15:57:12.0246059Z Warning: Permanently added 'compute.4395654183015020126' (ED25519) to the list of known hosts.
+2025-09-07T15:57:14.0687334Z GCloud SSH connection test successful
+2025-09-07T15:57:14.1804887Z ✅ GCloud SSH connection successful
+2025-09-07T15:57:14.1806004Z 🔍 Getting current VM IP address...
+2025-09-07T15:57:15.6167157Z 📍 Current VM IP: 34.30.73.146

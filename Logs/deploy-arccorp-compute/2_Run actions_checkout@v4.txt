@@ -1,0 +1,87 @@
+﻿2025-09-07T15:56:48.0659095Z ##[group]Run actions/checkout@v4
+2025-09-07T15:56:48.0661342Z with:
+2025-09-07T15:56:48.0663221Z   repository: The-Red-Legion/red-legion-bots
+2025-09-07T15:56:48.0665515Z   token: ***
+2025-09-07T15:56:48.0667130Z   ssh-strict: true
+2025-09-07T15:56:48.0668796Z   ssh-user: git
+2025-09-07T15:56:48.0670478Z   persist-credentials: true
+2025-09-07T15:56:48.0672273Z   clean: true
+2025-09-07T15:56:48.0674152Z   sparse-checkout-cone-mode: true
+2025-09-07T15:56:48.0676014Z   fetch-depth: 1
+2025-09-07T15:56:48.0677657Z   fetch-tags: false
+2025-09-07T15:56:48.0679328Z   show-progress: true
+2025-09-07T15:56:48.0681014Z   lfs: false
+2025-09-07T15:56:48.0682765Z   submodules: false
+2025-09-07T15:56:48.0684458Z   set-safe-directory: true
+2025-09-07T15:56:48.0686436Z env:
+2025-09-07T15:56:48.0688984Z   DATABASE_URL: ***
+2025-09-07T15:56:48.0690647Z ##[endgroup]
+2025-09-07T15:56:48.1806679Z Syncing repository: The-Red-Legion/red-legion-bots
+2025-09-07T15:56:48.1810758Z ##[group]Getting Git version info
+2025-09-07T15:56:48.1813584Z Working directory is '/home/runner/work/red-legion-bots/red-legion-bots'
+2025-09-07T15:56:48.1817061Z [command]/usr/bin/git version
+2025-09-07T15:56:48.1885481Z git version 2.51.0
+2025-09-07T15:56:48.1913403Z ##[endgroup]
+2025-09-07T15:56:48.1925313Z Temporarily overriding HOME='/home/runner/work/_temp/601d863d-08b0-4945-bf2c-d6eb39ef585a' before making global git config changes
+2025-09-07T15:56:48.1929767Z Adding repository directory to the temporary git global config as a safe directory
+2025-09-07T15:56:48.1933443Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/red-legion-bots/red-legion-bots
+2025-09-07T15:56:48.1965080Z Deleting the contents of '/home/runner/work/red-legion-bots/red-legion-bots'
+2025-09-07T15:56:48.1969238Z ##[group]Initializing the repository
+2025-09-07T15:56:48.1972888Z [command]/usr/bin/git init /home/runner/work/red-legion-bots/red-legion-bots
+2025-09-07T15:56:48.2087985Z hint: Using 'master' as the name for the initial branch. This default branch name
+2025-09-07T15:56:48.2092010Z hint: is subject to change. To configure the initial branch name to use in all
+2025-09-07T15:56:48.2095115Z hint: of your new repositories, which will suppress this warning, call:
+2025-09-07T15:56:48.2098052Z hint:
+2025-09-07T15:56:48.2099899Z hint: 	git config --global init.defaultBranch <name>
+2025-09-07T15:56:48.2102687Z hint:
+2025-09-07T15:56:48.2104761Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2025-09-07T15:56:48.2107581Z hint: 'development'. The just-created branch can be renamed via this command:
+2025-09-07T15:56:48.2109996Z hint:
+2025-09-07T15:56:48.2111622Z hint: 	git branch -m <name>
+2025-09-07T15:56:48.2113592Z hint:
+2025-09-07T15:56:48.2115728Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2025-09-07T15:56:48.2118891Z Initialized empty Git repository in /home/runner/work/red-legion-bots/red-legion-bots/.git/
+2025-09-07T15:56:48.2124272Z [command]/usr/bin/git remote add origin https://github.com/The-Red-Legion/red-legion-bots
+2025-09-07T15:56:48.2144474Z ##[endgroup]
+2025-09-07T15:56:48.2147635Z ##[group]Disabling automatic garbage collection
+2025-09-07T15:56:48.2149877Z [command]/usr/bin/git config --local gc.auto 0
+2025-09-07T15:56:48.2185827Z ##[endgroup]
+2025-09-07T15:56:48.2189577Z ##[group]Setting up auth
+2025-09-07T15:56:48.2191931Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-09-07T15:56:48.2217183Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-09-07T15:56:48.2558990Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-09-07T15:56:48.2589231Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-09-07T15:56:48.2834728Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2025-09-07T15:56:48.2871818Z ##[endgroup]
+2025-09-07T15:56:48.2876838Z ##[group]Fetching the repository
+2025-09-07T15:56:48.2883630Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +df032f364d2d8996b8b933ee779a77b352811b2c:refs/remotes/pull/50/merge
+2025-09-07T15:56:48.7295334Z From https://github.com/The-Red-Legion/red-legion-bots
+2025-09-07T15:56:48.7298806Z  * [new ref]         df032f364d2d8996b8b933ee779a77b352811b2c -> pull/50/merge
+2025-09-07T15:56:48.7328493Z ##[endgroup]
+2025-09-07T15:56:48.7331218Z ##[group]Determining the checkout info
+2025-09-07T15:56:48.7335154Z ##[endgroup]
+2025-09-07T15:56:48.7337039Z [command]/usr/bin/git sparse-checkout disable
+2025-09-07T15:56:48.7375700Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2025-09-07T15:56:48.7406388Z ##[group]Checking out the ref
+2025-09-07T15:56:48.7408865Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/50/merge
+2025-09-07T15:56:48.7513189Z Note: switching to 'refs/remotes/pull/50/merge'.
+2025-09-07T15:56:48.7515451Z 
+2025-09-07T15:56:48.7516712Z You are in 'detached HEAD' state. You can look around, make experimental
+2025-09-07T15:56:48.7520240Z changes and commit them, and you can discard any commits you make in this
+2025-09-07T15:56:48.7523512Z state without impacting any branches by switching back to a branch.
+2025-09-07T15:56:48.7525113Z 
+2025-09-07T15:56:48.7526322Z If you want to create a new branch to retain commits you create, you may
+2025-09-07T15:56:48.7528916Z do so (now or later) by using -c with the switch command. Example:
+2025-09-07T15:56:48.7530360Z 
+2025-09-07T15:56:48.7531196Z   git switch -c <new-branch-name>
+2025-09-07T15:56:48.7532473Z 
+2025-09-07T15:56:48.7533329Z Or undo this operation with:
+2025-09-07T15:56:48.7534672Z 
+2025-09-07T15:56:48.7535446Z   git switch -
+2025-09-07T15:56:48.7536349Z 
+2025-09-07T15:56:48.7537619Z Turn off this advice by setting config variable advice.detachedHead to false
+2025-09-07T15:56:48.7539216Z 
+2025-09-07T15:56:48.7540990Z HEAD is now at df032f3 Merge ed0d12a9e1e0a26adfe71f703c3d2e7457edbc4c into e73349f7c689a84198d9aa7d0e5c0ffc64ae0e42
+2025-09-07T15:56:48.7547085Z ##[endgroup]
+2025-09-07T15:56:48.7556237Z [command]/usr/bin/git log -1 --format=%H
+2025-09-07T15:56:48.7578412Z df032f364d2d8996b8b933ee779a77b352811b2c

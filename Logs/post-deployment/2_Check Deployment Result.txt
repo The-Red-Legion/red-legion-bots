@@ -1,0 +1,10 @@
+﻿2025-09-07T16:10:19.7737089Z ##[group]Run if [ "success" == "success" ]; then
+2025-09-07T16:10:19.7737858Z [36;1mif [ "success" == "success" ]; then[0m
+2025-09-07T16:10:19.7738504Z [36;1m  echo "✅ Deployment job completed successfully"[0m
+2025-09-07T16:10:19.7739091Z [36;1melse[0m
+2025-09-07T16:10:19.7739509Z [36;1m  echo "❌ Deployment job failed"[0m
+2025-09-07T16:10:19.7740206Z [36;1m  echo "Check the deployment logs above for detailed error information"[0m
+2025-09-07T16:10:19.7740872Z [36;1mfi[0m
+2025-09-07T16:10:19.7798908Z shell: /usr/bin/bash -e {0}
+2025-09-07T16:10:19.7799695Z ##[endgroup]
+2025-09-07T16:10:19.7921467Z ✅ Deployment job completed successfully
