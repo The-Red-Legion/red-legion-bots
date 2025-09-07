@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from bot import RedLegionBot
 from database import init_database
-from config import get_database_url
+from config.settings import get_database_url
 
 async def main():
     """Initialize and run the Red Legion Discord Bot."""
