@@ -77,15 +77,7 @@ jobs:
         run: |
           echo "=== Starting Ansible deployment ==="
 
-          # Set environment variables for Ansible
-          export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
-          export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
-          export DATABASE_URL=${{ secrets.DATABASE_URL }}
-
-          # Run Ansible playbook with dynamic inventory
-          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} \
-          TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }} \
-          DATABASE_URL=${{ secrets.DATABASE_URL }} \
+          # Run Ansible playbook with dynamic inventory using environment variables
           ansible-playbook ansible/deploy.yml -i /tmp/ansible/inventory.ini -v
 
           echo "=== Ansible deployment completed ==="
@@ -93,6 +85,10 @@ jobs:
           echo "=== Waiting for bot to stabilize ==="
           sleep 10
           echo "=== Bot startup wait completed ==="
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         shell: bash
       - name: Verify Bot Health
         run: |
