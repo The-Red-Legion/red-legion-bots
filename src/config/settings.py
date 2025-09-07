@@ -5,8 +5,11 @@ Core settings and configuration for Red Legion Discord Bot.
 import os
 from google.cloud import secretmanager
 
-def get_secret(secret_name, project_id="the-red-legion"):
+def get_secret(secret_name, project_id=None):
     """Retrieve secret from Google Cloud Secret Manager."""
+    if project_id is None:
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
+    
     client = secretmanager.SecretManagerServiceClient()
     secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
     response = client.access_secret_version(request={"name": secret_path})
