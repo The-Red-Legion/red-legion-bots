@@ -330,23 +330,28 @@ async def leave_voice_channel(channel_id):
         return False
 
 
-async def add_tracked_channel(channel_id):
+async def add_tracked_channel(channel_id, should_join=False):
     """
-    Add a voice channel to participation tracking and join it.
+    Add a voice channel to participation tracking and optionally join it.
     
     Args:
         channel_id: The Discord channel ID to track
+        should_join: Whether the bot should attempt to join this channel
     """
     active_voice_channels[channel_id] = datetime.now()
     last_checks[channel_id] = datetime.now()
     
-    # Join the voice channel to provide visual indication
-    success = await join_voice_channel(channel_id)
-    
-    if success:
-        print(f"✅ Added channel {channel_id} to voice tracking and joined")
+    if should_join:
+        # Join the voice channel to provide visual indication
+        success = await join_voice_channel(channel_id)
+        
+        if success:
+            print(f"✅ Added channel {channel_id} to voice tracking and joined")
+        else:
+            print(f"⚠️ Added channel {channel_id} to voice tracking (could not join)")
     else:
-        print(f"⚠️ Added channel {channel_id} to voice tracking (could not join)")
+        print(f"✅ Added channel {channel_id} to voice tracking")
+        return True
 
 
 async def remove_tracked_channel(channel_id):

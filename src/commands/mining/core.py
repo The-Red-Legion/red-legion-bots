@@ -607,7 +607,9 @@ class SundayMiningCommands(commands.Cog):
             # Start voice tracking for all Sunday mining channels
             mining_channels = get_sunday_mining_channels()
             for channel_name, channel_id in mining_channels.items():
-                await add_tracked_channel(int(channel_id))
+                # Only join the dispatch channel, track all others
+                should_join = channel_name.lower() == 'dispatch'
+                await add_tracked_channel(int(channel_id), should_join=should_join)
             
             start_voice_tracking()
             
@@ -633,13 +635,13 @@ class SundayMiningCommands(commands.Cog):
             ])
             embed.add_field(
                 name="🎤 Tracked Voice Channels",
-                value=channel_list + "\n\n🤖 **Bot will join each channel** to indicate active tracking!",
+                value=channel_list + "\n\n🤖 **Bot will join Dispatch channel** to indicate active tracking!",
                 inline=False
             )
             
             embed.add_field(
                 name="📝 Next Steps",
-                value="1. **Look for the bot in voice channels** - this confirms tracking is active\n2. Join voice channels to track participation\n3. Mine ore and deposit in central storage\n4. Use `/sunday_mining_stop` when done\n5. Payroll officer uses `/payroll` to calculate distribution",
+                value="1. **Look for the bot in Dispatch channel** - this confirms tracking is active\n2. Join any tracked voice channels to track participation\n3. Mine ore and deposit in central storage\n4. Use `/sunday_mining_stop` when done\n5. Payroll officer uses `/payroll` to calculate distribution",
                 inline=False
             )
             
