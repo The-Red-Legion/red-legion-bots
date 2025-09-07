@@ -11,17 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-# Add src to p            secret_status = []
-            try:
-                from config.settings import get_secret
-                # Test if we can access Secret Manager (without exposing values)
-                try:
-                    get_secret("database-connection-string")
-                    secret_status.append("✅ Database connection string: Accessible")
-                except Exception as e:
-                    secret_status.append(f"❌ Database connection string: {str(e)[:30]}")
-                
-                try:orts
+# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.decorators import has_org_role, error_handler
@@ -309,7 +299,7 @@ def register_commands(bot):
             # Check Secret Manager access
             secret_status = []
             try:
-                from ..config.settings import get_secret
+                from config.settings import get_secret
                 # Test if we can access Secret Manager (without exposing values)
                 try:
                     get_secret("database-connection-string")
