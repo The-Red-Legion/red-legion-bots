@@ -35,8 +35,8 @@ async def setup_core_handlers(bot):
             # Run database init in a thread to avoid blocking the event loop
             import asyncio
             import functools
-            from ..database import init_db
-            from ..config.settings import get_database_url
+            from database import init_db
+            from config.settings import get_database_url
             
             loop = asyncio.get_event_loop()
             
@@ -53,7 +53,7 @@ async def setup_core_handlers(bot):
                 print(f"⚠️ Database initialization failed: {db_error} - bot will continue without database")
             
             print("Setting up event handlers...")
-            from ..event_handlers import setup_event_handlers
+            from event_handlers import setup_event_handlers
             await setup_event_handlers()  # Register event handler
             print("Event handlers registered successfully")
             
