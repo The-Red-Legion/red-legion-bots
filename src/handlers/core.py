@@ -36,7 +36,7 @@ async def setup_core_handlers(bot):
             import asyncio
             import functools
             from ..database import init_db
-            from ..config import get_database_url
+            from ..config.settings import get_database_url
             
             loop = asyncio.get_event_loop()
             
