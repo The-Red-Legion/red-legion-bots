@@ -914,6 +914,7 @@ async def setup(bot):
     await bot.add_cog(cog)
     
     # Explicitly add the command group to the bot's command tree
-    bot.tree.add_command(cog.events)
+    # Command groups defined as class attributes need to be manually added
+    bot.tree.add_command(EventManagement.events)
     print("✅ Event Management commands loaded")
-    print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
+    print(f"✅ Added red-events command group with {len(EventManagement.events.commands)} subcommands")
