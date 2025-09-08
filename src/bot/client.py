@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -90,26 +91,49 @@ class RedLegionBot(commands.Bot):
         local_commands = [cmd.name for cmd in self.tree.get_commands() if hasattr(cmd, 'name')]
         print(f'🔍 Local commands loaded: {len(local_commands)}')
         
-        # Show first few commands for debugging
-        for i, cmd in enumerate(sorted(local_commands)[:10]):
-            prefix = "🟢" if cmd.startswith("red-") else "🔴"
-            print(f'  {prefix} {cmd}')
-        if len(local_commands) > 10:
-            print(f'  ... and {len(local_commands) - 10} more')
+        # Count red- prefix commands
+        red_commands = [cmd for cmd in local_commands if cmd.startswith('red-')]
+        other_commands = [cmd for cmd in local_commands if not cmd.startswith('red-')]
         
-        # Sync slash commands
+        print(f'✅ Commands with red- prefix: {len(red_commands)}')
+        if other_commands:
+            print(f'⚠️ Commands without red- prefix: {len(other_commands)}')
+            for cmd in other_commands:
+                print(f'  � {cmd}')
+        
+        # Show first few commands for verification
+        print('📋 Sample commands loaded:')
+        for i, cmd in enumerate(sorted(red_commands)[:10]):
+            print(f'  🟢 /{cmd}')
+        if len(red_commands) > 10:
+            print(f'  ... and {len(red_commands) - 10} more')
+        
+        # Sync slash commands with enhanced logging
         try:
             print('🔄 Syncing slash commands with Discord...')
+            start_time = datetime.now()
             synced = await self.tree.sync()
-            print(f'✅ Synced {len(synced)} slash commands')
+            sync_time = (datetime.now() - start_time).total_seconds()
             
-            # Debug: Show what was actually synced
-            print('📋 Synced commands:')
-            for i, cmd in enumerate(synced[:10]):
-                prefix = "🟢" if cmd.name.startswith("red-") else "🔴"
-                print(f'  {prefix} {cmd.name}')
-            if len(synced) > 10:
-                print(f'  ... and {len(synced) - 10} more')
+            print(f'✅ Synced {len(synced)} slash commands in {sync_time:.1f}s')
+            
+            # Verify sync results
+            synced_red = [cmd.name for cmd in synced if cmd.name.startswith('red-')]
+            synced_other = [cmd.name for cmd in synced if not cmd.name.startswith('red-')]
+            
+            print(f'� Sync Results:')
+            print(f'  🟢 Red-prefixed commands synced: {len(synced_red)}')
+            if synced_other:
+                print(f'  🔴 Non-red commands synced: {len(synced_other)}')
+                for cmd in synced_other:
+                    print(f'    - {cmd}')
+            
+            # Final status
+            if len(synced_red) > 0 and len(synced_other) == 0:
+                print('🎉 SUCCESS: All synced commands have red- prefix!')
+                print('💡 Commands should now appear in Discord. Type /red to test.')
+            else:
+                print('⚠️ WARNING: Sync completed but may have issues')
                 
         except Exception as e:
             print(f'❌ Failed to sync slash commands: {e}')
