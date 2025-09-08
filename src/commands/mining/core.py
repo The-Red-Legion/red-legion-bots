@@ -27,10 +27,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config.settings import (
-    get_sunday_mining_channels,
     ORE_TYPES, 
     UEX_API_CONFIG
 )
+from config.channels import get_sunday_mining_channels
 from handlers.voice_tracking import (
     add_tracked_channel, 
     remove_tracked_channel, 
@@ -623,7 +623,7 @@ class SundayMiningCommands(commands.Cog):
             # Ensure bot instance is set for voice operations
             set_bot_instance(interaction.client)
             
-            mining_channels = get_sunday_mining_channels()
+            mining_channels = get_sunday_mining_channels(interaction.guild.id)
             for channel_name, channel_id in mining_channels.items():
                 # Only join the dispatch channel, track all others
                 should_join = channel_name.lower() == 'dispatch'
@@ -647,11 +647,20 @@ class SundayMiningCommands(commands.Cog):
             )
             
             # List tracked channels
-            mining_channels = get_sunday_mining_channels()
-            channel_list = "\n".join([
-                f"• {name.title()}: <#{channel_id}>"
-                for name, channel_id in mining_channels.items()
-            ])
+            mining_channels = get_sunday_mining_channels(interaction.guild.id)
+            channel_list_items = []
+            for name, channel_id in mining_channels.items():
+                try:
+                    # Get the actual channel object to display proper name
+                    channel = interaction.guild.get_channel(int(channel_id))
+                    if channel:
+                        channel_list_items.append(f"• {name.title()}: {channel.name}")
+                    else:
+                        channel_list_items.append(f"• {name.title()}: Channel ID {channel_id}")
+                except (ValueError, TypeError):
+                    channel_list_items.append(f"• {name.title()}: Invalid ID {channel_id}")
+            
+            channel_list = "\n".join(channel_list_items)
             embed.add_field(
                 name="🎤 Tracked Voice Channels",
                 value=channel_list + "\n\n🤖 **Bot will join Dispatch channel** to indicate active tracking!",
@@ -690,7 +699,7 @@ class SundayMiningCommands(commands.Cog):
             duration_hours = duration.total_seconds() / 3600
             
             # Stop voice tracking
-            mining_channels = get_sunday_mining_channels()
+            mining_channels = get_sunday_mining_channels(interaction.guild.id)
             for channel_id in mining_channels.values():
                 await remove_tracked_channel(int(channel_id))
             
@@ -934,7 +943,7 @@ class SundayMiningCommands(commands.Cog):
         
         if current_session['active']:
             # Stop tracking and leave voice channels
-            mining_channels = get_sunday_mining_channels()
+            mining_channels = get_sunday_mining_channels(None)  # Use None since we don't have guild context here
             for channel_id in mining_channels.values():
                 await remove_tracked_channel(int(channel_id))
             stop_voice_tracking()
@@ -1188,6 +1197,122 @@ class SundayMiningCommands(commands.Cog):
         except Exception as e:
             print(f"Error generating PDF report: {e}")
             return None
+    
+    @app_commands.command(name="sunday_mining_test", description="Run diagnostics for Sunday Mining voice channel issues (Admin only)")
+    @app_commands.describe(
+        test_type="Type of diagnostic test to run"
+    )
+    @app_commands.choices(test_type=[
+        app_commands.Choice(name="All Tests", value="all"),
+        app_commands.Choice(name="Database Schema", value="database"),
+        app_commands.Choice(name="Voice Channels", value="voice"),
+        app_commands.Choice(name="Bot Permissions", value="permissions"),
+        app_commands.Choice(name="Voice Connection", value="connection"),
+        app_commands.Choice(name="Guild Configuration", value="guild")
+    ])
+    async def sunday_mining_test(self, interaction: discord.Interaction, test_type: str = "all"):
+        """Run comprehensive diagnostics for Sunday Mining system."""
+        try:
+            # Check admin permissions
+            if not interaction.user.guild_permissions.administrator:
+                await interaction.response.send_message(
+                    "❌ Access denied. Only administrators can run mining diagnostics.",
+                    ephemeral=True
+                )
+                return
+            
+            await interaction.response.defer()
+            
+            # Import the testing framework
+            from commands.mining.testing import SundayMiningTester
+            
+            # Create tester instance
+            tester = SundayMiningTester(self.bot, interaction.guild)
+            
+            # Run specified tests
+            if test_type == "all":
+                results = await tester.run_all_tests()
+            elif test_type == "database":
+                results = await tester.test_database_schema()
+            elif test_type == "voice":
+                results = await tester.test_voice_channels()
+            elif test_type == "permissions":
+                results = await tester.test_bot_permissions()
+            elif test_type == "connection":
+                results = await tester.test_voice_connection()
+            elif test_type == "guild":
+                results = await tester.test_guild_configuration()
+            else:
+                results = {"error": "Invalid test type"}
+            
+            # Create results embed
+            embed = discord.Embed(
+                title=f"🔧 Sunday Mining Diagnostics - {test_type.title()}",
+                description=f"Diagnostic results for {interaction.guild.name}",
+                color=0x3498db,
+                timestamp=datetime.now()
+            )
+            
+            # Add test results
+            if "error" in results:
+                embed.add_field(
+                    name="❌ Error",
+                    value=results["error"],
+                    inline=False
+                )
+            else:
+                # Add results for each test category
+                for category, tests in results.items():
+                    if isinstance(tests, dict):
+                        test_status = []
+                        for test_name, result in tests.items():
+                            status = "✅" if result.get("passed", False) else "❌"
+                            test_status.append(f"{status} {test_name}")
+                        
+                        embed.add_field(
+                            name=f"📋 {category.replace('_', ' ').title()}",
+                            value="\n".join(test_status[:10]),  # Limit to 10 per field
+                            inline=True
+                        )
+            
+            # Add recommendation section
+            recommendations = []
+            
+            if test_type in ["all", "voice", "connection"]:
+                recommendations.append("• Check if bot has permission to join voice channels")
+                recommendations.append("• Verify voice channel IDs in mining configuration")
+                recommendations.append("• Ensure bot can see and access all mining channels")
+            
+            if test_type in ["all", "database"]:
+                recommendations.append("• Verify database connection and schema")
+                recommendations.append("• Check if mining channels are properly configured")
+            
+            if recommendations:
+                embed.add_field(
+                    name="💡 Common Solutions",
+                    value="\n".join(recommendations),
+                    inline=False
+                )
+            
+            # Add next steps
+            embed.add_field(
+                name="🎯 Next Steps",
+                value="1. Review failed tests above\n"
+                      "2. Check bot permissions in voice channels\n"
+                      "3. Verify mining channel configuration\n"
+                      "4. Test with `/sunday_mining_start` after fixes",
+                inline=False
+            )
+            
+            embed.set_footer(text="Sunday Mining Diagnostics • Use results to troubleshoot issues")
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error running diagnostics: {str(e)}",
+                ephemeral=True
+            )
 
 
 async def setup(bot):

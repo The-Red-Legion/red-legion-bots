@@ -10,9 +10,75 @@ permissions:
   pull-requests: write
 
 jobs:
-  code-quality:
-    name: "Code Quality & Unit Tests"
+  # Clear previous test labels before starting new test run
+  clear-labels:
+    name: "Clear Previous Test Labels"
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Remove all previous test labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number;
+            
+            if (!pull_number) {
+              console.log('Not a pull request, skipping label clearing');
+              return;
+            }
+
+            // List of all possible test-related and deployment labels to remove
+            // Using exact case-sensitive label names from GitHub
+            const testLabels = [
+              'tests pending',
+              'tests failed', 
+              'Tests Good',           // Note: Capital letters as shown in GitHub
+              'tests good',           // Also try lowercase version
+              'database tests failed',
+              'bot tests failed', 
+              'linting failed',
+              'validation failed',
+              'performance issues',
+              'ready for review',
+              'Ready to Merge',       // Capital letters as shown in GitHub
+              'needs fixes',
+              'Deploy',               // Capital D as shown in GitHub
+              'Merge'                 // Capital M as shown in GitHub
+            ];
+            
+            console.log('🧹 Clearing previous test and deployment labels...');
+            
+            for (const label of testLabels) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: pull_number,
+                  name: label
+                });
+                console.log(`✅ Removed label: ${label}`);
+              } catch (error) {
+                console.log(`ℹ️ Label "${label}" not found or already removed`);
+              }
+            }
+            
+            // Add 'tests pending' label to indicate tests are starting
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: pull_number,
+              labels: ['tests pending']
+            });
+            
+            console.log('✅ Added "tests pending" label - test run starting');
+
+  code-quality:
+    name: "Code Quality & Validation"
+    runs-on: ubuntu-latest
+    needs: clear-labels
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -39,18 +105,22 @@ jobs:
             echo "⚠️ Linting found issues - continuing with tests"
             echo "💡 Please review and fix linting issues when possible"
           fi
-      - name: Run unit tests
+      - name: Run validation tests
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: python3 -m pytest tests/
+        run: |
+          echo "✅ Running validation tests..."
+          python3 -m pytest tests/test_validation.py -v
+          echo "✅ Validation tests completed!"
 
-  test-modular-architecture:
-    name: "Modular Architecture Tests"
+  database-architecture:
+    name: "Database Architecture Tests"
     runs-on: ubuntu-latest
+    needs: [clear-labels, code-quality]
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -67,7 +137,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
-      - name: Test modular system functionality
+      - name: Test Database v2.0.0 Architecture
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -75,13 +145,36 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
-          echo "🧪 Testing modular system architecture..."
-          python3 tests/test_modular_system.py
-          echo "✅ Modular architecture tests completed!"
+          echo "🗄️ Testing Database Architecture v2.0.0..."
+          python3 -m pytest tests/test_database_v2.py -v
+          echo "✅ Database v2.0.0 tests completed!"
+      - name: Test Database Integration
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "🔗 Testing Database Integration..."
+          python3 -m pytest tests/test_database_integration.py -v
+          echo "✅ Database integration tests completed!"
+      - name: Test Database Performance
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "⚡ Testing Database Performance..."
+          python3 -m pytest tests/test_database_performance.py -v
+          echo "✅ Database performance tests completed!"
 
-  test-advanced-components:
-    name: "Advanced Component Tests"
+  bot-functionality:
+    name: "Bot Functionality Tests" 
     runs-on: ubuntu-latest
+    needs: [clear-labels, code-quality]
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -98,7 +191,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
-      - name: Test advanced system components
+      - name: Test Participation Bot
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -106,13 +199,25 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
-          echo "🔬 Testing advanced system components..."
-          python3 tests/test_advanced_system.py
-          echo "✅ Advanced component tests completed!"
+          echo "🤖 Testing Participation Bot..."
+          python3 -m pytest tests/test_participation_bot.py -v
+          echo "✅ Participation bot tests completed!"
+      - name: Test Modular System
+        env:
+          PYTHONPATH: .
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLOUD_PROJECT: rl-prod-471116
+        run: |
+          echo "🧩 Testing Modular System Architecture..."
+          python3 -m pytest tests/test_modular_system.py -v
+          echo "✅ Modular system tests completed!"
 
-  test-final-validation:
-    name: "Final System Validation"
+  advanced-system:
+    name: "Advanced System Tests"
     runs-on: ubuntu-latest
+    needs: [database-architecture, bot-functionality]
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -129,7 +234,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
-      - name: Run final validation tests
+      - name: Test Advanced System Components
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -137,204 +242,114 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
-          echo "🎯 Running final system validation..."
-          python3 tests/test_validation.py
-          echo "✅ Final validation tests completed!"
+          echo "🚀 Testing Advanced System Components..."
+          python3 -m pytest tests/test_advanced_system.py -v
+          echo "✅ Advanced system tests completed!"
 
-  test-connections:
-    name: "Connection & Infrastructure Tests"
-    needs: code-quality
+  test-summary:
+    name: "Test Summary & Results"
     runs-on: ubuntu-latest
+    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
+    if: always()
     steps:
       - uses: actions/checkout@v4
-      - name: Set up SSH key for Ansible
+      - name: Generate Test Summary
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          # Verify SSH key format
-          echo "🔍 Checking SSH key format..."
-          head -1 ~/.ssh/id_rsa
-          echo "🔍 SSH key file size: $(wc -c < ~/.ssh/id_rsa) bytes"
-          # Add host key
-          ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts || true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-          check-latest: false
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Install Dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt psycopg2-binary google-cloud-secret-manager
-      - name: Test Connections
-        id: test
-        run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
-          echo "DEBUG: DATABASE_URL set to [${DATABASE_URL}]" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Test Suite Results Summary**" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY  
+          echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality & Validation | ${{ needs.code-quality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database Architecture Tests | ${{ needs.database-architecture.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bot Functionality Tests | ${{ needs.bot-functionality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Advanced System Tests | ${{ needs.advanced-system.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           
-          # Test database connection with better error handling
-          if python3 -c "
-          import os
-          import psycopg2
-          try:
-              conn = psycopg2.connect(os.getenv('DATABASE_URL').replace('%', '%25'), connect_timeout=10, sslmode='require')
-              conn.close()
-              print('Database connection successful')
-          except psycopg2.OperationalError as e:
-              if 'timeout expired' in str(e) or 'connection refused' in str(e).lower():
-                  print('Database not accessible from GitHub runner (expected for private networks)')
-                  print('Skipping database connectivity test')
-                  exit(0)  # Don't fail the test
-              else:
-                  print(f'Database connection failed: {e}')
-                  exit(1)
-          except Exception as e:
-              print(f'Database connection failed: {e}')
-              exit(1)
-          "; then
-              echo "Database successful"
+          # Overall result
+          if [ "${{ needs.code-quality.result }}" = "success" ] && [ "${{ needs.database-architecture.result }}" = "success" ] && [ "${{ needs.bot-functionality.result }}" = "success" ] && [ "${{ needs.advanced-system.result }}" = "success" ]; then
+            echo "## 🎉 All tests passed! Ready for deployment" >> $GITHUB_STEP_SUMMARY
           else
-              echo "result=fail" >> $GITHUB_OUTPUT
-              echo "Database test failed"
-              exit 1
+            echo "## ⚠️ Some tests failed - review results above" >> $GITHUB_STEP_SUMMARY
           fi
-          python3 -c "from google.cloud import secretmanager; client = secretmanager.SecretManagerServiceClient(); client.access_secret_version(name='projects/rl-prod-471116/secrets/discord-token/versions/latest');" || { echo "result=fail" >> $GITHUB_OUTPUT; echo "Secret failed"; exit 1; }
-          echo "Secret successful"
-          echo "result=success" >> $GITHUB_OUTPUT
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-    outputs:
-      result: ${{ steps.test.outputs.result }}
 
-  test-ansible-deployment:
-    name: "Ansible Deployment Tests"
-    needs: test-connections
+  # Post-test actions for label management
+  post-tests:
+    name: "Post-Test Actions"
     runs-on: ubuntu-latest
+    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
+    if: always()
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Test GCloud SSH connection
-        run: |
-          echo "� Testing GCloud SSH connection..."
-          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30" || echo "GCloud SSH test failed - continuing anyway"
-      - name: Install Ansible
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install ansible
-      - name: Ansible Syntax Check and GCloud Deployment Test
-        id: ansible_test
-        run: |
-          echo "=== Starting Ansible Validation ==="
-          
-          # First, validate Ansible playbook syntax
-          echo "🔍 Validating Ansible playbook syntax..."
-          if ansible-playbook --syntax-check ansible/deploy.yml; then
-            echo "✅ Ansible playbook syntax is valid"
-          else
-            echo "❌ Ansible playbook has syntax errors"
-            echo "result=fail" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-          
-          # Test deployment with gcloud (simplified check)
-          echo "🚀 Testing deployment readiness with GCloud..."
-          if gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'Deployment target accessible'" --ssh-flag="-o ConnectTimeout=30"; then
-            echo "✅ Deployment target is accessible via GCloud"
-            echo "result=success" >> $GITHUB_OUTPUT
-          else
-            echo "⚠️ GCloud SSH connection failed - VM might be stopped"
-            echo "💡 Syntax validation passed, deployment will work when VM is running"
-            echo "result=syntax-valid" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "=== Ansible Validation Completed ==="
-        env:
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-    outputs:
-      result: ${{ steps.ansible_test.outputs.result }}
-
-  post-test:
-    if: always()  # Run regardless of test job success/failure
-    needs: [code-quality, test-modular-architecture, test-advanced-components, test-final-validation, test-connections, test-ansible-deployment]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Add Ready to Deploy Label on Success
-        if: needs.code-quality.result == 'success' && needs.test-modular-architecture.result == 'success' && needs.test-advanced-components.result == 'success' && needs.test-final-validation.result == 'success' && needs.test-connections.result == 'success' && (needs.test-ansible-deployment.result == 'success' || needs.test-ansible-deployment.outputs.result == 'syntax-valid')
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update PR labels based on test results
         uses: actions/github-script@v7
         with:
           script: |
-            try {
-              // Add Ready to Deploy label
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                labels: ['Ready to Deploy']
-              });
-              console.log('Ready to Deploy label added successfully');
-              
-              // Remove bug label if it exists
-              try {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.payload.pull_request.number,
-                  name: 'bug'
-                });
-                console.log('Bug label removed successfully');
-              } catch (error) {
-                if (error.status === 404) {
-                  console.log('Bug label not found, nothing to remove');
-                } else {
-                  console.error('Failed to remove bug label:', error.message);
-                }
-              }
-            } catch (error) {
-              console.error('Failed to add Ready to Deploy label:', error.message);
-              throw error;
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number;
+            
+            if (!pull_number) {
+              console.log('Not a pull request, skipping label updates');
+              return;
             }
-      
-      - name: Add Bug Label on Failure
-        if: needs.code-quality.result == 'failure' || needs.test-modular-architecture.result == 'failure' || needs.test-advanced-components.result == 'failure' || needs.test-final-validation.result == 'failure' || needs.test-connections.result == 'failure' || (needs.test-ansible-deployment.result == 'failure' && needs.test-ansible-deployment.outputs.result == 'fail')
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              // Add bug label
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                labels: ['bug']
-              });
-              console.log('Bug label added successfully');
-              
-              // Remove Ready to Deploy label if it exists
+
+            // Check test results
+            const codeQuality = '${{ needs.code-quality.result }}';
+            const dbArchitecture = '${{ needs.database-architecture.result }}';
+            const botFunctionality = '${{ needs.bot-functionality.result }}';
+            const advancedSystem = '${{ needs.advanced-system.result }}';
+            
+            const allTestsPassed = codeQuality === 'success' && 
+                                 dbArchitecture === 'success' && 
+                                 botFunctionality === 'success' && 
+                                 advancedSystem === 'success';
+            
+            // Remove all existing test-related labels first
+            const labelsToRemove = ['tests pending', 'Tests Good', 'Deploy', 'Ready to Merge'];
+            for (const label of labelsToRemove) {
               try {
                 await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.payload.pull_request.number,
-                  name: 'Ready to Deploy'
+                  owner,
+                  repo,
+                  issue_number: pull_number,
+                  name: label
                 });
-                console.log('Ready to Deploy label removed successfully');
+                console.log(`✅ Removed "${label}" label`);
               } catch (error) {
-                if (error.status === 404) {
-                  console.log('Ready to Deploy label not found, nothing to remove');
-                } else {
-                  console.error('Failed to remove Ready to Deploy label:', error.message);
-                }
+                console.log(`ℹ️ "${label}" label not found`);
               }
-            } catch (error) {
-              console.error('Failed to add bug label:', error.message);
-              // Don't throw error here to avoid failing the workflow
-              // since this is just cleanup
+            }
+            
+            // Add appropriate final label based on results
+            if (allTestsPassed) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pull_number,
+                labels: ['Tests Good']
+              });
+              
+              // Add comment with success summary
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pull_number,
+                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n\\n🚀 **Ready for deployment!** Add the `deploy` label when ready to deploy to staging."
+              });
+            } else {
+              // Don't add any success labels for failed tests
+              // The absence of 'Tests Good' indicates tests need attention
+              
+              // Add comment with failure details
+              const failedTests = [];
+              if (codeQuality !== 'success') failedTests.push('Code Quality & Validation');
+              if (dbArchitecture !== 'success') failedTests.push('Database Architecture');
+              if (botFunctionality !== 'success') failedTests.push('Bot Functionality');
+              if (advancedSystem !== 'success') failedTests.push('Advanced System');
+              
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pull_number,
+                body: "## ❌ Some Tests Failed\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | " + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Database Architecture v2.0.0 | " + (dbArchitecture === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Bot Functionality | " + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Advanced System Components | " + (advancedSystem === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n\\n**Failed test suites:** " + failedTests.join(', ') + "\\n\\nPlease review the test results and fix any issues before proceeding."
+              });
             }

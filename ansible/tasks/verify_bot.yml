@@ -6,7 +6,7 @@
   when: not ansible_check_mode
 
 - name: Verify bot process is running
-  shell: kill -0 $(cat {{ app_dir }}/bot.pid)
+  shell: ps -p $(cat {{ app_dir }}/bot.pid) > /dev/null 2>&1
   when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
   register: process_check
   failed_when: process_check.rc != 0

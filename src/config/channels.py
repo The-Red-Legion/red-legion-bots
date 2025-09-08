@@ -23,12 +23,48 @@ def get_sunday_mining_channels(guild_id=None):
     Falls back to hardcoded values if database is unavailable.
     """
     try:
-        from database import get_mining_channels_dict
+        # Direct database query approach to bypass import issues
+        import psycopg2
+        from urllib.parse import urlparse
+        
         db_url = get_database_url()
         if db_url:
-            channels = get_mining_channels_dict(db_url, guild_id)
-            if channels:
-                return channels
+            # If no guild_id provided, use the default Red Legion guild ID
+            if guild_id is None:
+                guild_id = 814699481912049704  # Default Red Legion server ID
+                
+            # Convert to proxy URL if needed
+            parsed = urlparse(db_url)
+            if parsed.hostname not in ['127.0.0.1', 'localhost']:
+                proxy_url = db_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+                try:
+                    conn = psycopg2.connect(proxy_url)
+                except psycopg2.OperationalError:
+                    conn = psycopg2.connect(db_url)
+            else:
+                conn = psycopg2.connect(db_url)
+                
+            c = conn.cursor()
+            c.execute('''
+                SELECT channel_name, channel_id 
+                FROM mining_channels 
+                WHERE guild_id = %s AND is_active = TRUE
+                ORDER BY channel_name
+            ''', (guild_id,))
+            
+            rows = c.fetchall()
+            
+            if rows:
+                channels_dict = {}
+                for channel_name, channel_id in rows:
+                    channels_dict[channel_name] = str(channel_id)
+                
+                conn.close()
+                print(f"✅ Loaded {len(channels_dict)} mining channels from database for guild {guild_id}")
+                return channels_dict
+            
+            conn.close()
+            
     except Exception as e:
         print(f"Warning: Could not get mining channels from database: {e}")
     

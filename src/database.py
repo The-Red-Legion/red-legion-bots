@@ -1,25 +1,49 @@
 """
-Legacy database module (Compatibility)
+Legacy Database Module
 
-This file exists for backward compatibility.
-All database operations are now in database/operations.py
+This file provides backward compatibility for imports from the old 'database.py' structure.
+All functions are re-exported from the new modular database package.
 """
 
-import warnings
-import sys
-from pathlib import Path
-
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-# Show deprecation warning
-warnings.warn(
-    "database.py is deprecated. Use database.operations instead.", 
-    DeprecationWarning, 
-    stacklevel=2
-)
-
-# Import everything from the new database modules for compatibility
+# Import everything from the new database package
+from database import *
 from database.operations import *
-from database.models import *
-from database import init_database as init_db
+
+# Maintain legacy compatibility
+__all__ = [
+    # All exports from new database module
+    'DatabaseManager',
+    'get_connection', 
+    'get_cursor',
+    'Guild',
+    'User', 
+    'GuildMembership',
+    'MiningEvent',
+    'MiningChannel',
+    'MiningParticipation',
+    'Material',
+    'MiningYield',
+    'Loan',
+    'LoanStatus',
+    'MiningEventStatus',
+    'GuildOperations',
+    'UserOperations',
+    'MiningOperations',
+    'EconomyOperations',
+    'init_database',
+    'init_db',
+    'get_market_items',
+    'add_market_item',
+    'get_mining_channels_dict',
+    'issue_loan',
+    'save_mining_participation',
+    'add_mining_channel',
+    'remove_mining_channel',
+    'get_mining_channels',
+    'migrate_schema',
+    'close_mining_event',
+    'mark_pdf_generated',
+    'get_mining_session_participants',
+    'create_mining_event',
+    'get_open_mining_events',
+]

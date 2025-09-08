@@ -74,13 +74,12 @@ class RedLegionBot(commands.Bot):
         
         # Initialize database for new guild
         try:
-            from database import init_database
-            from config.settings import get_database_url
+            from database_init import init_database_for_deployment
             
-            db_url = get_database_url()
-            if db_url:
-                init_database(db_url)
+            if init_database_for_deployment():
                 print(f"✅ Database initialized for guild {guild.name}")
+            else:
+                print(f"❌ Database initialization failed for guild {guild.name}")
         except Exception as e:
             print(f"❌ Error initializing database for guild {guild.name}: {e}")
     

@@ -1,0 +1,474 @@
+name: Deploy Bot (Restructured)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: read
+  checks: read
+
+jobs:
+  # Phase 1: Infrastructure Preparation
+  infrastructure-setup:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'tests good')
+    outputs:
+      vm_ip: ${{ steps.vm_info.outputs.vm_ip }}
+      ssh_status: ${{ steps.ssh_test.outputs.status }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Get VM Information
+        id: vm_info
+        run: |
+          echo "🔗 Testing GCloud SSH connection to arccorp-compute..."
+          if gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30"; then
+            echo "✅ GCloud SSH connection successful"
+          else
+            echo "⚠️ GCloud SSH test failed - continuing anyway"
+          fi
+          
+          # Get current VM IP for Ansible
+          echo "🔍 Getting current VM IP address..."
+          VM_IP=$(gcloud compute instances describe arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --format="get(networkInterfaces[0].accessConfigs[0].natIP)" || echo "")
+          if [ -z "$VM_IP" ]; then
+            echo "❌ Could not get VM IP address, using fallback"
+            VM_IP="34.30.73.146"
+          fi
+          echo "📍 Current VM IP: $VM_IP"
+          echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
+      
+      - name: Setup SSH Access
+        id: ssh_test
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # Add host key for the current IP
+          ssh-keyscan -H ${{ steps.vm_info.outputs.vm_ip }} >> ~/.ssh/known_hosts || true
+          echo "🔍 Testing SSH connection for Ansible to ${{ steps.vm_info.outputs.vm_ip }}..."
+          if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@${{ steps.vm_info.outputs.vm_ip }} "echo 'Ansible SSH connection test successful'"; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ SSH connection successful"
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "⚠️ SSH test failed - will continue anyway"
+          fi
+      
+      - name: Create Ansible Inventory
+        run: |
+          # Create a temporary inventory file with the current IP
+          mkdir -p /tmp/ansible
+          cat > /tmp/ansible/inventory.ini << EOF
+          [arccorp_compute]
+          ${{ steps.vm_info.outputs.vm_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+          [arccorp_compute:vars]
+          ansible_python_interpreter=/usr/bin/python3
+          EOF
+          echo "📋 Dynamic inventory file created:"
+          cat /tmp/ansible/inventory.ini
+      
+      - name: Upload Ansible Inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-inventory
+          path: /tmp/ansible/inventory.ini
+          retention-days: 1
+
+  # Phase 2: Ansible Deployment
+  ansible-deployment:
+    runs-on: ubuntu-latest
+    needs: infrastructure-setup
+    outputs:
+      deployment_status: ${{ steps.deploy.outputs.status }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Download Ansible Inventory
+        uses: actions/download-artifact@v4
+        with:
+          name: ansible-inventory
+          path: /tmp/ansible/
+      
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.infrastructure-setup.outputs.vm_ip }} >> ~/.ssh/known_hosts || true
+      
+      - name: Setup Python and Ansible
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+      
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Run Ansible Deployment
+        id: deploy
+        run: |
+          echo "=== Starting Ansible deployment ==="
+          
+          # Run Ansible playbook with dynamic inventory using environment variables
+          if ansible-playbook ansible/deploy.yml -i /tmp/ansible/inventory.ini -v; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ Ansible deployment completed successfully"
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "❌ Ansible deployment failed"
+            exit 1
+          fi
+          
+          echo "=== Waiting for bot to stabilize ==="
+          sleep 10
+          echo "=== Bot startup wait completed ==="
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # Phase 3: Health Verification
+  health-verification:
+    runs-on: ubuntu-latest
+    needs: [infrastructure-setup, ansible-deployment]
+    outputs:
+      health_status: ${{ steps.health_check.outputs.status }}
+      process_status: ${{ steps.health_check.outputs.process_status }}
+    steps:
+      - name: Setup SSH Access
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ needs.infrastructure-setup.outputs.vm_ip }} >> ~/.ssh/known_hosts || true
+      
+      - name: Discord API Health Check
+        id: health_check
+        run: |
+          echo "=== Discord Bot Health Check ==="
+          
+          # Function to check if bot responds to Discord
+          check_discord_health() {
+            local max_attempts=3
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Health check attempt $attempt/$max_attempts..."
+              
+              # Send a test message to Discord and check if bot processes it
+              # Using a simple API call to check if bot is online
+              HEALTH_CHECK=$(curl -s -X GET \
+                "https://discord.com/api/v10/applications/@me" \
+                -H "Authorization: Bot ${{ secrets.DISCORD_TOKEN }}" \
+                -H "Content-Type: application/json")
+              
+              if echo "$HEALTH_CHECK" | grep -q '"id"'; then
+                echo "✅ Bot is authenticated and responding to Discord API"
+                
+                # Additional check: verify bot can access guild information
+                GUILD_CHECK=$(curl -s -X GET \
+                  "https://discord.com/api/v10/users/@me/guilds" \
+                  -H "Authorization: Bot ${{ secrets.DISCORD_TOKEN }}" \
+                  -H "Content-Type: application/json")
+                
+                if echo "$GUILD_CHECK" | grep -q '\[.*\]'; then
+                  echo "✅ Bot can access guild information"
+                  echo "✅ Discord health check PASSED"
+                  return 0
+                else
+                  echo "⚠️ Bot authenticated but cannot access guilds"
+                fi
+              else
+                echo "❌ Bot not responding to Discord API"
+              fi
+              
+              echo "Waiting 10 seconds before retry..."
+              sleep 10
+              attempt=$((attempt + 1))
+            done
+            
+            echo "❌ Discord health check FAILED after $max_attempts attempts"
+            return 1
+          }
+          
+          # Check process status via SSH
+          echo "=== Process Status Check ==="
+          PROCESS_STATUS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ needs.infrastructure-setup.outputs.vm_ip }} '
+            if [ -f "/app/bot.pid" ]; then
+              PID=$(cat /app/bot.pid)
+              if ps -p "$PID" > /dev/null 2>&1; then
+                echo "running"
+              else
+                echo "stopped"
+              fi
+            else
+              echo "no_pid"
+            fi
+          ' || echo "ssh_failed")
+          
+          echo "process_status=$PROCESS_STATUS" >> $GITHUB_OUTPUT
+          echo "Process status: $PROCESS_STATUS"
+          
+          # Primary health check: Discord API response
+          if check_discord_health; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ Health verification PASSED"
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "❌ Health verification FAILED"
+            exit 1
+          fi
+
+  # Phase 4: Log Collection and Monitoring
+  log-collection:
+    runs-on: ubuntu-latest
+    needs: [infrastructure-setup, ansible-deployment, health-verification]
+    if: always()
+    steps:
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Collect Deployment Logs
+        run: |
+          echo "=== Deployment Log Collection ==="
+          
+          # Create a temporary script for complex SSH commands
+          cat > /tmp/check_deployment.sh << 'EOF'
+          #!/bin/bash
+          # Check if this is a first deployment
+          if [ ! -d /app ]; then
+            echo "ℹ️  First deployment in progress - /app directory does not exist yet"
+            echo "This is normal during initial setup"
+            echo "=== System resource check ==="
+            free -h || echo "Could not check memory"
+            echo "=== Deployment log capture completed ==="
+            exit 0
+          fi
+          
+          # Show bot status
+          if [ -f /app/bot.pid ]; then
+            PID=$(cat /app/bot.pid)
+            if ps -p "$PID" > /dev/null 2>&1; then
+              echo "✅ Bot is running (PID: $PID)"
+            else
+              echo "⚠️ Bot PID file exists but process not found (PID: $PID)"
+              # Check if there is another python process running
+              if pgrep -f "python.*main.py" > /dev/null; then
+                ACTUAL_PID=$(pgrep -f "python.*main.py")
+                echo "🔍 Found bot process running with different PID: $ACTUAL_PID"
+                echo "This may indicate a PID file sync issue"
+              else
+                echo "❌ No bot process found"
+              fi
+            fi
+          else
+            echo "❌ No bot PID file found"
+          fi
+          
+          # Show recent logs
+          if [ -f /app/bot.log ]; then
+            echo "=== Last 20 lines of bot log ==="
+            tail -20 /app/bot.log
+          else
+            echo "❌ No bot log file found"
+          fi
+          
+          # Check system resources
+          echo "=== System resource check ==="
+          if [ -d /app ]; then
+            df -h /app || echo "Could not check disk space for /app"
+          else
+            df -h / || echo "Could not check disk space"
+          fi
+          free -h || echo "Could not check memory"
+          
+          echo "=== Deployment log capture completed ==="
+          EOF
+          
+          # Copy script to VM and execute
+          gcloud compute scp /tmp/check_deployment.sh arccorp-compute:/tmp/ --zone=us-central1-a --project=rl-prod-471116 || echo "Could not copy script to VM"
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="chmod +x /tmp/check_deployment.sh && /tmp/check_deployment.sh" || echo "Could not capture deployment logs - VM may be unreachable"
+
+  # Phase 5: Post-Deployment Actions
+  post-deployment:
+    runs-on: ubuntu-latest
+    needs: [infrastructure-setup, ansible-deployment, health-verification, log-collection]
+    if: always()
+    steps:
+      - name: Success Actions
+        if: needs.infrastructure-setup.result == 'success' && needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              // Remove deploy label
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  name: 'deploy'
+                });
+                console.log('Deploy label removed successfully');
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log('Deploy label not found, nothing to remove');
+                } else {
+                  console.error('Failed to remove deploy label:', error.message);
+                }
+              }
+              
+              // Add ready to merge label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['ready to merge']
+              });
+              console.log('Ready to Merge label added successfully');
+              
+              // Add success comment with job details
+              const deploymentSummary = "## ✅ Deployment Successful\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ✅ Success | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip }} |\n| Ansible Deployment | ✅ Success | ${{ needs.ansible-deployment.outputs.deployment_status }} |\n| Health Verification | ✅ Success | Process: ${{ needs.health-verification.outputs.process_status }} |\n| Log Collection | ✅ Success | Logs captured successfully |\n\n🚀 **Bot Status:** The bot has been successfully deployed and is responding to Discord.\n\n**Next Steps:** Add the `merge` label to trigger the merge workflow.";
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: deploymentSummary
+              });
+            } catch (error) {
+              console.error('Failed to update labels after successful deployment:', error.message);
+            }
+      
+      - name: Failure Actions
+        if: always() && !(needs.infrastructure-setup.result == 'success' && needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              // Remove workflow labels
+              const labelsToRemove = ['tests good', 'deploy', 'ready to merge'];
+              for (const label of labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.payload.pull_request.number,
+                    name: label
+                  });
+                  console.log(`${label} label removed successfully`);
+                } catch (error) {
+                  if (error.status === 404) {
+                    console.log(`${label} label not found, nothing to remove`);
+                  } else {
+                    console.error(`Failed to remove ${label} label:`, error.message);
+                  }
+                }
+              }
+              
+              // Add bug label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['bug']
+              });
+              console.log('Bug label added successfully');
+              
+              // Determine failure point
+              const failureDetails = [];
+              if ('${{ needs.infrastructure-setup.result }}' === 'failure') failureDetails.push('Infrastructure Setup');
+              if ('${{ needs.ansible-deployment.result }}' === 'failure') failureDetails.push('Ansible Deployment');
+              if ('${{ needs.health-verification.result }}' === 'failure') failureDetails.push('Health Verification');
+              
+              const failureSummary = "## ❌ Deployment Failed\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ${{ needs.infrastructure-setup.result == 'success' && '✅ Success' || '❌ Failed' }} | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip || 'Not available' }} |\n| Ansible Deployment | ${{ needs.ansible-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} | ${{ needs.ansible-deployment.outputs.deployment_status || 'Failed' }} |\n| Health Verification | ${{ needs.health-verification.result == 'success' && '✅ Success' || '❌ Failed' }} | Process: ${{ needs.health-verification.outputs.process_status || 'Unknown' }} |\n\n**Failed phases:** " + (failureDetails.join(', ') || 'Multiple phases failed') + "\n\n**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.";
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: failureSummary
+              });
+              
+            } catch (error) {
+              console.error('Failed to update labels after deployment failure:', error.message);
+            }
+
+  # Phase 5: Optional VM Reboot (only on successful deployment)
+  vm-reboot:
+    runs-on: ubuntu-latest
+    needs: [infrastructure-setup, ansible-deployment, health-verification, log-collection]
+    if: needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success'
+    steps:
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Reboot VM after successful deployment
+        run: |
+          echo "=== Post-Deployment VM Reboot ==="
+          echo "Rebooting VM to ensure clean state after deployment..."
+          
+          # Gracefully shut down the bot first
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="
+            if [ -f /app/bot.pid ]; then
+              echo 'Gracefully stopping bot before reboot...'
+              sudo systemctl stop red-legion-bot 2>/dev/null || echo 'Systemd service not active'
+              sleep 5
+            fi
+          " || echo "Could not gracefully stop bot - proceeding with reboot"
+          
+          # Reboot the VM
+          gcloud compute instances stop arccorp-compute --zone=us-central1-a --project=rl-prod-471116
+          echo "VM stopped, waiting 10 seconds..."
+          sleep 10
+          
+          gcloud compute instances start arccorp-compute --zone=us-central1-a --project=rl-prod-471116
+          echo "VM reboot initiated"
+          
+          # Wait for VM to be ready
+          echo "Waiting 60 seconds for VM to fully boot..."
+          sleep 60
+          
+          # Verify bot auto-starts after reboot
+          echo "=== Post-Reboot Verification ==="
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="
+            echo 'Checking if bot auto-started after reboot...'
+            sleep 10
+            if [ -f /app/bot.pid ] && ps -p \$(cat /app/bot.pid) > /dev/null 2>&1; then
+              echo '✅ Bot successfully auto-started after reboot'
+              echo 'Bot PID: '\$(cat /app/bot.pid)
+            else
+              echo '⚠️ Bot may need manual start after reboot'
+              echo 'Attempting to start bot service...'
+              sudo systemctl start red-legion-bot || echo 'Could not start via systemd'
+            fi
+          " || echo "Could not verify post-reboot status"
+          
+          echo "✅ VM reboot completed"
