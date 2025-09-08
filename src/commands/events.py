@@ -913,8 +913,12 @@ async def setup(bot):
     cog = EventManagement(bot)
     await bot.add_cog(cog)
     
-    # Explicitly add the command group to the bot's command tree
-    # Command groups defined as class attributes need to be manually added
-    bot.tree.add_command(EventManagement.events)
-    print("✅ Event Management commands loaded")
-    print(f"✅ Added red-events command group with {len(EventManagement.events.commands)} subcommands")
+    # Add the command group to the bot's tree
+    # Use the class attribute directly since it's defined at class level
+    if hasattr(EventManagement, 'events'):
+        bot.tree.add_command(EventManagement.events)
+        print("✅ Event Management commands loaded")
+        print(f"✅ Added red-events command group with {len(EventManagement.events.commands)} subcommands")
+    else:
+        print("❌ EventManagement.events attribute not found - command group not registered")
+        print("✅ Event Management commands loaded (without events group)")
