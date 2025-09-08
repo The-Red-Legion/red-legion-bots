@@ -305,7 +305,7 @@ jobs:
     if: always()
     steps:
       - name: Success Actions
-        if: needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success'
+        if: needs.infrastructure-setup.result == 'success' && needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -351,7 +351,7 @@ jobs:
             }
       
       - name: Failure Actions
-        if: needs.ansible-deployment.result == 'failure' || needs.health-verification.result == 'failure'
+        if: always() && !(needs.infrastructure-setup.result == 'success' && needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success')
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
