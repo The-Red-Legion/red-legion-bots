@@ -243,11 +243,10 @@ def test_file_structure():
         'src/commands/loans.py',
         'src/commands/events.py',
         'src/commands/diagnostics.py',
+        'src/commands/admin.py',
         'src/commands/general.py',
         'src/commands/mining/__init__.py',
         'src/commands/mining/core.py',
-        'src/commands/admin/__init__.py',
-        'src/commands/admin/core.py',
         
         # Handlers
         'src/handlers/__init__.py',

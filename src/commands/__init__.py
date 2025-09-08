@@ -28,9 +28,9 @@ async def register_all_commands(bot):
             'commands.diagnostics',      # red-health, red-test, red-dbtest, red-config
             'commands.general',          # red-ping
             'commands.market',           # red-market-list, red-market-add
-            'commands.admin_new',        # red-config-refresh, red-restart, etc.
-            'commands.loans_new',        # red-loan-request, red-loan-status
-            'commands.events_new',       # red-events group commands
+            'commands.admin',            # red-config-refresh, red-restart, etc.
+            'commands.loans',            # red-loan-request, red-loan-status
+            'commands.events',           # red-events group commands
             'commands.mining.core',      # red-sunday-mining-*, red-payroll
         ]
         

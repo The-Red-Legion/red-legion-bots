@@ -39,17 +39,16 @@ class RedLegionBot(commands.Bot):
             # Load new Cog-based slash command modules
             print("🔄 Loading Red Legion slash command extensions...")
             
-            command_extensions = [
-                'commands.diagnostics',      # red-health, red-test, red-dbtest, red-config
-                'commands.general',          # red-ping
-                'commands.market',           # red-market-list, red-market-add
-                'commands.admin_new',        # red-config-refresh, red-restart, etc.
-                'commands.loans_new',        # red-loan-request, red-loan-status
-                'commands.events_new',       # red-events group commands
-                'commands.mining.core',      # red-sunday-mining-*, red-payroll
+            # Core command extensions
+            extensions = [
+                'commands.mining',          # red-mining command group
+                'commands.diagnostics',     # red-health, red-test, red-dbtest, red-config
+                'commands.admin',           # red-config-refresh, red-restart, etc.
+                'commands.loans',           # red-loan-request, red-loan-status
+                'commands.events'           # red-events command group
             ]
             
-            for extension in command_extensions:
+            for extension in extensions:
                 try:
                     await self.load_extension(extension)
                     print(f"  ✅ Loaded {extension}")
