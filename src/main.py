@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from bot import RedLegionBot
-from database import init_database
+from database_init import init_database_for_deployment
 from config.settings import get_database_url
 
 def main():
@@ -27,7 +27,13 @@ def main():
         print(f"📋 Database URL (masked): {db_url[:30]}...{db_url[-20:] if len(db_url) > 50 else db_url}")
         print(f"🔍 URL contains '#': {'#' in db_url}")
         print(f"🔍 URL contains '%23': {'%23' in db_url}")
-        init_database(db_url)
+        
+        # Initialize database
+        if init_database_for_deployment():
+            print("✅ Database initialized successfully")
+        else:
+            print("❌ Database initialization failed")
+            return
         print("✅ Database initialized successfully")
         
     except Exception as e:
