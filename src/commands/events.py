@@ -24,12 +24,12 @@ from src.database import operations as database_operations
 class EventManagement(commands.Cog):
     """Complete event management system for mining events."""
     
+    # Define the command group at the top of the class
+    events = app_commands.Group(name="red-events", description="Red Legion event management system")
+    
     def __init__(self, bot):
         self.bot = bot
         print("✅ Event Management Cog initialized")
-    
-    # Define the command group
-    events = app_commands.Group(name="red-events", description="Red Legion event management system")
 
     @events.command(name="create", description="Create a new Red Legion event")
     @app_commands.describe(
@@ -914,11 +914,11 @@ async def setup(bot):
     await bot.add_cog(cog)
     
     # Add the command group to the bot's tree
-    # Use the class attribute directly since it's defined at class level
-    if hasattr(EventManagement, 'events'):
-        bot.tree.add_command(EventManagement.events)
+    # Use the instance's command group attribute
+    try:
+        bot.tree.add_command(cog.events)
         print("✅ Event Management commands loaded")
-        print(f"✅ Added red-events command group with {len(EventManagement.events.commands)} subcommands")
-    else:
-        print("❌ EventManagement.events attribute not found - command group not registered")
+        print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
+    except Exception as e:
+        print(f"❌ Failed to register red-events command group: {e}")
         print("✅ Event Management commands loaded (without events group)")
