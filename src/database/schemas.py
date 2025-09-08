@@ -99,6 +99,29 @@ def init_database(database_url=None):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             
+            -- Events table (for participation tracking and payroll)
+            CREATE TABLE IF NOT EXISTS events (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                event_date DATE NOT NULL,
+                event_time TIMESTAMP NOT NULL,
+                event_name TEXT DEFAULT 'Sunday Mining',
+                total_participants INTEGER DEFAULT 0,
+                total_payout REAL,
+                is_open BOOLEAN DEFAULT TRUE,
+                payroll_calculated BOOLEAN DEFAULT FALSE,
+                pdf_generated BOOLEAN DEFAULT FALSE,
+                -- Legacy columns for backward compatibility
+                event_id INTEGER GENERATED ALWAYS AS (id) STORED,
+                channel_id TEXT,
+                channel_name TEXT,
+                start_time TEXT,
+                end_time TEXT,
+                total_value REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
             -- Mining participation table
             CREATE TABLE IF NOT EXISTS mining_participation (
                 participation_id SERIAL PRIMARY KEY,
@@ -156,6 +179,9 @@ def init_database(database_url=None):
             CREATE INDEX IF NOT EXISTS idx_guild_memberships_guild_user ON guild_memberships(guild_id, user_id);
             CREATE INDEX IF NOT EXISTS idx_loans_user_id ON loans(user_id);
             CREATE INDEX IF NOT EXISTS idx_mining_yields_participation ON mining_yields(participation_id);
+            CREATE INDEX IF NOT EXISTS idx_events_guild_id ON events(guild_id);
+            CREATE INDEX IF NOT EXISTS idx_events_event_date ON events(event_date);
+            CREATE INDEX IF NOT EXISTS idx_events_is_open ON events(is_open);
             """
             
             cursor.execute(schema_sql)
