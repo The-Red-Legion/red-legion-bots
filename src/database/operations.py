@@ -122,15 +122,58 @@ def init_db(database_url):
 def migrate_schema(cursor):
     """Handle database schema migrations for backward compatibility"""
     try:
-        # Check if guild_id column exists in events table
+        # Check if events table exists and what columns it has
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name = 'events' AND column_name = 'guild_id'
+            WHERE table_name = 'events' AND table_schema = 'public'
         """)
-        guild_id_exists = cursor.fetchone()
+        existing_columns = [row[0] for row in cursor.fetchall()]
+        print(f"🔍 Existing events table columns: {existing_columns}")
         
-        if not guild_id_exists:
+        # Check if id column exists (required for test data management)
+        if 'id' not in existing_columns:
+            print("🚨 Critical: events table missing 'id' primary key column!")
+            print("🔧 This is required for test data management and foreign key relationships")
+            
+            # Check if table has any data
+            cursor.execute("SELECT COUNT(*) FROM events")
+            row_count = cursor.fetchone()[0]
+            
+            if row_count == 0:
+                print("🗑️ Events table is empty, recreating with proper schema...")
+                cursor.execute("DROP TABLE IF EXISTS events CASCADE")
+                cursor.execute("""
+                    CREATE TABLE events (
+                        id SERIAL PRIMARY KEY,
+                        guild_id BIGINT NOT NULL,
+                        event_date DATE NOT NULL,
+                        event_time TIMESTAMP NOT NULL,
+                        event_name TEXT DEFAULT 'Sunday Mining',
+                        total_participants INTEGER DEFAULT 0,
+                        total_payout REAL,
+                        is_open BOOLEAN DEFAULT TRUE,
+                        payroll_calculated BOOLEAN DEFAULT FALSE,
+                        pdf_generated BOOLEAN DEFAULT FALSE,
+                        -- Legacy columns for backward compatibility
+                        event_id INTEGER GENERATED ALWAYS AS (id) STORED,
+                        channel_id TEXT,
+                        channel_name TEXT,
+                        start_time TEXT,
+                        end_time TEXT,
+                        total_value REAL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                print("✅ Events table recreated with proper schema including 'id' column")
+            else:
+                print(f"⚠️ Events table has {row_count} rows - cannot safely recreate")
+                print("💡 Manual migration required to preserve data")
+                raise Exception("Events table schema migration requires manual intervention")
+        
+        # Check if guild_id column exists in events table
+        if 'guild_id' not in existing_columns:
             print("🔧 Adding missing guild_id column to events table...")
             cursor.execute("ALTER TABLE events ADD COLUMN guild_id BIGINT")
             print("✅ guild_id column added successfully")

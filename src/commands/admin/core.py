@@ -376,8 +376,38 @@ def register_commands(bot):
             )
 
 async def _create_test_data(interaction, cursor, conn, guild_id, test_channels, test_participants):
-    """Create comprehensive test data."""
+    """Create comprehensive test data for mining events and participation."""
     try:
+        # First, check if the events table has the required 'id' column
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'events' AND column_name = 'id' AND table_schema = 'public'
+        """)
+        
+        has_id_column = cursor.fetchone() is not None
+        
+        if not has_id_column:
+            # Try to run migration to fix the schema
+            await interaction.followup.send(
+                "🔧 Events table missing 'id' column, attempting schema migration...",
+                ephemeral=True
+            )
+            
+            from database.operations import migrate_schema
+            migrate_schema(cursor)
+            
+            # Check again after migration
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'events' AND column_name = 'id' AND table_schema = 'public'
+            """)
+            has_id_column = cursor.fetchone() is not None
+            
+            if not has_id_column:
+                raise Exception("Events table schema migration failed - 'id' column still missing. Database may need manual intervention.")
+        
         created_data = {'events': [], 'participants': [], 'channels': []}
         
         # Create test channels
@@ -428,6 +458,7 @@ async def _create_test_data(interaction, cursor, conn, guild_id, test_channels, 
         created_data['events'].append(event3_id)
         
         # Create participants for each event
+        import random
         for event_id, event_date in [(event1_id, today), (event2_id, event2_date), (event3_id, event3_date)]:
             num_participants = random.randint(8, 12)
             selected = random.sample(test_participants, num_participants)
@@ -459,11 +490,11 @@ async def _create_test_data(interaction, cursor, conn, guild_id, test_channels, 
         
         conn.commit()
         
-        # Create success embed
+        # Send success message
         embed = discord.Embed(
-            title="✅ Test Data Created Successfully",
-            description="Complete test dataset has been generated for mining system testing",
-            color=0x00ff00,
+            title="🧪 Test Data Created Successfully",
+            description="Comprehensive test data has been added to the database",
+            color=0x00ff88,
             timestamp=datetime.now()
         )
         
@@ -471,25 +502,15 @@ async def _create_test_data(interaction, cursor, conn, guild_id, test_channels, 
             name="📊 Created Data",
             value=f"• **{len(created_data['events'])}** mining events\n"
                   f"• **{len(created_data['participants'])}** participation records\n"
-                  f"• **{len(created_data['channels'])}** mining channels",
+                  f"• **{len(created_data['channels'])}** test channels",
             inline=False
         )
         
         embed.add_field(
-            name="🎯 Event States",
-            value="• 1 OPEN event (current session)\n"
-                  "• 1 COMPLETED event (with payroll & PDF)\n"
-                  "• 1 PAYROLL DONE event (missing PDF)",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="🚀 Ready for Testing",
-            value="You can now test:\n"
-                  "• `/mining session` commands\n"
-                  "• `/mining payroll` calculations\n"
-                  "• Event lifecycle management\n"
-                  "• PDF generation workflow",
+            name="🎯 Event Types",
+            value="• Open event (current session)\n"
+                  "• Completed event with payroll\n"
+                  "• Event with payroll but no PDF",
             inline=False
         )
         
