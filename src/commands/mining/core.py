@@ -564,7 +564,7 @@ class SundayMiningCommands(commands.Cog):
         set_bot_instance(bot)
         print("✅ Mining commands initialized with bot instance")
     
-    @app_commands.command(name="sunday_mining_start", description="Start Sunday mining session with voice tracking")
+    @app_commands.command(name="red-sunday-mining-start", description="Start Sunday mining session with voice tracking")
     async def sunday_mining_start(self, interaction: discord.Interaction):
         """Start Sunday mining session."""
         try:
@@ -701,7 +701,7 @@ class SundayMiningCommands(commands.Cog):
                 ephemeral=True
             )
     
-    @app_commands.command(name="sunday_mining_stop", description="Stop the current Sunday mining session")
+    @app_commands.command(name="red-sunday-mining-stop", description="Stop the current Sunday mining session")
     async def sunday_mining_stop(self, interaction: discord.Interaction):
         """Stop Sunday mining session."""
         try:
@@ -761,7 +761,7 @@ class SundayMiningCommands(commands.Cog):
                 ephemeral=True
             )
     
-    @app_commands.command(name="payroll", description="Calculate Sunday mining payroll distribution (Admin/OrgLeaders only)")
+    @app_commands.command(name="red-payroll", description="Calculate Sunday mining payroll distribution (Admin/OrgLeaders only)")
     @app_commands.describe(
         action="Choose to calculate payroll or view summary (PDF auto-generated with calculation)"
     )
@@ -1218,7 +1218,7 @@ class SundayMiningCommands(commands.Cog):
             print(f"Error generating PDF report: {e}")
             return None
     
-    @app_commands.command(name="sunday_mining_test", description="Run diagnostics for Sunday Mining voice channel issues (Admin only)")
+    @app_commands.command(name="red-sunday-mining-test", description="Run diagnostics for Sunday Mining voice channel issues (Admin only)")
     @app_commands.describe(
         test_type="Type of diagnostic test to run"
     )

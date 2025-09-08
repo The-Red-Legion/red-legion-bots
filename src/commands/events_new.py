@@ -35,9 +35,9 @@ class EventManagement(commands.Cog):
         print("✅ Event Management Cog initialized")
     
     # Define the command group
-    events = app_commands.Group(name="events", description="Red Legion event management system")
+    events = app_commands.Group(name="red-events", description="Red Legion event management system")
 
-    @events.command(name="create", description="Create a new event")
+    @events.command(name="create", description="Create a new Red Legion event")
     @app_commands.describe(
         category="Event category",
         name="Event name",
@@ -71,7 +71,7 @@ class EventManagement(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
     
-    @events.command(name="delete", description="Delete an event (Admin only)")
+    @events.command(name="delete", description="Delete a Red Legion event (Admin only)")
     @app_commands.describe(
         event_id="ID of the event to delete"
     )
@@ -95,7 +95,7 @@ class EventManagement(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
     
-    @events.command(name="lookup", description="Look up events by category and status")
+    @events.command(name="lookup", description="Look up Red Legion events by category and status")
     @app_commands.describe(
         category="Event category to filter by",
         status="Event status to filter by (optional)",

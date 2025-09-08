@@ -1,57 +1,59 @@
 """
 Discord bot commands for the Red Legion bot.
 
-This package contains all Discord command modules organized by feature:
-- market.py: Market-related commands
-- loans.py: Loan system commands  
-- events.py: Event management commands
-- mining.py: Mining results commands
-- diagnostics.py: Health and diagnostic commands
-- admin.py: Administrative commands
-- general.py: Basic bot commands
+This package contains all Discord slash command modules organized by feature:
+- market.py: Market-related slash commands  
+- loans_new.py: Loan system slash commands
+- events_new.py: Event management slash commands
+- mining.py: Mining results slash commands
+- diagnostics.py: Health and diagnostic slash commands
+- admin_new.py: Administrative slash commands
+- general.py: Basic bot slash commands
+
+All commands are now using Discord's modern slash command system with "red-" prefix.
 """
 
-def register_all_commands(bot):
+async def register_all_commands(bot):
     """
-    Register all command modules with the bot.
+    Register all command modules with the bot using Cog extension loading.
     
     Args:
         bot: The Discord bot instance
     """
     try:
-        from . import market, loans, events, diagnostics, general
-        from .mining import SundayMiningCommands, register_commands as register_mining_commands
-        from .admin import register_commands as register_admin_commands
+        print("🔄 Loading Red Legion slash command modules...")
         
-        # Register commands from each module
-        print("  📦 Registering market commands...")
-        market.register_commands(bot)
+        # Load new Cog-based slash command modules
+        extensions = [
+            'commands.diagnostics',      # red-health, red-test, red-dbtest, red-config
+            'commands.general',          # red-ping
+            'commands.market',           # red-market-list, red-market-add
+            'commands.admin_new',        # red-config-refresh, red-restart, etc.
+            'commands.loans_new',        # red-loan-request, red-loan-status
+            'commands.events_new',       # red-events group commands
+            'commands.mining.core',      # red-sunday-mining-*, red-payroll
+        ]
         
-        print("  💰 Registering loan commands...")
-        loans.register_commands(bot)
+        for extension in extensions:
+            try:
+                await bot.load_extension(extension)
+                print(f"  ✅ Loaded {extension}")
+            except Exception as e:
+                print(f"  ❌ Failed to load {extension}: {e}")
+                # Continue loading other extensions
+                continue
+                
+        print("✅ All Red Legion slash command modules loaded successfully")
         
-        print("  🎯 Registering event commands...")
-        events.register_commands(bot)
-        
-        print("  ⛏️ Registering mining commands...")
-        # Mining uses cog pattern, add it directly
-        bot.add_cog(SundayMiningCommands(bot))
-        # Also register legacy commands for test compatibility
-        register_mining_commands(bot)
-        
-        print("  🔍 Registering diagnostic commands...")
-        diagnostics.register_commands(bot)
-        
-        print("  🛡️ Registering admin commands...")
-        register_admin_commands(bot)
-        
-        print("  🏓 Registering general commands...")
-        general.register_commands(bot)
-        
-        print("✅ All command modules registered successfully")
+        # Sync slash commands with Discord
+        try:
+            synced = await bot.tree.sync()
+            print(f"✅ Synced {len(synced)} slash commands with Discord")
+        except Exception as e:
+            print(f"⚠️ Failed to sync slash commands: {e}")
         
     except Exception as e:
-        print(f"❌ Error registering command modules: {e}")
+        print(f"❌ Error loading command modules: {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())

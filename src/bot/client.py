@@ -36,18 +36,41 @@ class RedLegionBot(commands.Bot):
     async def setup_hook(self):
         """Load extensions and setup the bot."""
         try:
-            # Load command modules
-            await self.load_extension('commands.mining')
-            await self.load_extension('commands.admin')
-            await self.load_extension('commands.general')
-            await self.load_extension('commands.market')
-            await self.load_extension('commands.loans')
-            await self.load_extension('commands.diagnostics')
-            await self.load_extension('commands.events_new')  # New comprehensive event management
+            # Load new Cog-based slash command modules
+            print("🔄 Loading Red Legion slash command extensions...")
+            
+            command_extensions = [
+                'commands.diagnostics',      # red-health, red-test, red-dbtest, red-config
+                'commands.general',          # red-ping
+                'commands.market',           # red-market-list, red-market-add
+                'commands.admin_new',        # red-config-refresh, red-restart, etc.
+                'commands.loans_new',        # red-loan-request, red-loan-status
+                'commands.events_new',       # red-events group commands
+                'commands.mining.core',      # red-sunday-mining-*, red-payroll
+            ]
+            
+            for extension in command_extensions:
+                try:
+                    await self.load_extension(extension)
+                    print(f"  ✅ Loaded {extension}")
+                except Exception as e:
+                    print(f"  ❌ Failed to load {extension}: {e}")
+                    # Continue loading other extensions
+                    continue
             
             # Load event handlers
-            await self.load_extension('handlers.voice_tracking')
-            await self.load_extension('handlers.core')
+            handler_extensions = [
+                'handlers.voice_tracking',
+                'handlers.core'
+            ]
+            
+            for extension in handler_extensions:
+                try:
+                    await self.load_extension(extension)
+                    print(f"  ✅ Loaded {extension}")
+                except Exception as e:
+                    print(f"  ❌ Failed to load {extension}: {e}")
+                    continue
             
             print("✅ All extensions loaded successfully")
             

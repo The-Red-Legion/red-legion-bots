@@ -235,6 +235,73 @@ def init_database(database_url=None):
                     CHECK (status IN ('planned', 'active', 'completed', 'cancelled'));
                 END IF;
             END $$;
+            
+            -- Market items table for red-market commands
+            CREATE TABLE IF NOT EXISTS market_items (
+                item_id SERIAL PRIMARY KEY,
+                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                price DECIMAL(15,2) NOT NULL CHECK (price > 0),
+                stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+                category VARCHAR(50) DEFAULT 'general',
+                seller_id VARCHAR(20),
+                seller_name VARCHAR(100),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Bot configuration table for red-config commands
+            CREATE TABLE IF NOT EXISTS bot_config (
+                config_id SERIAL PRIMARY KEY,
+                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                config_key VARCHAR(100) NOT NULL,
+                config_value TEXT,
+                config_type VARCHAR(20) DEFAULT 'string',
+                description TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(guild_id, config_key)
+            );
+
+            -- Command usage tracking for analytics
+            CREATE TABLE IF NOT EXISTS command_usage (
+                usage_id SERIAL PRIMARY KEY,
+                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                user_id VARCHAR(20) REFERENCES users(user_id),
+                command_name VARCHAR(100) NOT NULL,
+                command_type VARCHAR(20) DEFAULT 'slash',
+                success BOOLEAN DEFAULT TRUE,
+                execution_time_ms INTEGER,
+                error_message TEXT,
+                parameters JSON,
+                used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Admin actions log for red-admin commands
+            CREATE TABLE IF NOT EXISTS admin_actions (
+                action_id SERIAL PRIMARY KEY,
+                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                admin_id VARCHAR(20) REFERENCES users(user_id),
+                admin_name VARCHAR(100),
+                action_type VARCHAR(50) NOT NULL,
+                target_resource VARCHAR(100),
+                action_details JSON,
+                success BOOLEAN DEFAULT TRUE,
+                error_message TEXT,
+                performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Additional indexes for new tables
+            CREATE INDEX IF NOT EXISTS idx_market_items_guild ON market_items(guild_id);
+            CREATE INDEX IF NOT EXISTS idx_market_items_active ON market_items(is_active);
+            CREATE INDEX IF NOT EXISTS idx_bot_config_guild_key ON bot_config(guild_id, config_key);
+            CREATE INDEX IF NOT EXISTS idx_command_usage_guild ON command_usage(guild_id);
+            CREATE INDEX IF NOT EXISTS idx_command_usage_command ON command_usage(command_name);
+            CREATE INDEX IF NOT EXISTS idx_admin_actions_guild ON admin_actions(guild_id);
+            CREATE INDEX IF NOT EXISTS idx_admin_actions_type ON admin_actions(action_type);
             """
             
             cursor.execute(schema_sql)

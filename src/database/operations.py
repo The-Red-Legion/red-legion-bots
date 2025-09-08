@@ -74,12 +74,136 @@ def init_db(database_url):
     return init_database()
 
 def get_market_items(database_url):
-    """Legacy function - get market items"""
-    return []
+    """Get all active market items from the database"""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        # Handle database connection with proxy fallback
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+            
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT item_id, name, price, stock, category, description
+            FROM market_items 
+            WHERE is_active = TRUE 
+            ORDER BY category, name
+        """)
+        
+        items = cursor.fetchall()
+        conn.close()
+        return items
+        
+    except Exception as e:
+        print(f"Error getting market items: {e}")
+        return []
 
-def add_market_item(database_url, name, price, stock):
-    """Legacy function - add market item"""
-    pass
+def add_market_item(database_url, name, price, stock, guild_id=None, seller_name="Red Legion"):
+    """Add a new market item to the database"""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        # Handle database connection with proxy fallback
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+            
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO market_items (guild_id, name, price, stock, seller_name, category)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING item_id
+        """, (guild_id, name, price, stock, seller_name, 'general'))
+        
+        item_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return item_id
+        
+    except Exception as e:
+        print(f"Error adding market item: {e}")
+        raise
+
+def issue_loan(database_url, user_id, username, amount, issued_date_iso, due_date_iso):
+    """Issue a new loan to a user"""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        # Handle database connection with proxy fallback
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+            
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO loans (user_id, username, amount, issued_date_iso, due_date_iso, status, interest_rate)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING loan_id
+        """, (user_id, username, amount, issued_date_iso, due_date_iso, 'active', 0.05))
+        
+        loan_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return loan_id
+        
+    except Exception as e:
+        print(f"Error issuing loan: {e}")
+        raise
+
+def get_user_loans(database_url, user_id):
+    """Get all loans for a specific user"""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        # Handle database connection with proxy fallback
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+            
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT loan_id, amount, issued_date_iso, due_date_iso, status
+            FROM loans 
+            WHERE user_id = %s AND status IN ('active', 'overdue')
+            ORDER BY issued_date_iso DESC
+        """, (user_id,))
+        
+        loans = cursor.fetchall()
+        conn.close()
+        return loans
+        
+    except Exception as e:
+        print(f"Error getting user loans: {e}")
+        return []
 
 def get_mining_channels_dict(database_url, guild_id):
     """Get mining channels as a dictionary for a specific guild."""
@@ -544,6 +668,7 @@ __all__ = [
     'add_market_item',
     'get_mining_channels_dict',
     'issue_loan',
+    'get_user_loans',
     'save_mining_participation',
     'add_mining_channel',
     'remove_mining_channel',
