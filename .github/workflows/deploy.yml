@@ -269,10 +269,19 @@ jobs:
             
             # Show bot status
             if [ -f /app/bot.pid ]; then
-              if kill -0 $(cat /app/bot.pid) 2>/dev/null; then
-                echo "✅ Bot is running (PID: $(cat /app/bot.pid))"
+              PID=$(cat /app/bot.pid)
+              if ps -p "$PID" > /dev/null 2>&1; then
+                echo "✅ Bot is running (PID: $PID)"
               else
-                echo "❌ Bot process exists but is not running"
+                echo "⚠️ Bot PID file exists but process not found (PID: $PID)"
+                # Check if there's another python process running
+                if pgrep -f "python.*main.py" > /dev/null; then
+                  ACTUAL_PID=$(pgrep -f "python.*main.py")
+                  echo "🔍 Found bot process running with different PID: $ACTUAL_PID"
+                  echo "This may indicate a PID file sync issue"
+                else
+                  echo "❌ No bot process found"
+                fi
               fi
             else
               echo "❌ No bot PID file found"
