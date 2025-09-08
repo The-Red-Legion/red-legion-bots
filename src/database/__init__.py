@@ -1,23 +1,54 @@
 """
-Red Legion Bot - Database Module
+Database module for Red Legion Bot - Version 2.0.0
 
-This module provides a clean, modern database architecture for the Red Legion Discord Bot.
-Completely redesigned from the ground up with proper normalization, relationships, and scalability.
+Complete rebuild with modern PostgreSQL architecture:
+- Proper normalization and relationships
+- Connection pooling and transaction management  
+- Comprehensive dataclass models with type hints
+- Organized CRUD operations by entity
+- Scalable and maintainable design
 
-Architecture:
-- schemas/: Database schema definitions
-- operations/: CRUD operations for each entity
-- migrations/: Database migration system
-- connection.py: Database connection management
-- models.py: Data models and validation
-
-Design Principles:
-1. Normalization: Proper database structure to reduce redundancy
-2. Relationships: Clear foreign key relationships between entities  
-3. Scalability: Support for multiple guilds and concurrent operations
-4. Performance: Optimized indexes and query patterns
-5. Maintainability: Clear naming conventions and documentation
+Key Features:
+- DatabaseManager: Connection pooling and health monitoring
+- Models: Clean dataclass models for all entities
+- Operations: Organized CRUD operations (GuildOperations, UserOperations, etc.)
+- Schema: Complete SQL schema with proper relationships and indexes
 """
+
+from .connection import DatabaseManager, get_connection, get_cursor
+from .models import *
+from .operations import *
+from .schemas import init_database
+
+__version__ = "2.0.0"
+__all__ = [
+    # Connection management
+    'DatabaseManager',
+    'get_connection', 
+    'get_cursor',
+    
+    # Models
+    'Guild',
+    'User', 
+    'GuildMembership',
+    'MiningEvent',
+    'MiningChannel',
+    'MiningParticipation',
+    'Material',
+    'MiningYield',
+    'Loan',
+    'LoanStatus',
+    'MiningEventStatus',
+    
+    # Operations
+    'GuildOperations',
+    'UserOperations',
+    'MiningOperations',
+    'EconomyOperations',
+    
+    # Schema
+    'init_database',
+]
 
 from .connection import DatabaseManager, get_connection, get_cursor, initialize_database
 from .models import *
