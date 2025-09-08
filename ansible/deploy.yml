@@ -141,23 +141,13 @@
     - name: Stop existing bot process
       include_tasks: tasks/stop_bot.yml
 
-    - name: Clean and prepare application directory
-      file:
-        path: "{{ app_dir }}"
-        state: absent
-
     - name: Stop bot service before deployment
       systemd:
         name: red-legion-bot
         state: stopped
       ignore_errors: yes
 
-    - name: Remove old application directory completely
-      file:
-        path: "{{ app_dir }}"
-        state: absent
-
-    - name: Create fresh application directory
+    - name: Ensure application directory exists
       file:
         path: "{{ app_dir }}"
         state: directory
@@ -165,30 +155,27 @@
         group: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Copy entire codebase (full replacement)
-      copy:
+    - name: Sync codebase with rsync
+      synchronize:
         src: "{{ playbook_dir }}/../"
         dest: "{{ app_dir }}"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: preserve
+        delete: yes
+        recursive: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.github"
+          - "--exclude=__pycache__"
+          - "--exclude=.pytest_cache"
+          - "--exclude=.DS_Store"
+          - "--exclude=node_modules"
+          - "--exclude=venv"
+          - "--exclude=.env"
+          - "--exclude=Logs"
+          - "--exclude=*.pyc"
+          - "--exclude=*.pyo"
+          - "--perms"
+          - "--times"
       notify: restart red-legion-bot
-
-    - name: Remove unnecessary files and directories
-      file:
-        path: "{{ app_dir }}/{{ item }}"
-        state: absent
-      loop:
-        - ".git"
-        - ".github"
-        - "__pycache__"
-        - ".pytest_cache" 
-        - ".DS_Store"
-        - "node_modules"
-        - "venv"
-        - ".env"
-        - "Logs"
-      ignore_errors: yes
 
     - name: Verify codebase deployment
       stat:
@@ -198,7 +185,7 @@
 
     - name: Display deployment timestamp
       debug:
-        msg: "Codebase fully replaced at {{ ansible_date_time.iso8601 }}"
+        msg: "Codebase synced with rsync at {{ ansible_date_time.iso8601 }}"
 
     - name: Install Python dependencies
       block:
