@@ -82,8 +82,47 @@ def add_market_item(database_url, name, price, stock):
     pass
 
 def get_mining_channels_dict(database_url, guild_id):
-    """Legacy function - get mining channels"""
-    return {}
+    """Get mining channels as a dictionary for a specific guild."""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        # Convert database_url to use proxy if running locally
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            # Try proxy first on port 5433
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                # If proxy fails, try original URL
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+            
+        c = conn.cursor()
+        
+        # Query mining channels for the guild
+        c.execute('''
+            SELECT channel_name, channel_id 
+            FROM mining_channels 
+            WHERE guild_id = %s AND is_active = TRUE
+            ORDER BY channel_name
+        ''', (guild_id,))
+        
+        rows = c.fetchall()
+        channels_dict = {}
+        
+        for channel_name, channel_id in rows:
+            # Use channel names as-is since they're already in the correct format
+            channels_dict[channel_name] = str(channel_id)
+        
+        conn.close()
+        return channels_dict
+        
+    except Exception as e:
+        # If database fails, return empty dict to fall back to hardcoded values
+        return {}
 
 def issue_loan(database_url, user_id, amount, issued_date, due_date):
     """Legacy function - issue loan"""
@@ -102,8 +141,47 @@ def remove_mining_channel(database_url, guild_id, channel_id):
     return True
 
 def get_mining_channels(database_url, guild_id, active_only=True):
-    """Legacy function - get mining channels"""
-    return []
+    """Get mining channels as a list for a specific guild."""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        # Convert database_url to use proxy if running locally
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            # Try proxy first on port 5433
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except:
+                # Fallback to original URL
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+            
+        c = conn.cursor()
+        
+        # Query mining channels for the guild
+        where_clause = "WHERE guild_id = %s"
+        params = [guild_id]
+        
+        if active_only:
+            where_clause += " AND is_active = TRUE"
+            
+        c.execute(f'''
+            SELECT channel_id, channel_name, is_active, created_at
+            FROM mining_channels 
+            {where_clause}
+            ORDER BY channel_name
+        ''', params)
+        
+        rows = c.fetchall()
+        conn.close()
+        return rows
+        
+    except Exception as e:
+        print(f"Error getting mining channels from database: {e}")
+        return []
 
 def migrate_schema(database_url):
     """Legacy function - migrate schema"""

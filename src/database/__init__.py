@@ -32,9 +32,11 @@ def add_market_item(db_url, name, price, stock):
     """Legacy function - will be implemented with new operations"""
     pass
 
-def get_mining_channels_dict(db_url, guild_id):
-    """Legacy function - will be implemented with new operations"""
-    return {}
+# Import all functions from operations to make them available
+from .connection import DatabaseManager, get_connection, get_cursor, initialize_database
+from .models import *
+from .operations import *
+from .schemas import init_database
 
 def issue_loan(db_url, user_id, amount, issued_date, due_date):
     """Legacy function - will be implemented with new operations"""
