@@ -86,12 +86,35 @@ class RedLegionBot(commands.Bot):
         for guild in self.guilds:
             print(f'  - {guild.name} (ID: {guild.id})')
         
+        # Debug: Check what commands we have locally before sync
+        local_commands = [cmd.name for cmd in self.tree.get_commands() if hasattr(cmd, 'name')]
+        print(f'🔍 Local commands loaded: {len(local_commands)}')
+        
+        # Show first few commands for debugging
+        for i, cmd in enumerate(sorted(local_commands)[:10]):
+            prefix = "🟢" if cmd.startswith("red-") else "🔴"
+            print(f'  {prefix} {cmd}')
+        if len(local_commands) > 10:
+            print(f'  ... and {len(local_commands) - 10} more')
+        
         # Sync slash commands
         try:
+            print('🔄 Syncing slash commands with Discord...')
             synced = await self.tree.sync()
             print(f'✅ Synced {len(synced)} slash commands')
+            
+            # Debug: Show what was actually synced
+            print('📋 Synced commands:')
+            for i, cmd in enumerate(synced[:10]):
+                prefix = "🟢" if cmd.name.startswith("red-") else "🔴"
+                print(f'  {prefix} {cmd.name}')
+            if len(synced) > 10:
+                print(f'  ... and {len(synced) - 10} more')
+                
         except Exception as e:
             print(f'❌ Failed to sync slash commands: {e}')
+            import traceback
+            traceback.print_exc()
     
     async def on_guild_join(self, guild):
         """Called when the bot joins a new guild."""
