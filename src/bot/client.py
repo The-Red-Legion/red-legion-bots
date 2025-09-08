@@ -43,6 +43,7 @@ class RedLegionBot(commands.Bot):
             await self.load_extension('commands.market')
             await self.load_extension('commands.loans')
             await self.load_extension('commands.diagnostics')
+            await self.load_extension('commands.events_new')  # New comprehensive event management
             
             # Load event handlers
             await self.load_extension('handlers.voice_tracking')
