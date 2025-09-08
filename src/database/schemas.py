@@ -33,7 +33,9 @@ def init_database(database_url=None):
             if not database_url:
                 raise ValueError("No database URL provided and none found in configuration")
         
-        db_manager = DatabaseManager(database_url)
+        # Initialize the global database manager first
+        from .connection import initialize_database
+        db_manager = initialize_database(database_url)
         
         with db_manager.get_cursor() as cursor:
             # Create schema SQL
