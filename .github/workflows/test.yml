@@ -37,6 +37,7 @@ jobs:
               'tests failed', 
               'Tests Good',           // Note: Capital letters as shown in GitHub
               'tests good',           // Also try lowercase version
+              'Ready To Deploy',      // New deployment readiness label
               'database tests failed',
               'bot tests failed', 
               'linting failed',
@@ -304,7 +305,7 @@ jobs:
                                  advancedSystem === 'success';
             
             // Remove all existing test-related labels first
-            const labelsToRemove = ['tests pending', 'Tests Good', 'Deploy', 'Ready to Merge'];
+            const labelsToRemove = ['tests pending', 'Tests Good', 'Ready To Deploy', 'Deploy', 'Ready to Merge'];
             for (const label of labelsToRemove) {
               try {
                 await github.rest.issues.removeLabel({
@@ -325,7 +326,7 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                labels: ['Tests Good']
+                labels: ['Tests Good', 'Ready To Deploy']
               });
               
               // Add comment with success summary
@@ -333,7 +334,7 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n\\n🚀 **Ready for deployment!** Add the `deploy` label when ready to deploy to staging."
+                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n\\n🚀 **Ready for deployment!** This PR has been automatically labeled as 'Ready To Deploy'."
               });
             } else {
               // Don't add any success labels for failed tests
