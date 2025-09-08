@@ -19,7 +19,7 @@ from datetime import datetime, timezone, date
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import get_database_url
-from database import operations as database_operations
+from src.database import operations as database_operations
 
 class EventManagement(commands.Cog):
     """Complete event management system for mining events."""
