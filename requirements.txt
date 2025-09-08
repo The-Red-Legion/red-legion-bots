@@ -5,3 +5,4 @@ aiohttp==3.9.5
 psutil==5.9.8
 asyncpg==0.29.0
 google-cloud-secret-manager==2.20.0
+reportlab==4.0.4

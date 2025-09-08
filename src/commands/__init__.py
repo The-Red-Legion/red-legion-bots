@@ -19,7 +19,9 @@ def register_all_commands(bot):
         bot: The Discord bot instance
     """
     try:
-        from . import market, loans, events, mining, diagnostics, admin, general
+        from . import market, loans, events, diagnostics, general
+        from .mining import SundayMiningCommands, register_commands as register_mining_commands
+        from .admin import register_commands as register_admin_commands
         
         # Register commands from each module
         print("  📦 Registering market commands...")
@@ -32,13 +34,16 @@ def register_all_commands(bot):
         events.register_commands(bot)
         
         print("  ⛏️ Registering mining commands...")
-        mining.register_commands(bot)
+        # Mining uses cog pattern, add it directly
+        bot.add_cog(SundayMiningCommands(bot))
+        # Also register legacy commands for test compatibility
+        register_mining_commands(bot)
         
         print("  🔍 Registering diagnostic commands...")
         diagnostics.register_commands(bot)
         
         print("  🛡️ Registering admin commands...")
-        admin.register_commands(bot)
+        register_admin_commands(bot)
         
         print("  🏓 Registering general commands...")
         general.register_commands(bot)

@@ -17,14 +17,50 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'Ok to Deploy')  # Moved to job level
     steps:
       - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - name: Test GCloud SSH connection and get current IP
+        id: vm_info
+        run: |
+          echo "🔗 Testing GCloud SSH connection to arccorp-compute..."
+          if gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="echo 'GCloud SSH connection test successful'" --ssh-flag="-o ConnectTimeout=30"; then
+            echo "✅ GCloud SSH connection successful"
+          else
+            echo "⚠️ GCloud SSH test failed - continuing anyway"
+          fi
+          
+          # Get current VM IP for Ansible
+          echo "🔍 Getting current VM IP address..."
+          VM_IP=$(gcloud compute instances describe arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --format="get(networkInterfaces[0].accessConfigs[0].natIP)" || echo "")
+          if [ -z "$VM_IP" ]; then
+            echo "❌ Could not get VM IP address, using fallback"
+            VM_IP="34.30.73.146"
+          fi
+          echo "📍 Current VM IP: $VM_IP"
+          echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
       - name: Set up SSH key for Ansible
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.BOT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.BOT_SERVER_HOST }} >> ~/.ssh/known_hosts
-          # Test SSH connection
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@${{ secrets.BOT_SERVER_HOST }} "echo 'SSH connection test successful'"
+          # Add host key for the current IP
+          ssh-keyscan -H ${{ steps.vm_info.outputs.vm_ip }} >> ~/.ssh/known_hosts || true
+          echo "🔍 Testing SSH connection for Ansible to ${{ steps.vm_info.outputs.vm_ip }}..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ubuntu@${{ steps.vm_info.outputs.vm_ip }} "echo 'Ansible SSH connection test successful'" || echo "SSH test failed - continuing anyway"
+      - name: Create dynamic inventory for Ansible
+        run: |
+          # Create a temporary inventory file with the current IP
+          mkdir -p /tmp/ansible
+          cat > /tmp/ansible/inventory.ini << EOF
+          [arccorp_compute]
+          ${{ steps.vm_info.outputs.vm_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+          [arccorp_compute:vars]
+          ansible_python_interpreter=/usr/bin/python3
+          EOF
+          echo "📋 Dynamic inventory file created:"
+          cat /tmp/ansible/inventory.ini
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -37,31 +73,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install ansible
 
-      - name: Set up SSH key for Ansible
-        run: |
-          # SSH setup not needed for local deployment
-          echo "Using local connection for deployment"
-
       - name: Deploy to Compute Instance with Ansible
         run: |
           echo "=== Starting Ansible deployment ==="
 
-          # Set environment variables for Ansible
-          export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
-          export TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }}
-          export DATABASE_URL=${{ secrets.DATABASE_URL }}
-
-          # Run Ansible playbook
-          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} \
-          TEXT_CHANNEL_ID=${{ secrets.TEXT_CHANNEL_ID }} \
-          DATABASE_URL=${{ secrets.DATABASE_URL }} \
-          ansible-playbook ansible/deploy.yml -i ansible/inventory.ini -v
+          # Run Ansible playbook with dynamic inventory using environment variables
+          ansible-playbook ansible/deploy.yml -i /tmp/ansible/inventory.ini -v
 
           echo "=== Ansible deployment completed ==="
           
           echo "=== Waiting for bot to stabilize ==="
           sleep 10
           echo "=== Bot startup wait completed ==="
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         shell: bash
       - name: Verify Bot Health
         run: |
@@ -178,8 +205,8 @@ jobs:
         run: |
           echo "=== Final deployment status ==="
           
-          # SSH into remote host to check deployment status
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.BOT_SERVER_HOST }} << 'EOF'
+          # Use gcloud SSH to check deployment status
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command='
             # Check if this is a first deployment
             if [ ! -d /app ]; then
               echo "ℹ️  First deployment in progress - /app directory does not exist yet"
@@ -219,7 +246,7 @@ jobs:
             free -h || echo "Could not check memory"
             
             echo "=== Deployment log capture completed ==="
-          EOF
+          ' || echo "Could not capture deployment logs - VM may be unreachable"
         shell: bash
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}

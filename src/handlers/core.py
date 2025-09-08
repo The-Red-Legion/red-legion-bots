@@ -4,7 +4,6 @@ Core Discord event handlers for the Red Legion Discord bot.
 This module contains basic Discord event handlers that don't fit in other specific categories.
 """
 
-import discord
 from datetime import datetime
 
 
@@ -36,8 +35,8 @@ async def setup_core_handlers(bot):
             # Run database init in a thread to avoid blocking the event loop
             import asyncio
             import functools
-            from ..database import init_db
-            from ..config import get_database_url
+            from database import init_db
+            from config.settings import get_database_url
             
             loop = asyncio.get_event_loop()
             
@@ -54,8 +53,8 @@ async def setup_core_handlers(bot):
                 print(f"⚠️ Database initialization failed: {db_error} - bot will continue without database")
             
             print("Setting up event handlers...")
-            from ..event_handlers import setup_event_handlers
-            await setup_event_handlers()  # Register event handler
+            # Event handlers are now set up automatically through the modular system
+            # No need for explicit setup_event_handlers() call
             print("Event handlers registered successfully")
             
             print("Bot setup completed successfully!")
@@ -117,3 +116,8 @@ async def setup_core_handlers(bot):
         print("✅ Bot resumed connection to Discord!")
 
     print("✅ Core event handlers registered")
+
+
+async def setup(bot):
+    """Setup function for discord.py extension loading."""
+    await setup_core_handlers(bot)

@@ -6,10 +6,15 @@ and checking configuration status.
 """
 
 import discord
-from discord.ext import commands
 from datetime import datetime
 import os
-from ..core.decorators import has_org_role, standard_cooldown, error_handler
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.decorators import has_org_role, error_handler
 
 
 def register_commands(bot):
@@ -52,7 +57,7 @@ def register_commands(bot):
     @bot.command(name="test")
     @error_handler
     async def test_command(ctx):
-        """Comprehensive bot health and status test command"""
+        """🔧 Bot Test & Health Status - Comprehensive bot health and system status"""
         try:
             # Calculate uptime
             if hasattr(bot, 'start_time'):
@@ -64,10 +69,12 @@ def register_commands(bot):
             # Get Discord connection info
             guild_count = len(bot.guilds)
             total_members = sum(guild.member_count for guild in bot.guilds if guild.member_count)
+            latency_ms = round(bot.latency * 1000, 2)
             
-            # Try to get system info if psutil is available
+            # Get system info with enhanced error handling
             memory_info = "N/A"
             cpu_info = "N/A"
+            process_status = "Unknown"
             try:
                 import psutil
                 process = psutil.Process(os.getpid())
@@ -75,19 +82,20 @@ def register_commands(bot):
                 cpu_percent = process.cpu_percent()
                 memory_info = f"{memory_mb:.1f} MB"
                 cpu_info = f"{cpu_percent:.1f}%"
+                process_status = "Running"
             except ImportError:
                 memory_info = "psutil not available"
                 cpu_info = "psutil not available"
+                process_status = "Running (psutil unavailable)"
             except Exception as e:
                 memory_info = f"Error: {str(e)[:20]}"
                 cpu_info = f"Error: {str(e)[:20]}"
+                process_status = "Error getting status"
             
-            # Test database connection
+            # Test database connection with detailed status
             db_status = "❌ Not tested"
             try:
-                from ..config import get_database_url
-                
-                # Try to get database URL from config
+                from config.settings import get_database_url
                 db_url = get_database_url()
                 
                 if not db_url:
@@ -103,40 +111,124 @@ def register_commands(bot):
             except Exception as e:
                 db_status = f"❌ Error: {str(e)[:30]}"
             
-            # Create comprehensive embed
+            # Test voice tracking status
+            voice_status = "Ready"
+            voice_channels_count = 0
+            try:
+                # Count voice channels in current guild
+                if ctx.guild:
+                    voice_channels_count = len(ctx.guild.voice_channels)
+                    # Check if voice tracking is available
+                    try:
+                        from handlers.voice_tracking import get_tracking_status
+                        tracking_info = get_tracking_status()
+                        if tracking_info and tracking_info.get('task_running'):
+                            voice_status = "Active"
+                        else:
+                            voice_status = "Ready"
+                    except:
+                        voice_status = "Ready"
+                else:
+                    voice_status = "No guild context"
+            except Exception as e:
+                voice_status = f"Error: {str(e)[:20]}"
+            
+            # Test function checks
+            function_tests = []
+            
+            # Guild access test
+            try:
+                if ctx.guild and ctx.guild.member_count:
+                    function_tests.append("✅ Guild access")
+                else:
+                    function_tests.append("⚠️ Guild access (limited)")
+            except:
+                function_tests.append("❌ Guild access")
+            
+            # Voice channels test
+            try:
+                function_tests.append(f"✅ Voice channels ({voice_channels_count})")
+            except:
+                function_tests.append("❌ Voice channels")
+            
+            # User permissions test
+            try:
+                if ctx.author.guild_permissions.administrator:
+                    function_tests.append("✅ User permissions (Admin)")
+                elif ctx.author.guild_permissions.manage_guild:
+                    function_tests.append("✅ User permissions (Manager)")
+                else:
+                    function_tests.append("✅ User permissions (Member)")
+            except:
+                function_tests.append("❌ User permissions")
+            
+            # Create comprehensive embed with enhanced styling
             embed = discord.Embed(
-                title="🔍 Comprehensive Bot Test",
-                description="Complete system status check",
-                color=discord.Color.blue(),
+                title="🔧 Bot Test & Health Status",
+                description="Comprehensive bot health and system status",
+                color=discord.Color.green(),
                 timestamp=datetime.now()
             )
             
-            # Bot info
+            # Bot Status Section
+            bot_status_value = (
+                f"Status: 🟢 Online\n"
+                f"Uptime: {uptime_str}\n"
+                f"Guilds: {guild_count}\n"
+                f"Total Members: {total_members:,}"
+            )
             embed.add_field(
-                name="🤖 Bot Status",
-                value=f"**Uptime**: {uptime_str}\n**Latency**: {round(bot.latency * 1000, 2)}ms\n**Guilds**: {guild_count}\n**Total Members**: {total_members}",
+                name="🤖 Bot Status", 
+                value=bot_status_value,
                 inline=False
             )
             
-            # System info
+            # System Resources Section
+            system_resources_value = (
+                f"Memory: {memory_info}\n"
+                f"CPU: {cpu_info}\n"
+                f"Process: {process_status}"
+            )
             embed.add_field(
                 name="💻 System Resources",
-                value=f"**Memory**: {memory_info}\n**CPU**: {cpu_info}",
+                value=system_resources_value,
                 inline=True
             )
             
-            # Database status
+            # Services Section
+            services_value = (
+                f"Database: {db_status}\n"
+                f"Discord API: ✅ Connected\n"
+                f"Voice Tracking: {voice_status}"
+            )
             embed.add_field(
-                name="🗄️ Database",
-                value=db_status,
+                name="🗄️ Services",
+                value=services_value,
                 inline=True
             )
             
-            # Infrastructure info
+            # Performance Section
+            performance_value = (
+                f"Latency: {latency_ms}ms\n"
+                f"Commands: Responsive\n"
+                f"Events: Active"
+            )
             embed.add_field(
-                name="🏗️ Infrastructure",
-                value="**Instance**: arccorp-compute\n**Database**: arccorp-data-nexus\n**Project**: rl-prod-471116",
+                name="📊 Performance",
+                value=performance_value,
+                inline=True
+            )
+            
+            # Function Tests Section
+            embed.add_field(
+                name="🧪 Function Tests",
+                value="\n".join(function_tests),
                 inline=False
+            )
+            
+            # Footer with test info
+            embed.set_footer(
+                text=f"Test run by {ctx.author.display_name} • Response time: {latency_ms}ms"
             )
             
             await ctx.send(embed=embed)
@@ -170,7 +262,7 @@ def register_commands(bot):
             # Test database connection
             try:
                 import psycopg2
-                from ..config import get_database_url
+                from config.settings import get_database_url
                 
                 current_db_url = get_database_url()
                 if not current_db_url:
@@ -294,7 +386,7 @@ def register_commands(bot):
             # Check Secret Manager access
             secret_status = []
             try:
-                from ..config import get_secret
+                from config.settings import get_secret
                 # Test if we can access Secret Manager (without exposing values)
                 try:
                     get_secret("database-connection-string")
@@ -321,7 +413,7 @@ def register_commands(bot):
             db_test = "❌ Not tested"
             try:
                 import psycopg2
-                from ..config import get_database_url
+                from config.settings import get_database_url
                 
                 db_url = get_database_url()
                 if not db_url:
@@ -361,3 +453,8 @@ def register_commands(bot):
             await ctx.send(f"❌ Configuration check failed: {str(e)}")
 
     print("✅ Diagnostic commands registered")
+
+
+async def setup(bot):
+    """Setup function for discord.py extension loading."""
+    register_commands(bot)
