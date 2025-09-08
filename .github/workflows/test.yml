@@ -254,7 +254,7 @@ jobs:
             
             // Add appropriate label based on results
             if (allTestsPassed) {
-              await github.rest.issues.addLabelsToIssue({
+              await github.rest.issues.addLabels({
                 owner,
                 repo,
                 issue_number: pull_number,
@@ -269,7 +269,7 @@ jobs:
                 body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n\\n🚀 **Ready for deployment!** Add the `deploy` label when ready to deploy to staging."
               });
             } else {
-              await github.rest.issues.addLabelsToIssue({
+              await github.rest.issues.addLabels({
                 owner,
                 repo,
                 issue_number: pull_number,
