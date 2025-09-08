@@ -203,7 +203,6 @@ jobs:
           else
             echo "## ⚠️ Some tests failed - review results above" >> $GITHUB_STEP_SUMMARY
           fi
-
   # Post-test actions for label management
   post-tests:
     name: "Post-Test Actions"
@@ -266,7 +265,7 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n\\n🚀 **Ready for deployment!** Add the `deploy` label when ready to deploy to staging."
+                body: "## ✅ All Tests Passed!\n\n| Test Suite | Result |\n|------------|--------|\n| Code Quality & Validation | ✅ Passed |\n| Database Architecture v2.0.0 | ✅ Passed |\n| Bot Functionality | ✅ Passed |\n| Advanced System Components | ✅ Passed |\n\n🚀 **Ready for deployment!** Add the `deploy` label when ready to deploy to staging."
               });
             } else {
               await github.rest.issues.addLabelsToIssue({
@@ -289,4 +288,160 @@ jobs:
                 issue_number: pull_number,
                 body: "## ❌ Some Tests Failed\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | " + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Database Architecture v2.0.0 | " + (dbArchitecture === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Bot Functionality | " + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Advanced System Components | " + (advancedSystem === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n\\n**Failed test suites:** " + failedTests.join(', ') + "\\n\\nPlease review the test results and fix any issues before proceeding."
               });
+            }
+          python-version: '3.9'
+          check-latest: false
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt pytest psycopg2-binary
+      - name: Test Database Architecture v2.0.0
+        env:
+          PYTHONPATH: .
+        run: |
+          echo "🧪 Testing Database Architecture v2.0.0..."
+          python3 tests/test_database_integration.py
+          echo "✅ Database architecture tests completed!"
+
+  post-test:
+    if: always()  # Run regardless of test job success/failure
+    needs: [code-quality, test-modular-architecture, test-advanced-components, test-final-validation, test-connections, test-ansible-deployment, test-database-architecture]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add Tests Good Label on Success
+        if: needs.code-quality.result == 'success' && needs.test-modular-architecture.result == 'success' && needs.test-advanced-components.result == 'success' && needs.test-final-validation.result == 'success' && needs.test-connections.result == 'success' && (needs.test-ansible-deployment.result == 'success' || needs.test-ansible-deployment.outputs.result == 'syntax-valid') && needs.test-database-architecture.result == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              // Remove any existing labels from previous runs
+              const labelsToRemove = ['bug', 'deploy', 'ready to merge'];
+              for (const label of labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.payload.pull_request.number,
+                    name: label
+                  });
+                  console.log(`${label} label removed successfully`);
+                } catch (error) {
+                  if (error.status === 404) {
+                    console.log(`${label} label not found, nothing to remove`);
+                  } else {
+                    console.error(`Failed to remove ${label} label:`, error.message);
+                  }
+                }
+              }
+              
+              // Add Tests Good label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['tests good']
+              });
+              console.log('Tests Good label added successfully');
+              
+              // Remove bug label if it exists
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  name: 'bug'
+                });
+                console.log('Bug label removed successfully');
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log('Bug label not found, nothing to remove');
+                } else {
+                  console.error('Failed to remove bug label:', error.message);
+                }
+              }
+            } catch (error) {
+              console.error('Failed to add Ready to Deploy label:', error.message);
+              throw error;
+            }
+      
+      - name: Add Bug Label on Failure
+        if: needs.code-quality.result == 'failure' || needs.test-modular-architecture.result == 'failure' || needs.test-advanced-components.result == 'failure' || needs.test-final-validation.result == 'failure' || needs.test-connections.result == 'failure' || (needs.test-ansible-deployment.result == 'failure' && needs.test-ansible-deployment.outputs.result == 'fail')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              // Add bug label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['bug']
+              });
+              console.log('Bug label added successfully');
+              
+              // Remove Ready to Deploy label if it exists
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  name: 'Ready to Deploy'
+                });
+                console.log('Ready to Deploy label removed successfully');
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log('Ready to Deploy label not found, nothing to remove');
+                } else {
+                  console.error('Failed to remove Ready to Deploy label:', error.message);
+                }
+              }
+            } catch (error) {
+              console.error('Failed to add Tests Good label:', error.message);
+              throw error;
+            }
+      
+      - name: Add Bug Label on Test Failure
+        if: needs.code-quality.result == 'failure' || needs.test-modular-architecture.result == 'failure' || needs.test-advanced-components.result == 'failure' || needs.test-final-validation.result == 'failure' || needs.test-connections.result == 'failure' || (needs.test-ansible-deployment.result == 'failure' && needs.test-ansible-deployment.outputs.result != 'syntax-valid') || needs.test-database-architecture.result == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              // Remove any existing workflow labels
+              const labelsToRemove = ['tests good', 'deploy', 'ready to merge'];
+              for (const label of labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.payload.pull_request.number,
+                    name: label
+                  });
+                  console.log(`${label} label removed successfully`);
+                } catch (error) {
+                  if (error.status === 404) {
+                    console.log(`${label} label not found, nothing to remove`);
+                  } else {
+                    console.error(`Failed to remove ${label} label:`, error.message);
+                  }
+                }
+              }
+              
+              // Add Bug label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['bug']
+              });
+              console.log('Bug label added successfully');
+              
+              // Add comment explaining test failure
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: '❌ **Tests Failed**\\n\\nOne or more tests failed. Please review the test results above and fix any issues before proceeding with deployment.\\n\\nOnce fixed, push new changes to re-run the tests.'
+              });
+            } catch (error) {
+              console.error('Failed to add bug label:', error.message);
             }

@@ -7,17 +7,32 @@ for the complete database architecture.
 
 from .connection import DatabaseManager
 
-def init_database(database_url):
+def init_database(database_url=None):
     """
     Initialize the database with the complete schema.
     
     Args:
-        database_url (str): PostgreSQL connection URL
+        database_url (str, optional): PostgreSQL connection URL.
+                                     If not provided, will try to get from config.
         
     Returns:
         bool: True if successful, False otherwise
     """
     try:
+        if database_url is None:
+            # Try to get from environment or config
+            import os
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                try:
+                    from config.settings import get_database_url
+                    database_url = get_database_url()
+                except ImportError:
+                    pass
+            
+            if not database_url:
+                raise ValueError("No database URL provided and none found in configuration")
+        
         db_manager = DatabaseManager(database_url)
         
         with db_manager.get_cursor() as cursor:

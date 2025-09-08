@@ -33,18 +33,23 @@ class MaterialCategory(Enum):
 @dataclass
 class Guild:
     """Represents a Discord guild/server."""
-    id: int
+    guild_id: str
     name: str
+    owner_id: Optional[str] = None
     settings: Dict[str, Any] = field(default_factory=dict)
+    is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
 @dataclass
 class User:
     """Represents a Discord user."""
-    id: int
+    user_id: str
     username: str
     display_name: Optional[str] = None
+    first_seen: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+    is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -59,16 +64,12 @@ class GuildMembership:
 @dataclass
 class MiningEvent:
     """Represents a mining event."""
-    id: Optional[int] = None
-    guild_id: int = 0
-    event_date: Optional[date] = None
-    event_time: Optional[datetime] = None
-    event_name: str = "Sunday Mining"
-    status: EventStatus = EventStatus.PLANNED
-    total_participants: int = 0
-    total_value_auec: Decimal = field(default_factory=lambda: Decimal('0.00'))
-    payroll_processed: bool = False
-    pdf_generated: bool = False
+    event_id: int
+    guild_id: str
+    name: str
+    event_date: date
+    location: str
+    is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -85,14 +86,14 @@ class MiningChannel:
 @dataclass
 class MiningParticipation:
     """Represents a user's participation in a mining event."""
-    id: Optional[int] = None
-    event_id: int = 0
-    user_id: int = 0
-    channel_id: int = 0
-    session_start: Optional[datetime] = None
-    session_end: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-    is_org_member: bool = False
+    participation_id: int
+    event_id: int
+    user_id: str
+    channel_id: str
+    join_time: datetime
+    leave_time: Optional[datetime] = None
+    duration_minutes: int = 0
+    is_valid: bool = True
     created_at: Optional[datetime] = None
 
 @dataclass

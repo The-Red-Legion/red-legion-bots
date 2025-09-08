@@ -12,16 +12,20 @@ from config.settings import get_database_url
 
 logger = logging.getLogger(__name__)
 
-def init_database_for_deployment():
+def init_database_for_deployment(db_url=None):
     """
     Initialize database for deployment.
     
     This function handles both new architecture initialization and legacy compatibility.
     Returns True if successful, False otherwise.
+    
+    Args:
+        db_url (str, optional): Database URL. If not provided, gets from config.
     """
     try:
         # Get database URL
-        db_url = get_database_url()
+        if db_url is None:
+            db_url = get_database_url()
         if not db_url:
             logger.error("No database URL configured")
             return False
@@ -33,7 +37,7 @@ def init_database_for_deployment():
         logger.info("Database manager initialized")
         
         # Initialize schema
-        if schema_init():
+        if schema_init(db_url):
             logger.info("✅ Database schema initialized successfully")
             return True
         else:

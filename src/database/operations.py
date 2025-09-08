@@ -1,10 +1,71 @@
 """
-Legacy Database Operations
+Database Operations for Red Legion Bot v2.0.0
 
-This file provides backward compatibility for legacy database operations.
-These functions are maintained for compatibility while the codebase transitions
-to the new modular operations structure.
+This module provides CRUD operations and business logic for database entities.
+Includes both new architecture classes and legacy compatibility functions.
 """
+
+from typing import List, Optional, Dict, Any
+from .connection import DatabaseManager
+from .models import User, Guild, MiningEvent, MiningParticipation
+
+class BaseOperations:
+    """Base class for database operations."""
+    
+    def __init__(self, db_manager: DatabaseManager):
+        self.db_manager = db_manager
+
+class UserOperations(BaseOperations):
+    """User-related database operations."""
+    
+    def create_user(self, user: User) -> bool:
+        """Create a new user."""
+        with self.db_manager.get_cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO users (user_id, username, display_name, first_seen, last_seen, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    username = EXCLUDED.username,
+                    display_name = EXCLUDED.display_name,
+                    last_seen = EXCLUDED.last_seen,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user.user_id, user.username, user.display_name, 
+                  user.first_seen, user.last_seen, user.is_active))
+            return True
+    
+    def get_user(self, user_id: str) -> Optional[User]:
+        """Get a user by ID."""
+        with self.db_manager.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+            row = cursor.fetchone()
+            if row:
+                return User(**row)
+            return None
+
+class GuildOperations(BaseOperations):
+    """Guild-related database operations."""
+    
+    def create_guild(self, guild: Guild) -> bool:
+        """Create a new guild."""
+        with self.db_manager.get_cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO guilds (guild_id, name, owner_id, is_active)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (guild_id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    owner_id = EXCLUDED.owner_id,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (guild.guild_id, guild.name, guild.owner_id, guild.is_active))
+            return True
+    
+    def get_guild(self, guild_id: str) -> Optional[Guild]:
+        """Get a guild by ID."""
+        with self.db_manager.get_cursor() as cursor:
+            cursor.execute("SELECT * FROM guilds WHERE guild_id = %s", (guild_id,))
+            row = cursor.fetchone()
+            if row:
+                return Guild(**row)
+            return None
 
 # Legacy functions - these will be properly implemented later
 def init_db(database_url):
