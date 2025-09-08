@@ -39,13 +39,15 @@ class RedLegionBot(commands.Bot):
             # Load new Cog-based slash command modules
             print("🔄 Loading Red Legion slash command extensions...")
             
-            # Core command extensions
+            # Core command extensions with proper "red-" prefix commands
             extensions = [
-                'commands.mining',          # red-mining command group
-                'commands.diagnostics',     # red-health, red-test, red-dbtest, red-config
-                'commands.admin',           # red-config-refresh, red-restart, etc.
-                'commands.loans',           # red-loan-request, red-loan-status
-                'commands.events'           # red-events command group
+                'commands.diagnostics',      # red-health, red-test, red-dbtest, red-config
+                'commands.general',          # red-ping
+                'commands.market',           # red-market-list, red-market-add
+                'commands.admin',            # red-config-refresh, red-restart, etc.
+                'commands.loans',            # red-loan-request, red-loan-status
+                'commands.events',           # red-events group commands
+                'commands.mining.core',      # red-sunday-mining-*, red-payroll
             ]
             
             for extension in extensions:
