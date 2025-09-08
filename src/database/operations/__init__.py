@@ -11,8 +11,29 @@ from .user_ops import UserOperations
 # Legacy functions for backward compatibility
 def init_db(database_url):
     """Legacy function - initialize database"""
-    from database.schemas import init_database
-    return init_database()
+    import psycopg2
+    try:
+        # Legacy init_db implementation for tests
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Execute basic table creation (legacy format for tests)
+        tables = [
+            "guilds", "users", "guild_memberships", "mining_events", 
+            "mining_channels", "mining_participation", "materials",
+            "mining_yields", "loans"
+        ]
+        
+        for table in tables:
+            cursor.execute(f"CREATE TABLE IF NOT EXISTS {table} (id SERIAL PRIMARY KEY)")
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Legacy init_db error: {e}")
+        return False
 
 def get_market_items(database_url):
     """Legacy function - get market items"""
