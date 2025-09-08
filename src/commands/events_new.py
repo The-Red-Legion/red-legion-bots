@@ -34,32 +34,112 @@ class EventManagement(commands.Cog):
         self.bot = bot
         print("✅ Event Management Cog initialized")
     
-    @app_commands.command(name="event", description="Comprehensive event management system")
+    # Define the command group
+    events = app_commands.Group(name="events", description="Red Legion event management system")
+
+    @events.command(name="create", description="Create a new event")
     @app_commands.describe(
-        action="What action to perform",
-        event_id="Event ID for view/delete actions",
-        filter_status="Filter events by status (for list action)",
-        name="Name for new adhoc event",
-        description="Description for new adhoc event"
+        category="Event category",
+        name="Event name",
+        description="Event description (optional)"
     )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="List All Events", value="list"),
-        app_commands.Choice(name="Filter Open Events", value="open"),
-        app_commands.Choice(name="Filter Closed Events", value="closed"),
-        app_commands.Choice(name="View Event Details", value="view"),
-        app_commands.Choice(name="Create Adhoc Event", value="create"),
-        app_commands.Choice(name="Delete Event", value="delete")
+    @app_commands.choices(category=[
+        app_commands.Choice(name="Mining", value="mining"),
+        app_commands.Choice(name="Training", value="training"),
+        app_commands.Choice(name="Combat Operations", value="combat_operations"),
+        app_commands.Choice(name="Salvage", value="salvage"),
+        app_commands.Choice(name="Miscellaneous", value="misc")
     ])
-    async def event_command(
+    async def create_event(
         self, 
         interaction: discord.Interaction,
-        action: app_commands.Choice[str],
-        event_id: int = None,
-        filter_status: str = None,
-        name: str = None,
+        category: app_commands.Choice[str],
+        name: str,
         description: str = None
     ):
-        """Main event management command with multiple actions."""
+        """Create a new event in the specified category."""
+        await interaction.response.defer()
+        
+        try:
+            await self._create_event_by_category(interaction, category.value, name, description)
+        except Exception as e:
+            print(f"❌ Error in create event command: {e}")
+            embed = discord.Embed(
+                title="❌ Command Error",
+                description=f"An error occurred while creating the event: {str(e)}",
+                color=0xff0000
+            )
+            await interaction.followup.send(embed=embed)
+    
+    @events.command(name="delete", description="Delete an event (Admin only)")
+    @app_commands.describe(
+        event_id="ID of the event to delete"
+    )
+    @app_commands.default_permissions(administrator=True)
+    async def delete_event(
+        self, 
+        interaction: discord.Interaction,
+        event_id: int
+    ):
+        """Delete an event (Admin only)."""
+        await interaction.response.defer()
+        
+        try:
+            await self._delete_event_by_id(interaction, event_id)
+        except Exception as e:
+            print(f"❌ Error in delete event command: {e}")
+            embed = discord.Embed(
+                title="❌ Command Error",
+                description=f"An error occurred while deleting the event: {str(e)}",
+                color=0xff0000
+            )
+            await interaction.followup.send(embed=embed)
+    
+    @events.command(name="lookup", description="Look up events by category and status")
+    @app_commands.describe(
+        category="Event category to filter by",
+        status="Event status to filter by (optional)",
+        event_id="Specific event ID to view details (optional)"
+    )
+    @app_commands.choices(category=[
+        app_commands.Choice(name="All Categories", value="all"),
+        app_commands.Choice(name="Mining", value="mining"),
+        app_commands.Choice(name="Training", value="training"),
+        app_commands.Choice(name="Combat Operations", value="combat_operations"),
+        app_commands.Choice(name="Salvage", value="salvage"),
+        app_commands.Choice(name="Miscellaneous", value="misc")
+    ])
+    @app_commands.choices(status=[
+        app_commands.Choice(name="All Statuses", value="all"),
+        app_commands.Choice(name="Active/Open", value="active"),
+        app_commands.Choice(name="Completed/Closed", value="completed"),
+        app_commands.Choice(name="Planned", value="planned")
+    ])
+    async def lookup_events(
+        self, 
+        interaction: discord.Interaction,
+        category: app_commands.Choice[str],
+        status: app_commands.Choice[str] = None,
+        event_id: int = None
+    ):
+        """Look up events by category and status, or view specific event details."""
+        await interaction.response.defer()
+        
+        try:
+            if event_id:
+                # View specific event details
+                await self._view_event_details(interaction, event_id)
+            else:
+                # List events by category and status
+                await self._lookup_events_by_filters(interaction, category.value, status.value if status else "all")
+        except Exception as e:
+            print(f"❌ Error in lookup events command: {e}")
+            embed = discord.Embed(
+                title="❌ Command Error",
+                description=f"An error occurred while looking up events: {str(e)}",
+                color=0xff0000
+            )
+            await interaction.followup.send(embed=embed)
 
 import discord
 from discord.ext import commands
@@ -84,101 +164,228 @@ class EventManagement(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="event", description="Event management - list, view, create, or delete events")
-    @app_commands.describe(
-        action="What you want to do with events",
-        event_id="Event ID for view/delete actions",
-        status="Filter events by status",
-        event_name="Name for new adhoc event",
-        days_back="How many days back to search (default: 30)"
-    )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="List All Events", value="list"),
-        app_commands.Choice(name="List Open Events", value="open"),
-        app_commands.Choice(name="List Closed Events", value="closed"),
-        app_commands.Choice(name="View Event Details", value="view"),
-        app_commands.Choice(name="Create Adhoc Event", value="create"),
-        app_commands.Choice(name="Delete Event", value="delete")
-    ])
-    @app_commands.choices(status=[
-        app_commands.Choice(name="All", value="all"),
-        app_commands.Choice(name="Planned", value="planned"),
-        app_commands.Choice(name="Active", value="active"),
-        app_commands.Choice(name="Completed", value="completed"),
-        app_commands.Choice(name="Cancelled", value="cancelled")
-    ])
-    async def event_command(
-        self, 
-        interaction: discord.Interaction,
-        action: str,
-        event_id: Optional[int] = None,
-        status: Optional[str] = None,
-        event_name: Optional[str] = None,
-        days_back: Optional[int] = 30
-    ):
-        """Main event management command."""
-        
-        await interaction.response.defer()
+    # Helper methods for the new subcommand structure
+    
+    async def _create_event_by_category(self, interaction: discord.Interaction, category: str, name: str, description: str = None):
+        """Create a new event in the specified category."""
         
         db_url = get_database_url()
-        if not db_url:
+        guild_id = interaction.guild.id
+        
+        try:
+            # Create the event with proper category
+            event_id = database_operations.create_adhoc_mining_event(
+                db_url,
+                guild_id,
+                interaction.user.id,
+                interaction.user.display_name,
+                name,
+                description or f"{category.title()} event created by {interaction.user.display_name}",
+                datetime.now(timezone.utc)
+            )
+            
+            if event_id:
+                embed = discord.Embed(
+                    title="✅ Event Created",
+                    description=f"Successfully created new {category} event",
+                    color=0x00ff00
+                )
+                
+                embed.add_field(
+                    name="📋 Event Details",
+                    value=f"**Event ID:** {event_id}\n"
+                          f"**Name:** {name}\n"
+                          f"**Category:** {category.title()}\n"
+                          f"**Created:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n"
+                          f"**Status:** Active\n"
+                          f"**Organizer:** {interaction.user.display_name}",
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="🎮 Next Steps",
+                    value="• Use `/events lookup` to view this event\n"
+                          "• Start tracking participation as needed\n"
+                          "• Use `/events lookup event_id:" + str(event_id) + "` for details",
+                    inline=False
+                )
+                
+            else:
+                embed = discord.Embed(
+                    title="❌ Creation Failed",
+                    description="Could not create the event. Please try again.",
+                    color=0xff0000
+                )
+                
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            print(f"❌ Error creating event: {e}")
             embed = discord.Embed(
                 title="❌ Database Error",
-                description="Database connection not available",
+                description=f"Could not create event: {str(e)}",
                 color=0xff0000
             )
             await interaction.followup.send(embed=embed)
-            return
-
+    
+    async def _delete_event_by_id(self, interaction: discord.Interaction, event_id: int):
+        """Delete an event by ID (Admin only)."""
+        
+        db_url = get_database_url()
+        
         try:
-            if action == "list":
-                await self._list_events(interaction, status, days_back)
-            elif action == "open":
-                await self._list_open_events(interaction)
-            elif action == "closed":
-                await self._list_closed_events(interaction, days_back)
-            elif action == "view":
-                if not event_id:
-                    embed = discord.Embed(
-                        title="❌ Missing Parameter",
-                        description="Please provide an event_id to view",
-                        color=0xff0000
-                    )
-                    await interaction.followup.send(embed=embed)
-                    return
-                await self._view_event_details(interaction, event_id)
-            elif action == "create":
-                if not event_name:
-                    embed = discord.Embed(
-                        title="❌ Missing Parameter",
-                        description="Please provide an event_name for the new event",
-                        color=0xff0000
-                    )
-                    await interaction.followup.send(embed=embed)
-                    return
-                await self._create_adhoc_event(interaction, event_name)
-            elif action == "delete":
-                if not event_id:
-                    embed = discord.Embed(
-                        title="❌ Missing Parameter",
-                        description="Please provide an event_id to delete",
-                        color=0xff0000
-                    )
-                    await interaction.followup.send(embed=embed)
-                    return
-                await self._delete_event(interaction, event_id)
-                
-        except Exception as e:
-            print(f"❌ Error in event command: {e}")
-            import traceback
-            print(f"Full traceback: {traceback.format_exc()}")
+            # First get event details for confirmation
+            events = database_operations.get_mining_events(db_url, interaction.guild.id)
+            event_to_delete = None
+            
+            for event in events:
+                if event[0] == event_id:  # event[0] is the ID
+                    event_to_delete = event
+                    break
+            
+            if not event_to_delete:
+                embed = discord.Embed(
+                    title="❌ Event Not Found",
+                    description=f"No event found with ID {event_id}",
+                    color=0xff0000
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Create confirmation dialog
+            event_name = event_to_delete[3]  # event[3] is the event name
+            view = DeleteConfirmationView(event_id, event_name)
             
             embed = discord.Embed(
-                title="❌ Command Error",
-                description=f"An error occurred: {str(e)}",
+                title="⚠️ Confirm Event Deletion",
+                description=f"Are you sure you want to delete this event?\n\n"
+                           f"**Event Name:** {event_name}\n"
+                           f"**Event ID:** {event_id}\n"
+                           f"**Requester:** {interaction.user.display_name}",
+                color=0xff9900
+            )
+            
+            embed.add_field(
+                name="⚠️ Warning",
+                value="This action cannot be undone. All participation records for this event will also be deleted.",
+                inline=False
+            )
+            
+            await interaction.followup.send(embed=embed, view=view)
+            
+        except Exception as e:
+            print(f"❌ Error preparing event deletion: {e}")
+            embed = discord.Embed(
+                title="❌ Database Error",
+                description=f"Could not prepare event deletion: {str(e)}",
                 color=0xff0000
             )
             await interaction.followup.send(embed=embed)
+    
+    async def _lookup_events_by_filters(self, interaction: discord.Interaction, category: str, status: str):
+        """Look up events by category and status filters."""
+        
+        db_url = get_database_url()
+        guild_id = interaction.guild.id
+        
+        try:
+            # Get events based on status filter
+            if status == "active":
+                events = database_operations.get_open_mining_events(db_url, guild_id)
+            else:
+                events = database_operations.get_mining_events(db_url, guild_id)
+            
+            if not events:
+                embed = discord.Embed(
+                    title="📋 No Events Found",
+                    description=f"No events found matching your criteria.",
+                    color=0x999999
+                )
+                
+                embed.add_field(
+                    name="🔍 Search Criteria",
+                    value=f"**Category:** {category.title() if category != 'all' else 'All Categories'}\n"
+                          f"**Status:** {status.title() if status != 'all' else 'All Statuses'}",
+                    inline=False
+                )
+                
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Filter by category if not "all"
+            if category != "all":
+                # For now, we'll show all events since we don't have category field in database yet
+                # This can be enhanced when category field is added to the database schema
+                pass
+            
+            # Filter by status if not "all"
+            if status != "all":
+                if status == "completed":
+                    events = [e for e in events if e[8] == 'completed']  # event[8] is status
+                elif status == "active":
+                    events = [e for e in events if e[8] == 'active']
+                elif status == "planned":
+                    events = [e for e in events if e[8] == 'planned']
+            
+            # Create embed with event list
+            embed = discord.Embed(
+                title="📋 Event Lookup Results",
+                description=f"Found {len(events)} event(s) matching your criteria",
+                color=0x0099ff
+            )
+            
+            embed.add_field(
+                name="🔍 Search Criteria",
+                value=f"**Category:** {category.title() if category != 'all' else 'All Categories'}\n"
+                      f"**Status:** {status.title() if status != 'all' else 'All Statuses'}",
+                inline=False
+            )
+            
+            # Add events to embed (limit to first 10 to avoid hitting Discord limits)
+            events_text = []
+            for i, event in enumerate(events[:10]):
+                event_id = event[0]
+                event_name = event[3]
+                event_status = event[8]
+                start_time = event[6].strftime('%Y-%m-%d') if event[6] else 'TBD'
+                
+                status_emoji = "🟢" if event_status == "active" else "🔴" if event_status == "completed" else "🟡"
+                events_text.append(f"{status_emoji} **{event_name}** (ID: {event_id})\n   Status: {event_status.title()} | Date: {start_time}")
+            
+            if events_text:
+                embed.add_field(
+                    name="📅 Events",
+                    value="\n\n".join(events_text),
+                    inline=False
+                )
+            
+            if len(events) > 10:
+                embed.add_field(
+                    name="📄 Note",
+                    value=f"Showing first 10 of {len(events)} events. Use specific filters to narrow results.",
+                    inline=False
+                )
+            
+            embed.add_field(
+                name="🔍 View Details",
+                value="Use `/events lookup event_id:<id>` to view detailed information about a specific event.",
+                inline=False
+            )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            print(f"❌ Error looking up events: {e}")
+            embed = discord.Embed(
+                title="❌ Database Error",
+                description=f"Could not retrieve events: {str(e)}",
+                color=0xff0000
+            )
+            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed)
+
+
+class DeleteConfirmationView(discord.ui.View):
 
     async def _list_events(self, interaction: discord.Interaction, status_filter: Optional[str], days_back: int):
         """List all events with optional status filtering."""
