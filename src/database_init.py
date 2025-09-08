@@ -7,7 +7,9 @@ with both the new architecture and legacy deployment scripts.
 
 import os
 import logging
-from database import DatabaseManager, init_database as schema_init
+from database import DatabaseManager
+from database.connection import initialize_database
+from database.schemas import init_database as schema_init
 from config.settings import get_database_url
 
 logger = logging.getLogger(__name__)
@@ -32,11 +34,11 @@ def init_database_for_deployment(db_url=None):
         
         logger.info("Initializing database for deployment...")
         
-        # Initialize database manager
-        db_manager = DatabaseManager(db_url)
-        logger.info("Database manager initialized")
+        # Initialize the global database manager first
+        db_manager = initialize_database(db_url)
+        logger.info("Global database manager initialized")
         
-        # Initialize schema
+        # Initialize schema using the properly initialized manager
         if schema_init(db_url):
             logger.info("✅ Database schema initialized successfully")
             return True
