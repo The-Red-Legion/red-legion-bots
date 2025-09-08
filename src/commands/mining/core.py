@@ -587,6 +587,8 @@ class SundayMiningCommands(commands.Cog):
             db_url = get_database_url()
             event_id = None
             
+            print(f"🔍 DEBUG: Database URL available: {db_url is not None}")
+            
             if db_url:
                 try:
                     # Use interaction.guild.id for proper guild-aware event creation
@@ -598,6 +600,12 @@ class SundayMiningCommands(commands.Cog):
                         f"Sunday Mining - {datetime.now().strftime('%Y-%m-%d')}"
                     )
                     print(f"✅ Created mining event {event_id} for session {session_id} in guild {interaction.guild.name}")
+                    
+                    if event_id is None:
+                        print(f"❌ create_mining_event returned None - database operation failed")
+                    else:
+                        print(f"🎯 Event ID {event_id} will be used for participation tracking")
+                        
                 except Exception as e:
                     print(f"⚠️ Could not create database event: {e}")
                     import traceback

@@ -200,12 +200,118 @@ def get_mining_session_participants(database_url, *args, **kwargs):
     return []
 
 def create_mining_event(database_url, guild_id, event_date=None, event_name="Sunday Mining"):
-    """Legacy function - create mining event"""
-    return None
+    """Create a mining event in the database."""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        from datetime import datetime, date
+        
+        # Set default event_date to today if not provided
+        if event_date is None:
+            event_date = date.today()
+        
+        # Convert database_url to use proxy if running locally
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+        
+        cursor = conn.cursor()
+        
+        # Create the mining event with 'active' status since it's starting now
+        cursor.execute("""
+            INSERT INTO mining_events (guild_id, event_date, event_time, event_name, status)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (guild_id, event_date, datetime.now(), event_name, 'active'))
+        
+        event_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Created mining event {event_id} in database for guild {guild_id}")
+        return event_id
+        
+    except Exception as e:
+        print(f"❌ Error creating mining event: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return None
 
 def get_open_mining_events(database_url, guild_id=None):
-    """Legacy function - get open mining events"""
-    return []
+    """Get open/active mining events from the database."""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        # Convert database_url to use proxy if running locally
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+        
+        cursor = conn.cursor()
+        
+        if guild_id:
+            # Get open events for specific guild
+            cursor.execute("""
+                SELECT id, guild_id, event_date, event_time, event_name, status,
+                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                       created_at, updated_at
+                FROM mining_events 
+                WHERE guild_id = %s AND status IN ('planned', 'active')
+                ORDER BY event_time DESC
+            """, (guild_id,))
+        else:
+            # Get all open events
+            cursor.execute("""
+                SELECT id, guild_id, event_date, event_time, event_name, status,
+                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                       created_at, updated_at
+                FROM mining_events 
+                WHERE status IN ('planned', 'active')
+                ORDER BY event_time DESC
+            """)
+        
+        events = cursor.fetchall()
+        conn.close()
+        
+        # Convert to list of dictionaries for easier handling
+        event_list = []
+        for event in events:
+            event_list.append({
+                'id': event[0],
+                'guild_id': event[1],
+                'event_date': event[2],
+                'event_time': event[3],
+                'event_name': event[4],
+                'status': event[5],
+                'total_participants': event[6],
+                'total_value_auec': event[7],
+                'payroll_processed': event[8],
+                'pdf_generated': event[9],
+                'created_at': event[10],
+                'updated_at': event[11]
+            })
+        
+        print(f"✅ Retrieved {len(event_list)} open mining events" + (f" for guild {guild_id}" if guild_id else ""))
+        return event_list
+        
+    except Exception as e:
+        print(f"❌ Error getting open mining events: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return []
 
 def save_event(database_url, channel_id, channel_name, event_name, start_time):
     """Legacy function - save event"""
@@ -216,8 +322,75 @@ def update_event_end_time(database_url, channel_id, end_time):
     pass
 
 def get_mining_events(database_url, guild_id, event_date=None):
-    """Legacy function - get mining events"""
-    return []
+    """Get mining events from the database."""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        from datetime import date
+        
+        # Convert database_url to use proxy if running locally
+        parsed = urlparse(database_url)
+        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+            try:
+                conn = psycopg2.connect(proxy_url)
+            except psycopg2.OperationalError:
+                conn = psycopg2.connect(database_url)
+        else:
+            conn = psycopg2.connect(database_url)
+        
+        cursor = conn.cursor()
+        
+        if event_date:
+            # Get events for specific date
+            cursor.execute("""
+                SELECT id, guild_id, event_date, event_time, event_name, status,
+                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                       created_at, updated_at
+                FROM mining_events 
+                WHERE guild_id = %s AND event_date = %s
+                ORDER BY event_time DESC
+            """, (guild_id, event_date))
+        else:
+            # Get recent events (last 30 days)
+            cursor.execute("""
+                SELECT id, guild_id, event_date, event_time, event_name, status,
+                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                       created_at, updated_at
+                FROM mining_events 
+                WHERE guild_id = %s AND event_date >= CURRENT_DATE - INTERVAL '30 days'
+                ORDER BY event_time DESC
+            """, (guild_id,))
+        
+        events = cursor.fetchall()
+        conn.close()
+        
+        # Convert to list of dictionaries for easier handling
+        event_list = []
+        for event in events:
+            event_list.append({
+                'id': event[0],
+                'guild_id': event[1],
+                'event_date': event[2],
+                'event_time': event[3],
+                'event_name': event[4],
+                'status': event[5],
+                'total_participants': event[6],
+                'total_value_auec': event[7],
+                'payroll_processed': event[8],
+                'pdf_generated': event[9],
+                'created_at': event[10],
+                'updated_at': event[11]
+            })
+        
+        print(f"✅ Retrieved {len(event_list)} mining events for guild {guild_id}")
+        return event_list
+        
+    except Exception as e:
+        print(f"❌ Error getting mining events: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return []
 
 def update_entries(database_url, member_id, month_year):
     """Legacy function - update entries"""
