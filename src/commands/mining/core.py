@@ -625,8 +625,8 @@ class SundayMiningCommands(commands.Cog):
             
             mining_channels = get_sunday_mining_channels(interaction.guild.id)
             for channel_name, channel_id in mining_channels.items():
-                # Only join the dispatch channel, track all others
-                should_join = channel_name.lower() == 'dispatch'
+                # Only join the dispatch channel (check if 'dispatch' is in the channel name)
+                should_join = 'dispatch' in channel_name.lower()
                 print(f"Adding channel {channel_name} ({channel_id}) to tracking, join={should_join}")
                 await add_tracked_channel(int(channel_id), should_join=should_join)
             
