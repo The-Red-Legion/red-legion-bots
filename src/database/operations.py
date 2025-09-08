@@ -5,9 +5,15 @@ This module provides CRUD operations and business logic for database entities.
 Includes both new architecture classes and legacy compatibility functions.
 """
 
+import sys
+from pathlib import Path
 from typing import List, Optional, Dict, Any
-from .connection import DatabaseManager
-from .models import User, Guild, MiningEvent, MiningParticipation
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from database.connection import DatabaseManager
+from database.models import User, Guild, MiningEvent, MiningParticipation
 
 class BaseOperations:
     """Base class for database operations."""
