@@ -288,15 +288,22 @@ async def join_voice_channel(channel_id):
         return False
     
     try:
+        print(f"🔍 Looking up channel {channel_id} using bot instance...")
         channel = bot_instance.get_channel(channel_id)
         if not channel:
             print(f"❌ Could not find channel {channel_id}")
+            print(f"🔍 Available channels in guilds:")
+            for guild in bot_instance.guilds:
+                print(f"  Guild: {guild.name} ({guild.id})")
+                for ch in guild.channels:
+                    if hasattr(ch, 'type') and str(ch.type) == 'voice':
+                        print(f"    Voice Channel: {ch.name} ({ch.id})")
             return False
         
-        print(f"🔍 Found channel: {channel.name} (type: {type(channel)})")
+        print(f"🔍 Found channel: {channel.name} (type: {type(channel)}) in guild: {channel.guild.name}")
         
         if not isinstance(channel, discord.VoiceChannel):
-            print(f"❌ Channel {channel_id} ({channel.name}) is not a voice channel")
+            print(f"❌ Channel {channel_id} ({channel.name}) is not a voice channel, it's a {type(channel)}")
             return False
         
         # Check if bot is already connected to this channel
@@ -355,10 +362,13 @@ async def add_tracked_channel(channel_id, should_join=False):
         channel_id: The Discord channel ID to track
         should_join: Whether the bot should attempt to join this channel
     """
+    print(f"🔄 add_tracked_channel called: channel_id={channel_id}, should_join={should_join}")
+    
     active_voice_channels[channel_id] = datetime.now()
     last_checks[channel_id] = datetime.now()
     
     if should_join:
+        print(f"🎯 Attempting to join channel {channel_id} because should_join=True")
         # Join the voice channel to provide visual indication
         success = await join_voice_channel(channel_id)
         
@@ -366,8 +376,9 @@ async def add_tracked_channel(channel_id, should_join=False):
             print(f"✅ Added channel {channel_id} to voice tracking and joined")
         else:
             print(f"⚠️ Added channel {channel_id} to voice tracking (could not join)")
+        return success
     else:
-        print(f"✅ Added channel {channel_id} to voice tracking")
+        print(f"✅ Added channel {channel_id} to voice tracking (join skipped)")
         return True
 
 

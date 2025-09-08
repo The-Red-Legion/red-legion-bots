@@ -564,7 +564,7 @@ class SundayMiningCommands(commands.Cog):
         set_bot_instance(bot)
         print("✅ Mining commands initialized with bot instance")
     
-    @app_commands.command(name="sunday_mining_start", description="Start Sunday mining session with voice tracking")
+    @app_commands.command(name="red-sunday-mining-start", description="Start Sunday mining session with voice tracking")
     async def sunday_mining_start(self, interaction: discord.Interaction):
         """Start Sunday mining session."""
         try:
@@ -582,22 +582,37 @@ class SundayMiningCommands(commands.Cog):
             session_id = f"sunday_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
             # Create event in database
-            from database.operations import create_mining_event
+            import sys
+            from pathlib import Path
+            
+            # Add src to path for imports
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            
             from config.settings import get_database_url
+            from database import operations as database_operations
+            
             db_url = get_database_url()
             event_id = None
+            
+            print(f"🔍 DEBUG: Database URL available: {db_url is not None}")
             
             if db_url:
                 try:
                     # Use interaction.guild.id for proper guild-aware event creation
                     print(f"🔍 Creating mining event for guild {interaction.guild.id} ({interaction.guild.name})")
-                    event_id = create_mining_event(
+                    event_id = database_operations.create_mining_event(
                         db_url, 
                         interaction.guild.id, 
                         datetime.now().date(),
                         f"Sunday Mining - {datetime.now().strftime('%Y-%m-%d')}"
                     )
                     print(f"✅ Created mining event {event_id} for session {session_id} in guild {interaction.guild.name}")
+                    
+                    if event_id is None:
+                        print(f"❌ create_mining_event returned None - database operation failed")
+                    else:
+                        print(f"🎯 Event ID {event_id} will be used for participation tracking")
+                        
                 except Exception as e:
                     print(f"⚠️ Could not create database event: {e}")
                     import traceback
@@ -624,9 +639,12 @@ class SundayMiningCommands(commands.Cog):
             set_bot_instance(interaction.client)
             
             mining_channels = get_sunday_mining_channels(interaction.guild.id)
+            print(f"🔍 DEBUG: Retrieved mining channels: {mining_channels}")
+            
             for channel_name, channel_id in mining_channels.items():
-                # Only join the dispatch channel, track all others
-                should_join = channel_name.lower() == 'dispatch'
+                # Only join the dispatch channel (check if channel name starts with 'dispatch')
+                should_join = channel_name.lower().startswith('dispatch')
+                print(f"🔍 DEBUG: Channel '{channel_name}' -> lowercase: '{channel_name.lower()}' -> contains 'dispatch': {should_join}")
                 print(f"Adding channel {channel_name} ({channel_id}) to tracking, join={should_join}")
                 await add_tracked_channel(int(channel_id), should_join=should_join)
             
@@ -681,7 +699,7 @@ class SundayMiningCommands(commands.Cog):
                 ephemeral=True
             )
     
-    @app_commands.command(name="sunday_mining_stop", description="Stop the current Sunday mining session")
+    @app_commands.command(name="red-sunday-mining-stop", description="Stop the current Sunday mining session")
     async def sunday_mining_stop(self, interaction: discord.Interaction):
         """Stop Sunday mining session."""
         try:
@@ -741,7 +759,7 @@ class SundayMiningCommands(commands.Cog):
                 ephemeral=True
             )
     
-    @app_commands.command(name="payroll", description="Calculate Sunday mining payroll distribution (Admin/OrgLeaders only)")
+    @app_commands.command(name="red-payroll", description="Calculate Sunday mining payroll distribution (Admin/OrgLeaders only)")
     @app_commands.describe(
         action="Choose to calculate payroll or view summary (PDF auto-generated with calculation)"
     )
@@ -1198,7 +1216,7 @@ class SundayMiningCommands(commands.Cog):
             print(f"Error generating PDF report: {e}")
             return None
     
-    @app_commands.command(name="sunday_mining_test", description="Run diagnostics for Sunday Mining voice channel issues (Admin only)")
+    @app_commands.command(name="red-sunday-mining-test", description="Run diagnostics for Sunday Mining voice channel issues (Admin only)")
     @app_commands.describe(
         test_type="Type of diagnostic test to run"
     )

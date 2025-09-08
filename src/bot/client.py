@@ -36,17 +36,40 @@ class RedLegionBot(commands.Bot):
     async def setup_hook(self):
         """Load extensions and setup the bot."""
         try:
-            # Load command modules
-            await self.load_extension('commands.mining')
-            await self.load_extension('commands.admin')
-            await self.load_extension('commands.general')
-            await self.load_extension('commands.market')
-            await self.load_extension('commands.loans')
-            await self.load_extension('commands.diagnostics')
+            # Load new Cog-based slash command modules
+            print("🔄 Loading Red Legion slash command extensions...")
+            
+            # Core command extensions
+            extensions = [
+                'commands.mining',          # red-mining command group
+                'commands.diagnostics',     # red-health, red-test, red-dbtest, red-config
+                'commands.admin',           # red-config-refresh, red-restart, etc.
+                'commands.loans',           # red-loan-request, red-loan-status
+                'commands.events'           # red-events command group
+            ]
+            
+            for extension in extensions:
+                try:
+                    await self.load_extension(extension)
+                    print(f"  ✅ Loaded {extension}")
+                except Exception as e:
+                    print(f"  ❌ Failed to load {extension}: {e}")
+                    # Continue loading other extensions
+                    continue
             
             # Load event handlers
-            await self.load_extension('handlers.voice_tracking')
-            await self.load_extension('handlers.core')
+            handler_extensions = [
+                'handlers.voice_tracking',
+                'handlers.core'
+            ]
+            
+            for extension in handler_extensions:
+                try:
+                    await self.load_extension(extension)
+                    print(f"  ✅ Loaded {extension}")
+                except Exception as e:
+                    print(f"  ❌ Failed to load {extension}: {e}")
+                    continue
             
             print("✅ All extensions loaded successfully")
             

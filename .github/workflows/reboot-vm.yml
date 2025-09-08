@@ -1,0 +1,235 @@
+name: Reboot VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for rebooting the VM'
+        required: false
+        default: 'Manual reboot requested'
+        type: string
+      skip_verification:
+        description: 'Skip post-reboot verification'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  vm-reboot:
+    name: "Reboot Production VM"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Set GCP Project
+        run: echo "GOOGLE_CLOUD_PROJECT=rl-prod-471116" >> $GITHUB_ENV
+      
+      - name: Display Reboot Information
+        run: |
+          echo "=== VM Reboot Information ==="
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Skip verification: ${{ github.event.inputs.skip_verification }}"
+          echo "Target VM: arccorp-compute (us-central1-a)"
+          echo "================================"
+      
+      - name: Pre-reboot VM Status Check
+        run: |
+          echo "=== Pre-Reboot Status Check ==="
+          
+          # Check VM status
+          VM_STATUS=$(gcloud compute instances describe arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --format="get(status)" || echo "UNKNOWN")
+          echo "Current VM Status: $VM_STATUS"
+          
+          if [ "$VM_STATUS" != "RUNNING" ]; then
+            echo "⚠️ Warning: VM is not in RUNNING state. Current status: $VM_STATUS"
+            echo "Proceeding with reboot anyway..."
+          fi
+          
+          # Check bot status
+          echo "Checking bot status before reboot..."
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="
+            if [ -f /app/bot.pid ]; then
+              PID=\$(cat /app/bot.pid)
+              if ps -p \$PID > /dev/null 2>&1; then
+                echo '✅ Bot is currently running (PID: '\$PID')'
+              else
+                echo '⚠️ Bot PID file exists but process is not running'
+              fi
+            else
+              echo 'ℹ️ Bot PID file not found'
+            fi
+            
+            # Check systemd service status
+            sudo systemctl is-active red-legion-bot 2>/dev/null && echo '✅ Bot systemd service is active' || echo 'ℹ️ Bot systemd service is not active'
+          " || echo "Could not check bot status via SSH"
+      
+      - name: Graceful Bot Shutdown
+        run: |
+          echo "=== Graceful Bot Shutdown ==="
+          echo "Attempting to gracefully stop the bot before reboot..."
+          
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="
+            # Try systemd first
+            if sudo systemctl is-active red-legion-bot >/dev/null 2>&1; then
+              echo 'Stopping bot via systemd...'
+              sudo systemctl stop red-legion-bot
+              sleep 5
+              
+              if sudo systemctl is-active red-legion-bot >/dev/null 2>&1; then
+                echo '⚠️ Bot service still active after systemd stop'
+              else
+                echo '✅ Bot service stopped via systemd'
+              fi
+            else
+              echo 'ℹ️ Bot systemd service not active'
+            fi
+            
+            # Check for any remaining bot processes
+            if [ -f /app/bot.pid ]; then
+              PID=\$(cat /app/bot.pid)
+              if ps -p \$PID > /dev/null 2>&1; then
+                echo 'Bot process still running, sending SIGTERM...'
+                kill \$PID
+                sleep 5
+                
+                if ps -p \$PID > /dev/null 2>&1; then
+                  echo '⚠️ Bot process still running after SIGTERM'
+                  echo 'Sending SIGKILL...'
+                  kill -9 \$PID 2>/dev/null || true
+                  sleep 2
+                fi
+              fi
+              
+              # Clean up PID file
+              rm -f /app/bot.pid
+            fi
+            
+            echo '✅ Bot shutdown preparation complete'
+          " || echo "⚠️ Could not gracefully stop bot - proceeding with reboot anyway"
+      
+      - name: Reboot VM
+        run: |
+          echo "=== VM Reboot Process ==="
+          echo "Initiating VM reboot..."
+          
+          # Stop the VM
+          echo "Stopping VM..."
+          gcloud compute instances stop arccorp-compute --zone=us-central1-a --project=rl-prod-471116
+          
+          echo "VM stopped, waiting 15 seconds for complete shutdown..."
+          sleep 15
+          
+          # Start the VM
+          echo "Starting VM..."
+          gcloud compute instances start arccorp-compute --zone=us-central1-a --project=rl-prod-471116
+          
+          echo "✅ VM reboot initiated"
+          echo "Waiting 60 seconds for VM to fully boot and initialize..."
+          sleep 60
+      
+      - name: Post-Reboot Verification
+        if: ${{ github.event.inputs.skip_verification != 'true' }}
+        run: |
+          echo "=== Post-Reboot Verification ==="
+          
+          # Check VM status
+          VM_STATUS=$(gcloud compute instances describe arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --format="get(status)" || echo "UNKNOWN")
+          echo "VM Status after reboot: $VM_STATUS"
+          
+          if [ "$VM_STATUS" != "RUNNING" ]; then
+            echo "❌ VM is not in RUNNING state after reboot: $VM_STATUS"
+            exit 1
+          fi
+          
+          # Wait a bit more for services to start
+          echo "Waiting additional 30 seconds for services to initialize..."
+          sleep 30
+          
+          # Check bot auto-start
+          echo "Checking if bot auto-started after reboot..."
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="
+            # Check systemd service
+            if sudo systemctl is-active red-legion-bot >/dev/null 2>&1; then
+              echo '✅ Bot systemd service is active after reboot'
+            else
+              echo '⚠️ Bot systemd service is not active, attempting to start...'
+              sudo systemctl start red-legion-bot || echo '❌ Could not start bot via systemd'
+              sleep 5
+            fi
+            
+            # Check PID file and process
+            if [ -f /app/bot.pid ]; then
+              PID=\$(cat /app/bot.pid)
+              if ps -p \$PID > /dev/null 2>&1; then
+                echo '✅ Bot is running after reboot (PID: '\$PID')'
+                
+                # Check bot responsiveness (basic check)
+                echo 'Testing bot process health...'
+                if ps -p \$PID -o etime,cmd --no-headers; then
+                  echo '✅ Bot process appears healthy'
+                else
+                  echo '⚠️ Bot process may have issues'
+                fi
+              else
+                echo '❌ Bot PID file exists but process is not running'
+                echo 'Attempting manual bot start...'
+                cd /app && nohup python3 -u src/main.py > bot.log 2>&1 & echo \$! > bot.pid
+                sleep 10
+                
+                if [ -f /app/bot.pid ] && ps -p \$(cat /app/bot.pid) > /dev/null 2>&1; then
+                  echo '✅ Bot started manually after reboot'
+                else
+                  echo '❌ Could not start bot manually'
+                fi
+              fi
+            else
+              echo '❌ Bot PID file not found after reboot'
+              echo 'Attempting to start bot...'
+              
+              # Try systemd first
+              sudo systemctl start red-legion-bot 2>/dev/null || {
+                echo 'Systemd start failed, trying manual start...'
+                cd /app && nohup python3 -u src/main.py > bot.log 2>&1 & echo \$! > bot.pid
+                sleep 10
+              }
+              
+              if [ -f /app/bot.pid ] && ps -p \$(cat /app/bot.pid) > /dev/null 2>&1; then
+                echo '✅ Bot started after manual intervention'
+              else
+                echo '❌ Could not start bot after reboot'
+              fi
+            fi
+            
+            # Show system information
+            echo '=== System Information ==='
+            echo 'Uptime:' \$(uptime)
+            echo 'Load:' \$(cat /proc/loadavg)
+            echo 'Memory:' \$(free -h | grep Mem)
+            echo 'Disk:' \$(df -h / | tail -1)
+          " || echo "❌ Could not verify post-reboot status via SSH"
+      
+      - name: Reboot Summary
+        if: always()
+        run: |
+          echo "=== VM Reboot Summary ==="
+          echo "Reboot requested by: ${{ github.actor }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Verification skipped: ${{ github.event.inputs.skip_verification }}"
+          echo "Workflow status: ${{ job.status }}"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "================================"
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ VM reboot completed successfully"
+          else
+            echo "⚠️ VM reboot completed with issues - check logs above"
+          fi

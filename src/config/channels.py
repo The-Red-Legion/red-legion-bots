@@ -8,7 +8,7 @@ from .settings import get_database_url
 # Note: Channel IDs are now managed in the database
 # Use get_sunday_mining_channels() to retrieve current channels
 SUNDAY_MINING_CHANNELS_FALLBACK = {
-    'dispatch': '1385774416755163247',
+    'Dispatch/Main': '1385774416755163247',
     'alpha': '1386367354753257583',
     'bravo': '1386367395643449414',
     'charlie': '1386367464279478313',

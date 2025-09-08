@@ -1,11 +1,13 @@
 """
 Diagnostic and health check commands for the Red Legion Discord bot.
 
-This module contains commands for monitoring bot health, testing connectivity,
-and checking configuration status.
+This module contains slash commands for monitoring bot health, testing connectivity,
+and checking configuration status. All commands are prefixed with "red-" for easy identification.
 """
 
 import discord
+from discord.ext import commands
+from discord import app_commands
 from datetime import datetime
 import os
 import sys
@@ -14,20 +16,21 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.decorators import has_org_role, error_handler
 
-
-def register_commands(bot):
-    """Register all diagnostic commands with the bot."""
+class Diagnostics(commands.Cog):
+    """Diagnostic and health check commands for Red Legion bot."""
     
-    @bot.command(name="health")
-    @error_handler
-    async def health_check(ctx):
+    def __init__(self, bot):
+        self.bot = bot
+        print("✅ Diagnostics Cog initialized")
+
+    @app_commands.command(name="red-health", description="Simple health check for Red Legion bot monitoring")
+    async def health_check(self, interaction: discord.Interaction):
         """Simple health check command for monitoring"""
         try:
             # Basic bot status
-            uptime = datetime.now() - bot.start_time if hasattr(bot, 'start_time') else 'Unknown'
-            guild_count = len(bot.guilds)
+            uptime = datetime.now() - self.bot.start_time if hasattr(self.bot, 'start_time') else 'Unknown'
+            guild_count = len(self.bot.guilds)
             
             # System status
             try:
@@ -41,7 +44,7 @@ def register_commands(bot):
                 memory_str = f"Error: {str(e)[:20]}"
             
             embed = discord.Embed(
-                title="🟢 Bot Health Status", 
+                title="🟢 Red Legion Bot Health Status", 
                 description="Bot is running normally",
                 color=discord.Color.green()
             )
@@ -49,27 +52,26 @@ def register_commands(bot):
             embed.add_field(name="Guilds", value=guild_count, inline=True)
             embed.add_field(name="Memory", value=memory_str, inline=True)
             
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed)
             
         except Exception as e:
-            await ctx.send(f"⚠️ Health check error: {str(e)}")
+            await interaction.response.send_message(f"⚠️ Health check error: {str(e)}")
 
-    @bot.command(name="test")
-    @error_handler
-    async def test_command(ctx):
+    @app_commands.command(name="red-test", description="Comprehensive Red Legion bot health and system status")
+    async def test_command(self, interaction: discord.Interaction):
         """🔧 Bot Test & Health Status - Comprehensive bot health and system status"""
         try:
             # Calculate uptime
-            if hasattr(bot, 'start_time'):
-                uptime = datetime.now() - bot.start_time
+            if hasattr(self.bot, 'start_time'):
+                uptime = datetime.now() - self.bot.start_time
                 uptime_str = str(uptime).split('.')[0]  # Remove microseconds
             else:
                 uptime_str = "Unknown"
             
             # Get Discord connection info
-            guild_count = len(bot.guilds)
-            total_members = sum(guild.member_count for guild in bot.guilds if guild.member_count)
-            latency_ms = round(bot.latency * 1000, 2)
+            guild_count = len(self.bot.guilds)
+            total_members = sum(guild.member_count for guild in self.bot.guilds if guild.member_count)
+            latency_ms = round(self.bot.latency * 1000, 2)
             
             # Get system info with enhanced error handling
             memory_info = "N/A"
@@ -98,363 +100,269 @@ def register_commands(bot):
                 from config.settings import get_database_url
                 db_url = get_database_url()
                 
-                if not db_url:
-                    db_status = "❌ DATABASE_URL not configured"
+                if db_url:
+                    try:
+                        import psycopg2
+                        from urllib.parse import urlparse
+                        
+                        # Test connection
+                        parsed = urlparse(db_url)
+                        if parsed.hostname not in ['127.0.0.1', 'localhost']:
+                            # Try proxy first, then direct
+                            proxy_url = db_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+                            try:
+                                test_conn = psycopg2.connect(proxy_url)
+                                test_conn.close()
+                                db_status = "✅ Connected (via proxy)"
+                            except:
+                                test_conn = psycopg2.connect(db_url)
+                                test_conn.close()
+                                db_status = "✅ Connected (direct)"
+                        else:
+                            test_conn = psycopg2.connect(db_url)
+                            test_conn.close()
+                            db_status = "✅ Connected (local)"
+                    except Exception as db_e:
+                        db_status = f"❌ Failed: {str(db_e)[:30]}"
                 else:
-                    import psycopg2
-                    conn = psycopg2.connect(db_url, connect_timeout=5)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT 1;")
-                    cursor.fetchone()
-                    db_status = "✅ Connected"
-                    conn.close()
+                    db_status = "❌ No URL configured"
+            except ImportError:
+                db_status = "❌ psycopg2 not available"
             except Exception as e:
                 db_status = f"❌ Error: {str(e)[:30]}"
             
-            # Test voice tracking status
-            voice_status = "Ready"
-            voice_channels_count = 0
-            try:
-                # Count voice channels in current guild
-                if ctx.guild:
-                    voice_channels_count = len(ctx.guild.voice_channels)
-                    # Check if voice tracking is available
-                    try:
-                        from handlers.voice_tracking import get_tracking_status
-                        tracking_info = get_tracking_status()
-                        if tracking_info and tracking_info.get('task_running'):
-                            voice_status = "Active"
-                        else:
-                            voice_status = "Ready"
-                    except:
-                        voice_status = "Ready"
-                else:
-                    voice_status = "No guild context"
-            except Exception as e:
-                voice_status = f"Error: {str(e)[:20]}"
+            # Get Discord-specific info
+            voice_info = "N/A"
+            if interaction.guild:
+                voice_channels_count = len(interaction.guild.voice_channels)
+                voice_info = f"{voice_channels_count} voice channels"
             
-            # Test function checks
-            function_tests = []
+            # Permission check
+            permission_info = "Standard User"
+            if interaction.user.guild_permissions.administrator:
+                permission_info = "Administrator"
+            elif interaction.user.guild_permissions.manage_guild:
+                permission_info = "Manager"
             
-            # Guild access test
-            try:
-                if ctx.guild and ctx.guild.member_count:
-                    function_tests.append("✅ Guild access")
-                else:
-                    function_tests.append("⚠️ Guild access (limited)")
-            except:
-                function_tests.append("❌ Guild access")
-            
-            # Voice channels test
-            try:
-                function_tests.append(f"✅ Voice channels ({voice_channels_count})")
-            except:
-                function_tests.append("❌ Voice channels")
-            
-            # User permissions test
-            try:
-                if ctx.author.guild_permissions.administrator:
-                    function_tests.append("✅ User permissions (Admin)")
-                elif ctx.author.guild_permissions.manage_guild:
-                    function_tests.append("✅ User permissions (Manager)")
-                else:
-                    function_tests.append("✅ User permissions (Member)")
-            except:
-                function_tests.append("❌ User permissions")
-            
-            # Create comprehensive embed with enhanced styling
+            # Create comprehensive status embed
             embed = discord.Embed(
-                title="🔧 Bot Test & Health Status",
-                description="Comprehensive bot health and system status",
-                color=discord.Color.green(),
-                timestamp=datetime.now()
+                title="🔧 Red Legion Bot Comprehensive Test",
+                description="Complete system health and connectivity report",
+                color=discord.Color.blue()
             )
             
-            # Bot Status Section
-            bot_status_value = (
-                f"Status: 🟢 Online\n"
-                f"Uptime: {uptime_str}\n"
-                f"Guilds: {guild_count}\n"
-                f"Total Members: {total_members:,}"
-            )
+            # Core Status
             embed.add_field(
-                name="🤖 Bot Status", 
-                value=bot_status_value,
-                inline=False
+                name="🤖 Bot Status",
+                value=f"**Status:** {process_status}\n"
+                      f"**Uptime:** {uptime_str}\n"
+                      f"**Latency:** {latency_ms}ms",
+                inline=True
             )
             
-            # System Resources Section
-            system_resources_value = (
-                f"Memory: {memory_info}\n"
-                f"CPU: {cpu_info}\n"
-                f"Process: {process_status}"
-            )
+            # System Resources
             embed.add_field(
                 name="💻 System Resources",
-                value=system_resources_value,
+                value=f"**Memory:** {memory_info}\n"
+                      f"**CPU:** {cpu_info}\n"
+                      f"**Process:** Active",
                 inline=True
             )
             
-            # Services Section
-            services_value = (
-                f"Database: {db_status}\n"
-                f"Discord API: ✅ Connected\n"
-                f"Voice Tracking: {voice_status}"
-            )
+            # Discord Integration
             embed.add_field(
-                name="🗄️ Services",
-                value=services_value,
+                name="🌐 Discord Integration",
+                value=f"**Guilds:** {guild_count}\n"
+                      f"**Members:** {total_members}\n"
+                      f"**Voice:** {voice_info}",
                 inline=True
             )
             
-            # Performance Section
-            performance_value = (
-                f"Latency: {latency_ms}ms\n"
-                f"Commands: Responsive\n"
-                f"Events: Active"
-            )
+            # Database Status
             embed.add_field(
-                name="📊 Performance",
-                value=performance_value,
+                name="🗃️ Database",
+                value=f"**Status:** {db_status}",
                 inline=True
             )
             
-            # Function Tests Section
+            # User Info
             embed.add_field(
-                name="🧪 Function Tests",
-                value="\n".join(function_tests),
-                inline=False
+                name="👤 User Info",
+                value=f"**Permissions:** {permission_info}\n"
+                      f"**User:** {interaction.user.display_name}",
+                inline=True
             )
             
-            # Footer with test info
+            # Add timestamp
             embed.set_footer(
-                text=f"Test run by {ctx.author.display_name} • Response time: {latency_ms}ms"
+                text=f"Test run by {interaction.user.display_name} • Response time: {latency_ms}ms"
             )
             
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed)
             
         except Exception as e:
-            # Create error embed if main test fails
+            # Error fallback embed
             error_embed = discord.Embed(
                 title="⚠️ Test Error",
-                description=f"Health check encountered an error: {str(e)}",
-                color=discord.Color.red(),
-                timestamp=datetime.now()
+                description="Bot is responding but test encountered an error",
+                color=discord.Color.orange()
             )
-            error_embed.add_field(name="Status", value="Bot is responding but health check failed", inline=False)
-            error_embed.add_field(name="Basic Info", value=f"Guilds: {len(bot.guilds)}\nLatency: {round(bot.latency * 1000, 2)}ms", inline=False)
+            error_embed.add_field(name="Error", value=f"`{str(e)[:100]}`", inline=False)
+            error_embed.add_field(name="Basic Info", value=f"Guilds: {len(self.bot.guilds)}\\nLatency: {round(self.bot.latency * 1000, 2)}ms", inline=False)
             
-            await ctx.send(embed=error_embed)
-            await ctx.send(f"⚠️ Health check error, but bot is responding to commands. Error: `{str(e)[:100]}`")
+            await interaction.response.send_message(embed=error_embed)
 
-    @bot.command(name="dbtest")
-    @error_handler
-    async def dbtest_command(ctx):
-        """Test database connectivity with detailed diagnostics"""
+    @app_commands.command(name="red-dbtest", description="Test Red Legion bot database connectivity (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def dbtest_command(self, interaction: discord.Interaction):
+        """Test database connectivity and performance"""
         try:
-            embed = discord.Embed(
-                title="🗄️ Database Connection Test",
-                description="Testing connection to arccorp-data-nexus database",
-                color=discord.Color.blue(),
-                timestamp=datetime.now()
-            )
+            from config.settings import get_database_url
+            db_url = get_database_url()
             
-            # Test database connection
+            if not db_url:
+                await interaction.response.send_message("❌ No database URL configured")
+                return
+            
+            # Test basic connection
+            start_time = datetime.now()
             try:
                 import psycopg2
-                from config.settings import get_database_url
+                from urllib.parse import urlparse
                 
-                current_db_url = get_database_url()
-                if not current_db_url:
-                    embed.add_field(
-                        name="❌ Configuration Error",
-                        value="DATABASE_URL is not configured",
-                        inline=False
-                    )
-                    embed.add_field(
-                        name="💡 Suggestion",
-                        value="Check Secret Manager configuration or environment variables",
-                        inline=False
-                    )
-                    embed.color = discord.Color.red()
+                # Parse and test connection
+                parsed = urlparse(db_url)
+                connection_method = "unknown"
+                
+                if parsed.hostname not in ['127.0.0.1', 'localhost']:
+                    # Try proxy first, then direct
+                    proxy_url = db_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
+                    try:
+                        conn = psycopg2.connect(proxy_url)
+                        connection_method = "Cloud SQL Proxy"
+                    except:
+                        conn = psycopg2.connect(db_url)
+                        connection_method = "Direct Connection"
                 else:
-                    conn = psycopg2.connect(current_db_url, connect_timeout=10)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT version();")
-                    version_info = cursor.fetchone()[0]
-                    cursor.execute("SELECT current_database();")
-                    db_name = cursor.fetchone()[0]
-                    cursor.execute("SELECT current_user;")
-                    db_user = cursor.fetchone()[0]
-                    
-                    embed.add_field(
-                        name="✅ Connection Status",
-                        value="Successfully connected to database",
-                        inline=False
-                    )
-                    embed.add_field(
-                        name="📋 Database Info",
-                        value=f"**Database**: {db_name}\n**User**: {db_user}\n**Version**: {version_info[:50]}...",
-                        inline=False
-                    )
-                    embed.color = discord.Color.green()
-                    conn.close()
+                    conn = psycopg2.connect(db_url)
+                    connection_method = "Local Database"
+                
+                # Test basic query
+                cursor = conn.cursor()
+                cursor.execute("SELECT version(), current_database(), current_user;")
+                db_info = cursor.fetchone()
+                
+                # Test tables
+                cursor.execute("""
+                    SELECT table_name FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    ORDER BY table_name;
+                """)
+                tables = [row[0] for row in cursor.fetchall()]
+                
+                conn.close()
+                connection_time = (datetime.now() - start_time).total_seconds() * 1000
+                
+                embed = discord.Embed(
+                    title="✅ Red Legion Database Test Results",
+                    description="Database connectivity test completed successfully",
+                    color=discord.Color.green()
+                )
+                
+                embed.add_field(
+                    name="🔗 Connection",
+                    value=f"**Method:** {connection_method}\\n"
+                          f"**Time:** {connection_time:.2f}ms\\n"
+                          f"**Status:** Connected",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="🗃️ Database Info",
+                    value=f"**Database:** {db_info[1]}\\n"
+                          f"**User:** {db_info[2]}\\n"
+                          f"**Tables:** {len(tables)}",
+                    inline=True
+                )
+                
+                # List important tables
+                important_tables = ['mining_events', 'mining_participation', 'events', 'users', 'guilds']
+                found_tables = [t for t in important_tables if t in tables]
+                missing_tables = [t for t in important_tables if t not in tables]
+                
+                tables_status = ""
+                if found_tables:
+                    tables_status += f"**Found:** {', '.join(found_tables)}\\n"
+                if missing_tables:
+                    tables_status += f"**Missing:** {', '.join(missing_tables)}"
+                
+                embed.add_field(
+                    name="📋 Schema Status",
+                    value=tables_status or "All important tables found",
+                    inline=False
+                )
+                
+                await interaction.response.send_message(embed=embed)
                 
             except Exception as db_error:
-                if "psycopg2" in str(type(db_error)):
-                    error_msg = str(db_error)
-                    embed.add_field(
-                        name="❌ Connection Failed",
-                        value=f"**Error**: {error_msg[:100]}...",
-                        inline=False
-                    )
-                    
-                    # Add troubleshooting suggestions
-                    if "authentication failed" in error_msg.lower():
-                        embed.add_field(
-                            name="💡 Suggestion",
-                            value="Database credentials may have changed. Try `!refresh_config`",
-                            inline=False
-                        )
-                    elif "timeout" in error_msg.lower() or "could not connect" in error_msg.lower():
-                        embed.add_field(
-                            name="💡 Suggestion", 
-                            value="Database server may be unreachable. Check arccorp-data-nexus status.",
-                            inline=False
-                        )
-                    elif "does not exist" in error_msg.lower():
-                        embed.add_field(
-                            name="💡 Suggestion",
-                            value="Database configuration issue. Verify database name and host.",
-                            inline=False
-                        )
-                    embed.color = discord.Color.red()
-                else:
-                    embed.add_field(
-                        name="❌ Unexpected Error",
-                        value=f"**Error**: {str(db_error)[:100]}...",
-                        inline=False
-                    )
-                    embed.add_field(
-                        name="💡 Suggestion",
-                        value="Check bot logs for detailed error information.",
-                        inline=False
-                    )
-                    embed.color = discord.Color.red()
-            
-            # Add infrastructure info
-            embed.add_field(
-                name="🏗️ Infrastructure",
-                value="**Instance**: arccorp-compute\n**Database**: arccorp-data-nexus\n**Connection**: Via Secret Manager",
-                inline=False
-            )
-            
-            await ctx.send(embed=embed)
-            
+                embed = discord.Embed(
+                    title="❌ Red Legion Database Test Failed",
+                    description="Could not connect to or query the database",
+                    color=discord.Color.red()
+                )
+                embed.add_field(name="Error", value=f"`{str(db_error)[:200]}`", inline=False)
+                await interaction.response.send_message(embed=embed)
+                
         except Exception as e:
-            await ctx.send(f"❌ Database test failed: {str(e)}")
+            await interaction.response.send_message(f"❌ Database test error: {str(e)}")
 
-    @bot.command(name="config_check")
-    @has_org_role()
-    @error_handler
-    async def config_check(ctx):
-        """Check configuration and infrastructure connectivity"""
+    @app_commands.command(name="red-config", description="Check Red Legion bot configuration status (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def config_check(self, interaction: discord.Interaction):
+        """Check configuration status and settings"""
         try:
+            from config.settings import DISCORD_CONFIG, get_database_url
+            
             embed = discord.Embed(
-                title="🔧 Configuration Check",
-                description="Infrastructure and configuration status",
-                color=discord.Color.blue(),
-                timestamp=datetime.now()
+                title="⚙️ Red Legion Bot Configuration",
+                description="Current configuration status",
+                color=discord.Color.blue()
             )
             
-            # Check environment variables
-            env_status = []
-            env_vars = ['GOOGLE_CLOUD_PROJECT', 'TEXT_CHANNEL_ID', 'ORG_ROLE_ID']
-            for var in env_vars:
-                value = os.getenv(var)
-                if value:
-                    env_status.append(f"✅ {var}: Set")
-                else:
-                    env_status.append(f"⚠️ {var}: Not set")
-            
+            # Discord Config
+            token_status = "✅ Present" if DISCORD_CONFIG.get('TOKEN') else "❌ Missing"
             embed.add_field(
-                name="🌍 Environment Variables",
-                value="\n".join(env_status),
-                inline=False
+                name="🤖 Discord Settings",
+                value=f"**Token:** {token_status}\\n"
+                      f"**Guilds:** {len(self.bot.guilds)}",
+                inline=True
             )
             
-            # Check Secret Manager access
-            secret_status = []
-            try:
-                from config.settings import get_secret
-                # Test if we can access Secret Manager (without exposing values)
-                try:
-                    get_secret("database-connection-string")
-                    secret_status.append("✅ Database connection string: Accessible")
-                except Exception as e:
-                    secret_status.append(f"❌ Database connection string: {str(e)[:30]}")
-                
-                try:
-                    get_secret("discord-token")
-                    secret_status.append("✅ Discord token: Accessible")
-                except Exception as e:
-                    secret_status.append(f"❌ Discord token: {str(e)[:30]}")
-                    
-            except Exception as e:
-                secret_status.append(f"❌ Secret Manager: {str(e)[:40]}")
-            
+            # Database Config
+            db_url = get_database_url()
+            db_status = "✅ Configured" if db_url else "❌ Missing"
             embed.add_field(
-                name="🔐 Secret Manager",
-                value="\n".join(secret_status),
-                inline=False
+                name="🗃️ Database Settings",
+                value=f"**URL:** {db_status}",
+                inline=True
             )
             
-            # Quick database connectivity test
-            db_test = "❌ Not tested"
-            try:
-                import psycopg2
-                from config.settings import get_database_url
-                
-                db_url = get_database_url()
-                if not db_url:
-                    db_test = "❌ Error: DATABASE_URL not configured"
-                else:
-                    conn = psycopg2.connect(db_url, connect_timeout=5)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT version();")
-                    cursor.fetchone()[0]  # Just test the connection, don't store
-                    db_test = "✅ Connected (PostgreSQL)"
-                    conn.close()
-            except Exception as e:
-                db_test = f"❌ Error: {str(e)[:40]}"
-            
+            # Environment Info
+            python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
             embed.add_field(
-                name="🗄️ Database Connection",
-                value=db_test,
-                inline=False
+                name="🐍 Environment",
+                value=f"**Python:** {python_version}\\n"
+                      f"**Platform:** {sys.platform}",
+                inline=True
             )
             
-            # Infrastructure info (if available)
-            infra_info = []
-            project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
-            infra_info.append(f"📍 Project: {project_id}")
-            infra_info.append("🏗️ Instance: arccorp-compute")
-            infra_info.append("🗄️ Database: arccorp-data-nexus")
-            
-            embed.add_field(
-                name="🏗️ Infrastructure Info",
-                value="\n".join(infra_info),
-                inline=False
-            )
-            
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed)
             
         except Exception as e:
-            await ctx.send(f"❌ Configuration check failed: {str(e)}")
-
-    print("✅ Diagnostic commands registered")
+            await interaction.response.send_message(f"❌ Config check error: {str(e)}")
 
 
 async def setup(bot):
     """Setup function for discord.py extension loading."""
-    register_commands(bot)
+    await bot.add_cog(Diagnostics(bot))
+    print("✅ Diagnostics commands loaded")
