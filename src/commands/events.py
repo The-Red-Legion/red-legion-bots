@@ -910,5 +910,10 @@ class DeleteConfirmationView(discord.ui.View):
 
 async def setup(bot):
     """Setup function for discord.py extension loading."""
-    await bot.add_cog(EventManagement(bot))
+    cog = EventManagement(bot)
+    await bot.add_cog(cog)
+    
+    # Explicitly add the command group to the bot's command tree
+    bot.tree.add_command(cog.events)
     print("✅ Event Management commands loaded")
+    print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
