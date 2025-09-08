@@ -1,0 +1,44 @@
+# Safe database testing in GitHub Actions
+# Add this to your test.yml workflow
+
+database-integration-tests:
+  runs-on: ubuntu-latest
+  needs: database-architecture
+  
+  services:
+    postgres:
+      image: postgres:13
+      env:
+        POSTGRES_PASSWORD: test_password
+        POSTGRES_USER: test_user
+        POSTGRES_DB: red_legion_test
+      ports:
+        - 5432:5432
+      options: >-
+        --health-cmd pg_isready
+        --health-interval 10s
+        --health-timeout 5s
+        --health-retries 5
+  
+  steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install psycopg2-binary
+    
+    - name: Test Real Database Integration
+      run: |
+        echo "🔗 Testing with real PostgreSQL database..."
+        python3 -m pytest tests/test_real_database_integration.py -v
+      env:
+        # Safe test database URL
+        TEST_DATABASE_URL: postgresql://test_user:test_password@localhost:5432/red_legion_test
+        RUN_INTEGRATION_TESTS: 1
+        PYTHONPATH: ./src

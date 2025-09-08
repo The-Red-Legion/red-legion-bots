@@ -149,9 +149,12 @@ class SchemaManager:
             logger.error(f"Failed to get table info: {e}")
             return {}
 
-def init_database() -> bool:
+def init_database(database_url=None) -> bool:
     """
     Initialize the database with the complete schema.
+    
+    Args:
+        database_url (str, optional): Database URL (ignored for compatibility)
     
     Returns:
         True if successful, False otherwise
