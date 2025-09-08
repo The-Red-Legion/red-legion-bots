@@ -25,73 +25,84 @@ class EventManagement(commands.Cog):
     """Complete event management system for mining events."""
     
     def __init__(self, bot):
-        self.bot = bot
-        print("✅ Event Management Cog initialized")
-        
-        # Create command group as instance attribute
-        self.events = app_commands.Group(name="red-events", description="Red Legion event management system")
-        print(f"✅ Created events group: {self.events}")
-        print(f"✅ self.events exists: {hasattr(self, 'events')}")
-        
-        # Create commands with proper decorators and add them to the group
-        create_cmd = app_commands.Command(
-            name="create",
-            description="Create a new Red Legion event",
-            callback=self.create_event
-        )
-        create_cmd = app_commands.describe(
-            category="Event category",
-            name="Event name", 
-            description="Event description (optional)"
-        )(create_cmd)
-        create_cmd = app_commands.choices(category=[
-            app_commands.Choice(name="Mining", value="mining"),
-            app_commands.Choice(name="Training", value="training"),
-            app_commands.Choice(name="Combat Operations", value="combat_operations"),
-            app_commands.Choice(name="Salvage", value="salvage"),
-            app_commands.Choice(name="Miscellaneous", value="misc")
-        ])(create_cmd)
-        self.events.add_command(create_cmd)
-        print(f"✅ Added create command to events group")
-        
-        delete_cmd = app_commands.Command(
-            name="delete",
-            description="Delete a Red Legion event (Admin only)",
-            callback=self.delete_event
-        )
-        delete_cmd = app_commands.describe(event_id="ID of the event to delete")(delete_cmd)
-        delete_cmd = app_commands.default_permissions(administrator=True)(delete_cmd)
-        self.events.add_command(delete_cmd)
-        print(f"✅ Added delete command to events group")
-        
-        lookup_cmd = app_commands.Command(
-            name="lookup",
-            description="Look up Red Legion events by category and status",
-            callback=self.lookup_events
-        )
-        lookup_cmd = app_commands.describe(
-            category="Event category to filter by",
-            status="Event status to filter by (optional)",
-            event_id="Specific event ID to view details (optional)"
-        )(lookup_cmd)
-        lookup_cmd = app_commands.choices(category=[
-            app_commands.Choice(name="All Categories", value="all"),
-            app_commands.Choice(name="Mining", value="mining"),
-            app_commands.Choice(name="Training", value="training"),
-            app_commands.Choice(name="Combat Operations", value="combat_operations"),
-            app_commands.Choice(name="Salvage", value="salvage"),
-            app_commands.Choice(name="Miscellaneous", value="misc")
-        ], status=[
-            app_commands.Choice(name="All Statuses", value="all"),
-            app_commands.Choice(name="Upcoming", value="upcoming"),
-            app_commands.Choice(name="Active", value="active"),
-            app_commands.Choice(name="Completed", value="completed"),
-            app_commands.Choice(name="Cancelled", value="cancelled")
-        ])(lookup_cmd)
-        self.events.add_command(lookup_cmd)
-        print(f"✅ Added lookup command to events group")
-        print(f"✅ Final events group has {len(self.events.commands)} commands")
-        print(f"✅ Final self.events exists: {hasattr(self, 'events')}")
+        try:
+            self.bot = bot
+            print("✅ Event Management Cog initialized - step 1")
+            
+            # Create command group as instance attribute
+            self.events = app_commands.Group(name="red-events", description="Red Legion event management system")
+            print(f"✅ Created events group: {self.events}")
+            print(f"✅ self.events exists: {hasattr(self, 'events')}")
+            
+            # Create commands with proper decorators and add them to the group
+            create_cmd = app_commands.Command(
+                name="create",
+                description="Create a new Red Legion event",
+                callback=self.create_event
+            )
+            print("✅ Created create_cmd")
+            create_cmd = app_commands.describe(
+                category="Event category",
+                name="Event name", 
+                description="Event description (optional)"
+            )(create_cmd)
+            print("✅ Applied describe to create_cmd")
+            create_cmd = app_commands.choices(category=[
+                app_commands.Choice(name="Mining", value="mining"),
+                app_commands.Choice(name="Training", value="training"),
+                app_commands.Choice(name="Combat Operations", value="combat_operations"),
+                app_commands.Choice(name="Salvage", value="salvage"),
+                app_commands.Choice(name="Miscellaneous", value="misc")
+            ])(create_cmd)
+            print("✅ Applied choices to create_cmd")
+            self.events.add_command(create_cmd)
+            print(f"✅ Added create command to events group")
+            
+            delete_cmd = app_commands.Command(
+                name="delete",
+                description="Delete a Red Legion event (Admin only)",
+                callback=self.delete_event
+            )
+            delete_cmd = app_commands.describe(event_id="ID of the event to delete")(delete_cmd)
+            delete_cmd = app_commands.default_permissions(administrator=True)(delete_cmd)
+            self.events.add_command(delete_cmd)
+            print(f"✅ Added delete command to events group")
+            
+            lookup_cmd = app_commands.Command(
+                name="lookup",
+                description="Look up Red Legion events by category and status",
+                callback=self.lookup_events
+            )
+            lookup_cmd = app_commands.describe(
+                category="Event category to filter by",
+                status="Event status to filter by (optional)",
+                event_id="Specific event ID to view details (optional)"
+            )(lookup_cmd)
+            lookup_cmd = app_commands.choices(category=[
+                app_commands.Choice(name="All Categories", value="all"),
+                app_commands.Choice(name="Mining", value="mining"),
+                app_commands.Choice(name="Training", value="training"),
+                app_commands.Choice(name="Combat Operations", value="combat_operations"),
+                app_commands.Choice(name="Salvage", value="salvage"),
+                app_commands.Choice(name="Miscellaneous", value="misc")
+            ], status=[
+                app_commands.Choice(name="All Statuses", value="all"),
+                app_commands.Choice(name="Upcoming", value="upcoming"),
+                app_commands.Choice(name="Active", value="active"),
+                app_commands.Choice(name="Completed", value="completed"),
+                app_commands.Choice(name="Cancelled", value="cancelled")
+            ])(lookup_cmd)
+            self.events.add_command(lookup_cmd)
+            print(f"✅ Added lookup command to events group")
+            print(f"✅ Final events group has {len(self.events.commands)} commands")
+            print(f"✅ Final self.events exists: {hasattr(self, 'events')}")
+            print("✅ Event Management Cog initialized successfully!")
+        except Exception as e:
+            print(f"❌ Error in EventManagement.__init__: {e}")
+            import traceback
+            traceback.print_exc()
+            # Still set a minimal self.events to prevent attribute errors
+            self.events = None
 
     async def create_event(
         self, 
