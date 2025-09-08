@@ -30,6 +30,8 @@ class EventManagement(commands.Cog):
         
         # Create command group as instance attribute
         self.events = app_commands.Group(name="red-events", description="Red Legion event management system")
+        print(f"✅ Created events group: {self.events}")
+        print(f"✅ self.events exists: {hasattr(self, 'events')}")
         
         # Create commands with proper decorators and add them to the group
         create_cmd = app_commands.Command(
@@ -50,6 +52,7 @@ class EventManagement(commands.Cog):
             app_commands.Choice(name="Miscellaneous", value="misc")
         ])(create_cmd)
         self.events.add_command(create_cmd)
+        print(f"✅ Added create command to events group")
         
         delete_cmd = app_commands.Command(
             name="delete",
@@ -59,6 +62,7 @@ class EventManagement(commands.Cog):
         delete_cmd = app_commands.describe(event_id="ID of the event to delete")(delete_cmd)
         delete_cmd = app_commands.default_permissions(administrator=True)(delete_cmd)
         self.events.add_command(delete_cmd)
+        print(f"✅ Added delete command to events group")
         
         lookup_cmd = app_commands.Command(
             name="lookup",
@@ -85,6 +89,9 @@ class EventManagement(commands.Cog):
             app_commands.Choice(name="Cancelled", value="cancelled")
         ])(lookup_cmd)
         self.events.add_command(lookup_cmd)
+        print(f"✅ Added lookup command to events group")
+        print(f"✅ Final events group has {len(self.events.commands)} commands")
+        print(f"✅ Final self.events exists: {hasattr(self, 'events')}")
 
     async def create_event(
         self, 
@@ -927,10 +934,25 @@ class DeleteConfirmationView(discord.ui.View):
 
 async def setup(bot):
     """Setup function for discord.py extension loading."""
+    print("🔧 Starting EventManagement setup...")
     cog = EventManagement(bot)
+    print(f"🔧 Created cog, checking for events attribute: {hasattr(cog, 'events')}")
+    if hasattr(cog, 'events'):
+        print(f"🔧 cog.events exists: {cog.events}")
+        print(f"🔧 cog.events commands: {len(cog.events.commands)}")
+    else:
+        print("❌ cog.events does not exist!")
+        return
+        
     await bot.add_cog(cog)
+    print("🔧 Added cog to bot")
     
     # Add the command group to the bot's tree using the instance
-    bot.tree.add_command(cog.events)
-    print("✅ Event Management commands loaded")
-    print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
+    try:
+        bot.tree.add_command(cog.events)
+        print("✅ Event Management commands loaded")
+        print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
+    except Exception as e:
+        print(f"❌ Failed to add command group: {e}")
+        import traceback
+        traceback.print_exc()
