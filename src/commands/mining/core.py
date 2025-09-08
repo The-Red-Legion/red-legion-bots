@@ -583,16 +583,14 @@ class SundayMiningCommands(commands.Cog):
             
             # Create event in database
             import sys
-            import importlib.util
             from pathlib import Path
             
-            # Import from the specific operations.py file, not the operations/ directory
-            operations_path = Path(__file__).parent.parent.parent / 'database' / 'operations.py'
-            spec = importlib.util.spec_from_file_location("database_operations", operations_path)
-            database_operations = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(database_operations)
+            # Add src to path for imports
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
             
             from config.settings import get_database_url
+            from database import operations as database_operations
+            
             db_url = get_database_url()
             event_id = None
             

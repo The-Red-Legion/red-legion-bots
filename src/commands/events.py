@@ -147,16 +147,14 @@ from discord import app_commands
 from datetime import datetime, date, timedelta
 from typing import Optional, List
 import sys
-import importlib.util
+import sys
 from pathlib import Path
 
-# Import database operations from the correct file
-operations_path = Path(__file__).parent.parent.parent / 'database' / 'operations.py'
-spec = importlib.util.spec_from_file_location("database_operations", operations_path)
-database_operations = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(database_operations)
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import get_database_url
+from database import operations as database_operations
 
 class EventManagement(commands.Cog):
     """Event management command group."""
