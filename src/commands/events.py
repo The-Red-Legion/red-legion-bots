@@ -14,18 +14,12 @@ from discord import app_commands
 import sys
 from pathlib import Path
 from datetime import datetime, timezone, date
-import importlib.util
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import get_database_url
-
-# Import database operations using importlib to avoid conflicts with operations/ directory
-operations_path = Path(__file__).parent.parent / "database" / "operations.py"
-spec = importlib.util.spec_from_file_location("database_operations", operations_path)
-database_operations = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(database_operations)
+from database import operations as database_operations
 
 class EventManagement(commands.Cog):
     """Complete event management system for mining events."""
