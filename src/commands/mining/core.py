@@ -582,7 +582,16 @@ class SundayMiningCommands(commands.Cog):
             session_id = f"sunday_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
             # Create event in database
-            from database.operations import create_mining_event
+            import sys
+            import importlib.util
+            from pathlib import Path
+            
+            # Import from the specific operations.py file, not the operations/ directory
+            operations_path = Path(__file__).parent.parent.parent / 'database' / 'operations.py'
+            spec = importlib.util.spec_from_file_location("database_operations", operations_path)
+            database_operations = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(database_operations)
+            
             from config.settings import get_database_url
             db_url = get_database_url()
             event_id = None
@@ -593,7 +602,7 @@ class SundayMiningCommands(commands.Cog):
                 try:
                     # Use interaction.guild.id for proper guild-aware event creation
                     print(f"🔍 Creating mining event for guild {interaction.guild.id} ({interaction.guild.name})")
-                    event_id = create_mining_event(
+                    event_id = database_operations.create_mining_event(
                         db_url, 
                         interaction.guild.id, 
                         datetime.now().date(),
