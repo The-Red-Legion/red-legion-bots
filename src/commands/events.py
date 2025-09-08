@@ -24,12 +24,12 @@ from src.database import operations as database_operations
 class EventManagement(commands.Cog):
     """Complete event management system for mining events."""
     
-    # Define the command group at the top of the class
-    events = app_commands.Group(name="red-events", description="Red Legion event management system")
-    
     def __init__(self, bot):
         self.bot = bot
         print("✅ Event Management Cog initialized")
+
+    # Define the command group
+    events = app_commands.Group(name="red-events", description="Red Legion event management system")
 
     @events.command(name="create", description="Create a new Red Legion event")
     @app_commands.describe(
@@ -913,12 +913,8 @@ async def setup(bot):
     cog = EventManagement(bot)
     await bot.add_cog(cog)
     
-    # Add the command group to the bot's tree
-    # Use the instance's command group attribute
-    try:
-        bot.tree.add_command(cog.events)
-        print("✅ Event Management commands loaded")
-        print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
-    except Exception as e:
-        print(f"❌ Failed to register red-events command group: {e}")
-        print("✅ Event Management commands loaded (without events group)")
+    # For Discord.py 2.0+, command groups defined as class attributes
+    # are automatically added when the cog is added, so we don't need
+    # to manually add them to the tree
+    print("✅ Event Management commands loaded")
+    print("✅ Added red-events command group automatically via cog")
