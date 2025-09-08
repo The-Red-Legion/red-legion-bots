@@ -31,28 +31,43 @@ async def setup_core_handlers(bot):
             print(f'Connected to guild: {guild.name} (ID: {guild.id})')
         
         # Enhanced command logging - Check what commands we have locally before sync
-        local_commands = [cmd.name for cmd in bot.tree.get_commands() if hasattr(cmd, 'name')]
-        print(f'🔍 Local commands loaded: {len(local_commands)}')
+        all_commands = bot.tree.get_commands()
+        print(f'🔍 Total command objects loaded: {len(all_commands)}')
+        
+        # Separate individual commands from command groups
+        individual_commands = []
+        command_groups = []
+        
+        for cmd in all_commands:
+            if hasattr(cmd, 'name'):
+                if hasattr(cmd, 'commands') and cmd.commands:  # This is a command group
+                    command_groups.append(cmd)
+                    print(f'� Command Group: /{cmd.name} (with {len(cmd.commands)} subcommands)')
+                    for subcmd in cmd.commands:
+                        print(f'  └── /{cmd.name} {subcmd.name}')
+                else:  # This is an individual command
+                    individual_commands.append(cmd.name)
+        
+        print(f'🔍 Individual commands: {len(individual_commands)}')
+        print(f'🔍 Command groups: {len(command_groups)}')
         
         # Count red- prefix commands
-        red_commands = [cmd for cmd in local_commands if cmd.startswith('red-')]
-        other_commands = [cmd for cmd in local_commands if not cmd.startswith('red-')]
+        red_commands = [cmd for cmd in individual_commands if cmd.startswith('red-')]
+        other_commands = [cmd for cmd in individual_commands if not cmd.startswith('red-')]
         
-        print(f'✅ Commands with red- prefix: {len(red_commands)}')
+        print(f'✅ Individual commands with red- prefix: {len(red_commands)}')
         if other_commands:
-            print(f'⚠️ Commands without red- prefix: {len(other_commands)}')
+            print(f'⚠️ Individual commands without red- prefix: {len(other_commands)}')
             for cmd in other_commands:
                 print(f'  ❌ {cmd}')
         
-        # Show first few commands for verification
+        # Show all individual commands for verification
         if red_commands:
-            print('📋 Sample red- commands loaded:')
-            for i, cmd in enumerate(sorted(red_commands)[:10]):
+            print('📋 All red- individual commands:')
+            for cmd in sorted(red_commands):
                 print(f'  🟢 /{cmd}')
-            if len(red_commands) > 10:
-                print(f'  ... and {len(red_commands) - 10} more red- commands')
         else:
-            print('⚠️ No red- prefix commands found! This indicates a problem.')
+            print('⚠️ No red- prefix individual commands found!')
         
         # Sync slash commands with enhanced logging
         try:
