@@ -24,26 +24,68 @@ from src.database import operations as database_operations
 class EventManagement(commands.Cog):
     """Complete event management system for mining events."""
     
-    # Define the command group as a class attribute at the top
-    events = app_commands.Group(name="red-events", description="Red Legion event management system")
-    
     def __init__(self, bot):
         self.bot = bot
         print("✅ Event Management Cog initialized")
+        
+        # Create command group as instance attribute
+        self.events = app_commands.Group(name="red-events", description="Red Legion event management system")
+        
+        # Create commands with proper decorators and add them to the group
+        create_cmd = app_commands.Command(
+            name="create",
+            description="Create a new Red Legion event",
+            callback=self.create_event
+        )
+        create_cmd = app_commands.describe(
+            category="Event category",
+            name="Event name", 
+            description="Event description (optional)"
+        )(create_cmd)
+        create_cmd = app_commands.choices(category=[
+            app_commands.Choice(name="Mining", value="mining"),
+            app_commands.Choice(name="Training", value="training"),
+            app_commands.Choice(name="Combat Operations", value="combat_operations"),
+            app_commands.Choice(name="Salvage", value="salvage"),
+            app_commands.Choice(name="Miscellaneous", value="misc")
+        ])(create_cmd)
+        self.events.add_command(create_cmd)
+        
+        delete_cmd = app_commands.Command(
+            name="delete",
+            description="Delete a Red Legion event (Admin only)",
+            callback=self.delete_event
+        )
+        delete_cmd = app_commands.describe(event_id="ID of the event to delete")(delete_cmd)
+        delete_cmd = app_commands.default_permissions(administrator=True)(delete_cmd)
+        self.events.add_command(delete_cmd)
+        
+        lookup_cmd = app_commands.Command(
+            name="lookup",
+            description="Look up Red Legion events by category and status",
+            callback=self.lookup_events
+        )
+        lookup_cmd = app_commands.describe(
+            category="Event category to filter by",
+            status="Event status to filter by (optional)",
+            event_id="Specific event ID to view details (optional)"
+        )(lookup_cmd)
+        lookup_cmd = app_commands.choices(category=[
+            app_commands.Choice(name="All Categories", value="all"),
+            app_commands.Choice(name="Mining", value="mining"),
+            app_commands.Choice(name="Training", value="training"),
+            app_commands.Choice(name="Combat Operations", value="combat_operations"),
+            app_commands.Choice(name="Salvage", value="salvage"),
+            app_commands.Choice(name="Miscellaneous", value="misc")
+        ], status=[
+            app_commands.Choice(name="All Statuses", value="all"),
+            app_commands.Choice(name="Upcoming", value="upcoming"),
+            app_commands.Choice(name="Active", value="active"),
+            app_commands.Choice(name="Completed", value="completed"),
+            app_commands.Choice(name="Cancelled", value="cancelled")
+        ])(lookup_cmd)
+        self.events.add_command(lookup_cmd)
 
-    @events.command(name="create", description="Create a new Red Legion event")
-    @app_commands.describe(
-        category="Event category",
-        name="Event name",
-        description="Event description (optional)"
-    )
-    @app_commands.choices(category=[
-        app_commands.Choice(name="Mining", value="mining"),
-        app_commands.Choice(name="Training", value="training"),
-        app_commands.Choice(name="Combat Operations", value="combat_operations"),
-        app_commands.Choice(name="Salvage", value="salvage"),
-        app_commands.Choice(name="Miscellaneous", value="misc")
-    ])
     async def create_event(
         self, 
         interaction: discord.Interaction,
@@ -65,11 +107,6 @@ class EventManagement(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
     
-    @events.command(name="delete", description="Delete a Red Legion event (Admin only)")
-    @app_commands.describe(
-        event_id="ID of the event to delete"
-    )
-    @app_commands.default_permissions(administrator=True)
     async def delete_event(
         self, 
         interaction: discord.Interaction,
@@ -89,26 +126,6 @@ class EventManagement(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
     
-    @events.command(name="lookup", description="Look up Red Legion events by category and status")
-    @app_commands.describe(
-        category="Event category to filter by",
-        status="Event status to filter by (optional)",
-        event_id="Specific event ID to view details (optional)"
-    )
-    @app_commands.choices(category=[
-        app_commands.Choice(name="All Categories", value="all"),
-        app_commands.Choice(name="Mining", value="mining"),
-        app_commands.Choice(name="Training", value="training"),
-        app_commands.Choice(name="Combat Operations", value="combat_operations"),
-        app_commands.Choice(name="Salvage", value="salvage"),
-        app_commands.Choice(name="Miscellaneous", value="misc")
-    ])
-    @app_commands.choices(status=[
-        app_commands.Choice(name="All Statuses", value="all"),
-        app_commands.Choice(name="Active/Open", value="active"),
-        app_commands.Choice(name="Completed/Closed", value="completed"),
-        app_commands.Choice(name="Planned", value="planned")
-    ])
     async def lookup_events(
         self, 
         interaction: discord.Interaction,
@@ -913,8 +930,7 @@ async def setup(bot):
     cog = EventManagement(bot)
     await bot.add_cog(cog)
     
-    # Explicitly add the command group to the bot's tree
-    # In Discord.py 2.0+, command groups need to be manually added
-    bot.tree.add_command(EventManagement.events)
+    # Add the command group to the bot's tree using the instance
+    bot.tree.add_command(cog.events)
     print("✅ Event Management commands loaded")
-    print(f"✅ Added red-events command group with {len(EventManagement.events.commands)} subcommands")
+    print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
