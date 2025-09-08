@@ -1,17 +1,15 @@
 """
-Database Operations
+Legacy Database Operations
 
-This module contains all database operation classes for the Red Legion Bot.
-Also provides legacy function compatibility.
+This file provides backward compatibility for legacy database operations.
+These functions are maintained for compatibility while the codebase transitions
+to the new modular operations structure.
 """
 
-from .guild_ops import GuildOperations
-from .user_ops import UserOperations
-
-# Legacy functions for backward compatibility
+# Legacy functions - these will be properly implemented later
 def init_db(database_url):
     """Legacy function - initialize database"""
-    from database.schemas import init_database
+    from database import init_database
     return init_database()
 
 def get_market_items(database_url):
@@ -91,11 +89,6 @@ def get_entries(database_url, month_year):
     return []
 
 __all__ = [
-    # New operations classes
-    'GuildOperations',
-    'UserOperations',
-    
-    # Legacy functions
     'init_db',
     'get_market_items',
     'add_market_item',
