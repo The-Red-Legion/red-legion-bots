@@ -15,7 +15,7 @@ permissions:
 jobs:
   merge-pr:
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'merge') && contains(github.event.pull_request.labels.*.name, 'ready to merge')
+    if: github.event.action == 'labeled' && github.event.label.name == 'merge' && contains(github.event.pull_request.labels.*.name, 'ready to merge')
     steps:
       - name: Merge Pull Request
         uses: actions/github-script@v7

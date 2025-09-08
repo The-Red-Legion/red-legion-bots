@@ -16,7 +16,7 @@ jobs:
   # Phase 1: Infrastructure Preparation
   infrastructure-setup:
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'deploy') && contains(github.event.pull_request.labels.*.name, 'tests good')
+    if: github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'tests good')
     outputs:
       vm_ip: ${{ steps.vm_info.outputs.vm_ip }}
       ssh_status: ${{ steps.ssh_test.outputs.status }}
