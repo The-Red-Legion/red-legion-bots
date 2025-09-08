@@ -10,9 +10,70 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Clear previous test labels before starting new test run
+  clear-labels:
+    name: "Clear Previous Test Labels"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Remove all previous test labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number;
+            
+            if (!pull_number) {
+              console.log('Not a pull request, skipping label clearing');
+              return;
+            }
+
+            // List of all possible test-related labels to remove
+            const testLabels = [
+              'tests pending', 
+              'tests failed', 
+              'tests good',
+              'database tests failed',
+              'bot tests failed', 
+              'linting failed',
+              'validation failed',
+              'performance issues',
+              'ready for review',
+              'needs fixes'
+            ];
+            
+            console.log('🧹 Clearing previous test labels...');
+            
+            for (const label of testLabels) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: pull_number,
+                  name: label
+                });
+                console.log(`✅ Removed label: ${label}`);
+              } catch (error) {
+                console.log(`ℹ️ Label "${label}" not found or already removed`);
+              }
+            }
+            
+            // Add 'tests pending' label to indicate tests are starting
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: pull_number,
+              labels: ['tests pending']
+            });
+            
+            console.log('✅ Added "tests pending" label - test run starting');
+
   code-quality:
     name: "Code Quality & Validation"
     runs-on: ubuntu-latest
+    needs: clear-labels
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -54,7 +115,7 @@ jobs:
   database-architecture:
     name: "Database Architecture Tests"
     runs-on: ubuntu-latest
-    needs: code-quality
+    needs: [clear-labels, code-quality]
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -108,7 +169,7 @@ jobs:
   bot-functionality:
     name: "Bot Functionality Tests" 
     runs-on: ubuntu-latest
-    needs: code-quality
+    needs: [clear-labels, code-quality]
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -183,7 +244,7 @@ jobs:
   test-summary:
     name: "Test Summary & Results"
     runs-on: ubuntu-latest
-    needs: [code-quality, database-architecture, bot-functionality, advanced-system]
+    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -208,7 +269,7 @@ jobs:
   post-tests:
     name: "Post-Test Actions"
     runs-on: ubuntu-latest
-    needs: [code-quality, database-architecture, bot-functionality, advanced-system]
+    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -237,22 +298,20 @@ jobs:
                                  botFunctionality === 'success' && 
                                  advancedSystem === 'success';
             
-            // Remove old test labels
-            const labelsToRemove = ['tests pending', 'tests failed'];
-            for (const label of labelsToRemove) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner,
-                  repo,
-                  issue_number: pull_number,
-                  name: label
-                });
-              } catch (error) {
-                console.log(`Label "${label}" not found, skipping removal`);
-              }
+            // Remove the 'tests pending' label first
+            try {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: pull_number,
+                name: 'tests pending'
+              });
+              console.log('✅ Removed "tests pending" label');
+            } catch (error) {
+              console.log('ℹ️ "tests pending" label not found');
             }
             
-            // Add appropriate label based on results
+            // Add appropriate final label based on results
             if (allTestsPassed) {
               await github.rest.issues.addLabels({
                 owner,
