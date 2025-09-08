@@ -255,57 +255,62 @@ jobs:
         run: |
           echo "=== Deployment Log Collection ==="
           
-          # Use gcloud SSH to check deployment status
-          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command='
-            # Check if this is a first deployment
-            if [ ! -d /app ]; then
-              echo "ℹ️  First deployment in progress - /app directory does not exist yet"
-              echo "This is normal during initial setup"
-              echo "=== System resource check ==="
-              free -h || echo "Could not check memory"
-              echo "=== Deployment log capture completed ==="
-              exit 0
-            fi
-            
-            # Show bot status
-            if [ -f /app/bot.pid ]; then
-              PID=$(cat /app/bot.pid)
-              if ps -p "$PID" > /dev/null 2>&1; then
-                echo "✅ Bot is running (PID: $PID)"
-              else
-                echo "⚠️ Bot PID file exists but process not found (PID: $PID)"
-                # Check if there's another python process running
-                if pgrep -f "python.*main.py" > /dev/null; then
-                  ACTUAL_PID=$(pgrep -f "python.*main.py")
-                  echo "🔍 Found bot process running with different PID: $ACTUAL_PID"
-                  echo "This may indicate a PID file sync issue"
-                else
-                  echo "❌ No bot process found"
-                fi
-              fi
-            else
-              echo "❌ No bot PID file found"
-            fi
-            
-            # Show recent logs
-            if [ -f /app/bot.log ]; then
-              echo "=== Last 20 lines of bot log ==="
-              tail -20 /app/bot.log
-            else
-              echo "❌ No bot log file found"
-            fi
-            
-            # Check system resources
+          # Create a temporary script for complex SSH commands
+          cat > /tmp/check_deployment.sh << 'EOF'
+          #!/bin/bash
+          # Check if this is a first deployment
+          if [ ! -d /app ]; then
+            echo "ℹ️  First deployment in progress - /app directory does not exist yet"
+            echo "This is normal during initial setup"
             echo "=== System resource check ==="
-            if [ -d /app ]; then
-              df -h /app || echo "Could not check disk space for /app"
-            else
-              df -h / || echo "Could not check disk space"
-            fi
             free -h || echo "Could not check memory"
-            
             echo "=== Deployment log capture completed ==="
-          ' || echo "Could not capture deployment logs - VM may be unreachable"
+            exit 0
+          fi
+          
+          # Show bot status
+          if [ -f /app/bot.pid ]; then
+            PID=$(cat /app/bot.pid)
+            if ps -p "$PID" > /dev/null 2>&1; then
+              echo "✅ Bot is running (PID: $PID)"
+            else
+              echo "⚠️ Bot PID file exists but process not found (PID: $PID)"
+              # Check if there is another python process running
+              if pgrep -f "python.*main.py" > /dev/null; then
+                ACTUAL_PID=$(pgrep -f "python.*main.py")
+                echo "🔍 Found bot process running with different PID: $ACTUAL_PID"
+                echo "This may indicate a PID file sync issue"
+              else
+                echo "❌ No bot process found"
+              fi
+            fi
+          else
+            echo "❌ No bot PID file found"
+          fi
+          
+          # Show recent logs
+          if [ -f /app/bot.log ]; then
+            echo "=== Last 20 lines of bot log ==="
+            tail -20 /app/bot.log
+          else
+            echo "❌ No bot log file found"
+          fi
+          
+          # Check system resources
+          echo "=== System resource check ==="
+          if [ -d /app ]; then
+            df -h /app || echo "Could not check disk space for /app"
+          else
+            df -h / || echo "Could not check disk space"
+          fi
+          free -h || echo "Could not check memory"
+          
+          echo "=== Deployment log capture completed ==="
+          EOF
+          
+          # Copy script to VM and execute
+          gcloud compute scp /tmp/check_deployment.sh arccorp-compute:/tmp/ --zone=us-central1-a --project=rl-prod-471116 || echo "Could not copy script to VM"
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="chmod +x /tmp/check_deployment.sh && /tmp/check_deployment.sh" || echo "Could not capture deployment logs - VM may be unreachable"
 
   # Phase 5: Post-Deployment Actions
   post-deployment:
@@ -413,3 +418,57 @@ jobs:
             } catch (error) {
               console.error('Failed to update labels after deployment failure:', error.message);
             }
+
+  # Phase 5: Optional VM Reboot (only on successful deployment)
+  vm-reboot:
+    runs-on: ubuntu-latest
+    needs: [infrastructure-setup, ansible-deployment, health-verification, log-collection]
+    if: needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success'
+    steps:
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      
+      - name: Reboot VM after successful deployment
+        run: |
+          echo "=== Post-Deployment VM Reboot ==="
+          echo "Rebooting VM to ensure clean state after deployment..."
+          
+          # Gracefully shut down the bot first
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="
+            if [ -f /app/bot.pid ]; then
+              echo 'Gracefully stopping bot before reboot...'
+              sudo systemctl stop red-legion-bot 2>/dev/null || echo 'Systemd service not active'
+              sleep 5
+            fi
+          " || echo "Could not gracefully stop bot - proceeding with reboot"
+          
+          # Reboot the VM
+          gcloud compute instances stop arccorp-compute --zone=us-central1-a --project=rl-prod-471116
+          echo "VM stopped, waiting 10 seconds..."
+          sleep 10
+          
+          gcloud compute instances start arccorp-compute --zone=us-central1-a --project=rl-prod-471116
+          echo "VM reboot initiated"
+          
+          # Wait for VM to be ready
+          echo "Waiting 60 seconds for VM to fully boot..."
+          sleep 60
+          
+          # Verify bot auto-starts after reboot
+          echo "=== Post-Reboot Verification ==="
+          gcloud compute ssh arccorp-compute --zone=us-central1-a --project=rl-prod-471116 --command="
+            echo 'Checking if bot auto-started after reboot...'
+            sleep 10
+            if [ -f /app/bot.pid ] && ps -p \$(cat /app/bot.pid) > /dev/null 2>&1; then
+              echo '✅ Bot successfully auto-started after reboot'
+              echo 'Bot PID: '\$(cat /app/bot.pid)
+            else
+              echo '⚠️ Bot may need manual start after reboot'
+              echo 'Attempting to start bot service...'
+              sudo systemctl start red-legion-bot || echo 'Could not start via systemd'
+            fi
+          " || echo "Could not verify post-reboot status"
+          
+          echo "✅ VM reboot completed"
