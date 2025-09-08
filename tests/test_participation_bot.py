@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from database import init_db
+from database.operations import init_db
 # Legacy event_handlers replaced by new modular system
 # from event_handlers import start_logging
 
