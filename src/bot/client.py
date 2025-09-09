@@ -47,9 +47,7 @@ class RedLegionBot(commands.Bot):
                 'commands.market',           # red-market-list, red-market-add
                 'commands.admin',            # red-config-refresh, red-restart, etc.
                 'commands.loans',            # red-loan-request, red-loan-status
-                'commands.events.mining',    # red-mining-create, red-mining-delete, red-mining-view
-                'commands.events.combat',    # red-combat-create, red-combat-delete, red-combat-view
-                'commands.events.training',  # red-training-create, red-training-delete, red-training-view
+                'commands.events_subcommand', # /red-events create|delete|view|list (unified subcommand group)
                 'commands.mining.core',      # red-sunday-mining-*, red-payroll
             ]
             
