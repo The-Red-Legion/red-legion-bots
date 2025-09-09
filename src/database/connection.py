@@ -112,18 +112,13 @@ def _get_db_password_from_secrets() -> str:
         # Get project ID from environment or use default
         project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
         
-        # Try different possible secret names for the database password
-        secret_names = ["database-password", "DATABASE_PASSWORD", "db-password"]
+        # Use the correct secret name for database password
+        secret_name = "db-password"
+        name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
         
-        for secret_name in secret_names:
-            try:
-                name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
-                response = client.access_secret_version(request={"name": name})
-                return response.payload.data.decode("UTF-8")
-            except Exception:
-                continue
-        
-        raise Exception("No database password secret found")
+        # Access the secret version
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
         
     except Exception as e:
         logger.error(f"Error getting database password from secrets: {e}")
