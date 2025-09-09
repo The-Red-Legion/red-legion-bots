@@ -177,9 +177,18 @@ class DatabaseManager:
         """Initialize the connection pool."""
         try:
             # Parse URL to validate format
+            logger.info(f"Initializing connection pool with URL: {self.database_url[:50]}...")
             parsed = urlparse(self.database_url)
+            logger.info(f"Parsed URL - scheme: {parsed.scheme}, hostname: {parsed.hostname}, port: {parsed.port}")
+            
             if not parsed.scheme == 'postgresql':
                 raise ValueError("Database URL must be a PostgreSQL URL")
+            
+            # Test connection first to provide better error messages
+            logger.info("Testing database connection...")
+            test_conn = psycopg2.connect(self.database_url)
+            test_conn.close()
+            logger.info("Database connection test successful")
             
             self._pool = SimpleConnectionPool(
                 self.min_connections,
