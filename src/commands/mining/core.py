@@ -48,6 +48,306 @@ current_session = {
 }
 
 
+class ParticipantDonationView(discord.ui.View):
+    """View for selecting participants who want to donate their earnings."""
+    
+    def __init__(self, participants_data, event_id, ore_prices):
+        super().__init__(timeout=300)  # 5 minute timeout
+        self.participants_data = participants_data
+        self.event_id = event_id
+        self.ore_prices = ore_prices
+        self.donations = {}  # Track who's donating
+        
+        # Create checkboxes for each participant (up to 25 due to Discord limits)
+        participant_list = list(participants_data.items())[:20]  # Limit for UI space
+        
+        if len(participant_list) <= 5:
+            # Use buttons for small groups
+            for member_id, data in participant_list:
+                button = discord.ui.Button(
+                    label=f"💰 {data['username'][:20]}",
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"donate_{member_id}"
+                )
+                button.callback = self._create_toggle_callback(member_id)
+                self.add_item(button)
+        else:
+            # Use select menu for larger groups
+            options = []
+            for member_id, data in participant_list:
+                options.append(discord.SelectOption(
+                    label=f"{data['username']}"[:100],
+                    description=f"Mining time: {data['hours']:.1f}h - Click to toggle donation"[:100],
+                    value=str(member_id),
+                    emoji="💰"
+                ))
+            
+            if options:
+                self.participant_select = discord.ui.Select(
+                    placeholder="Select participants who want to donate their earnings...",
+                    options=options,
+                    max_values=len(options),
+                    min_values=0
+                )
+                self.participant_select.callback = self.participants_selected
+                self.add_item(self.participant_select)
+        
+        # Continue to prices button
+        continue_button = discord.ui.Button(
+            label="Continue to Price Setup →",
+            style=discord.ButtonStyle.primary,
+            emoji="💎"
+        )
+        continue_button.callback = self.continue_to_prices
+        self.add_item(continue_button)
+    
+    def _create_toggle_callback(self, member_id):
+        """Create a callback function for donation toggle buttons."""
+        async def callback(interaction):
+            # Toggle donation status
+            if member_id in self.donations:
+                del self.donations[member_id]
+                style = discord.ButtonStyle.secondary
+                label_prefix = "💰"
+            else:
+                self.donations[member_id] = True
+                style = discord.ButtonStyle.success
+                label_prefix = "✅"
+            
+            # Update button style
+            for item in self.children:
+                if hasattr(item, 'custom_id') and item.custom_id == f"donate_{member_id}":
+                    item.style = style
+                    username = self.participants_data[member_id]['username'][:18]
+                    item.label = f"{label_prefix} {username}"
+                    break
+            
+            await interaction.response.edit_message(view=self)
+        
+        return callback
+    
+    async def participants_selected(self, interaction: discord.Interaction):
+        """Handle participant selection for donations."""
+        try:
+            # Update donations based on selection
+            self.donations = {}
+            for value in self.participant_select.values:
+                member_id = int(value)
+                self.donations[member_id] = True
+            
+            donation_count = len(self.donations)
+            total_participants = len(self.participants_data)
+            
+            embed = discord.Embed(
+                title="💰 Donation Selection Updated",
+                description=f"**{donation_count}** of **{total_participants}** participants selected for donation",
+                color=discord.Color.green() if donation_count > 0 else discord.Color.blue()
+            )
+            
+            if donation_count > 0:
+                donor_names = [self.participants_data[mid]['username'] for mid in self.donations.keys()]
+                embed.add_field(
+                    name="Donating Participants",
+                    value="\n".join([f"• {name}" for name in donor_names[:10]]),
+                    inline=False
+                )
+                if len(donor_names) > 10:
+                    embed.add_field(name="And more...", value=f"+ {len(donor_names) - 10} others", inline=False)
+            
+            embed.add_field(
+                name="Next Step",
+                value="Click **Continue to Price Setup** to proceed with UEX ore price configuration",
+                inline=False
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=self)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error updating donations: {str(e)}",
+                ephemeral=True
+            )
+    
+    async def continue_to_prices(self, interaction: discord.Interaction):
+        """Continue to UEX price setup."""
+        try:
+            # Create price setup view
+            price_view = UEXPriceSetupView(self.participants_data, self.event_id, self.ore_prices, self.donations)
+            
+            embed = discord.Embed(
+                title="💎 UEX Ore Price Setup",
+                description="Review and edit ore prices, then enter SCU amounts for calculation",
+                color=discord.Color.blue()
+            )
+            
+            # Show current price summary
+            price_summary = []
+            for ore_name, price_data in self.ore_prices.items():
+                if isinstance(price_data, dict) and 'max_price' in price_data:
+                    price = price_data['max_price']
+                    display_name = price_data.get('display_name', ore_name)
+                    price_summary.append(f"**{display_name}**: {price:,.0f} aUEC/SCU")
+                else:
+                    price_summary.append(f"**{ore_name}**: {price_data:,.0f} aUEC/SCU")
+            
+            if price_summary:
+                embed.add_field(
+                    name="Current UEX Prices",
+                    value="\n".join(price_summary),
+                    inline=False
+                )
+            
+            donation_count = len(self.donations)
+            embed.add_field(
+                name="Donation Status",
+                value=f"💰 {donation_count} participants donating their earnings",
+                inline=True
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=price_view)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error setting up prices: {str(e)}",
+                ephemeral=True
+            )
+
+
+class UEXPriceSetupView(discord.ui.View):
+    """View for editing UEX ore prices and entering SCU amounts."""
+    
+    def __init__(self, participants_data, event_id, ore_prices, donations):
+        super().__init__(timeout=300)  # 5 minute timeout
+        self.participants_data = participants_data
+        self.event_id = event_id
+        self.ore_prices = ore_prices.copy()  # Make editable copy
+        self.donations = donations
+        
+        # Add edit price buttons for each ore type
+        for ore_name, price_data in list(self.ore_prices.items())[:4]:  # Limit to 4 main ores
+            display_name = price_data.get('display_name', ore_name) if isinstance(price_data, dict) else ore_name
+            button = discord.ui.Button(
+                label=f"Edit {display_name[:15]}",
+                style=discord.ButtonStyle.secondary,
+                emoji="💎"
+            )
+            button.callback = self._create_price_edit_callback(ore_name)
+            self.add_item(button)
+        
+        # SCU amounts and calculation button
+        scu_button = discord.ui.Button(
+            label="Enter SCU Amounts & Calculate",
+            style=discord.ButtonStyle.primary,
+            emoji="⚖️",
+            row=2
+        )
+        scu_button.callback = self.enter_scu_amounts
+        self.add_item(scu_button)
+    
+    def _create_price_edit_callback(self, ore_name):
+        """Create callback for price editing."""
+        async def callback(interaction):
+            price_data = self.ore_prices[ore_name]
+            current_price = price_data.get('max_price', price_data) if isinstance(price_data, dict) else price_data
+            display_name = price_data.get('display_name', ore_name) if isinstance(price_data, dict) else ore_name
+            
+            modal = PriceEditModal(ore_name, display_name, current_price, self)
+            await interaction.response.send_modal(modal)
+        
+        return callback
+    
+    async def enter_scu_amounts(self, interaction: discord.Interaction):
+        """Show modal for SCU amounts and final calculation."""
+        try:
+            modal = EnhancedPayrollCalculationModal(
+                self.participants_data, 
+                self.event_id, 
+                self.ore_prices, 
+                self.donations
+            )
+            await interaction.response.send_modal(modal)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error opening SCU calculation: {str(e)}",
+                ephemeral=True
+            )
+
+
+class PriceEditModal(discord.ui.Modal, title='Edit Ore Price'):
+    """Modal for editing individual ore prices."""
+    
+    def __init__(self, ore_name, display_name, current_price, parent_view):
+        super().__init__(timeout=300)
+        self.ore_name = ore_name
+        self.parent_view = parent_view
+        
+        self.price_input = discord.ui.TextInput(
+            label=f'{display_name} Price (aUEC per SCU)',
+            placeholder=f'Current: {current_price:,.0f} aUEC/SCU',
+            default=str(int(current_price)),
+            max_length=10,
+            required=True
+        )
+        self.add_item(self.price_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Update the ore price."""
+        try:
+            new_price = float(self.price_input.value.replace(',', ''))
+            
+            # Update price in parent view
+            if isinstance(self.parent_view.ore_prices[self.ore_name], dict):
+                self.parent_view.ore_prices[self.ore_name]['max_price'] = new_price
+            else:
+                self.parent_view.ore_prices[self.ore_name] = new_price
+            
+            # Update embed to show new prices
+            embed = discord.Embed(
+                title="💎 UEX Ore Price Setup - Updated",
+                description="Ore price updated successfully. Review prices and continue to SCU calculation.",
+                color=discord.Color.green()
+            )
+            
+            # Show updated price summary
+            price_summary = []
+            for ore_name, price_data in self.parent_view.ore_prices.items():
+                if isinstance(price_data, dict) and 'max_price' in price_data:
+                    price = price_data['max_price']
+                    display_name = price_data.get('display_name', ore_name)
+                    prefix = "🆕 " if ore_name == self.ore_name else ""
+                    price_summary.append(f"{prefix}**{display_name}**: {price:,.0f} aUEC/SCU")
+                else:
+                    prefix = "🆕 " if ore_name == self.ore_name else ""
+                    price_summary.append(f"{prefix}**{ore_name}**: {price_data:,.0f} aUEC/SCU")
+            
+            embed.add_field(
+                name="Updated UEX Prices",
+                value="\n".join(price_summary),
+                inline=False
+            )
+            
+            donation_count = len(self.parent_view.donations)
+            embed.add_field(
+                name="Donation Status",
+                value=f"💰 {donation_count} participants donating their earnings",
+                inline=True
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=self.parent_view)
+            
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ Invalid price format: {self.price_input.value}",
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error updating price: {str(e)}",
+                ephemeral=True
+            )
+
+
 class EventSelectionView(discord.ui.View):
     """View for selecting which mining event to process payroll for."""
     
@@ -78,22 +378,92 @@ class EventSelectionView(discord.ui.View):
             self.add_item(self.event_select)
     
     async def event_selected(self, interaction: discord.Interaction):
-        """Handle event selection."""
+        """Handle event selection - now starts enhanced workflow."""
         try:
             selected_event_id = int(self.event_select.values[0])
             
-            # Get ore prices for the modal
+            # Get participants for the event
+            participants_data = await self._get_event_participants(selected_event_id)
+            if not participants_data:
+                await interaction.response.send_message(
+                    "❌ No participants found for this mining event",
+                    ephemeral=True
+                )
+                return
+            
+            # Get ore prices
             ore_prices = await self._fetch_uex_prices()
             
-            # Show payroll calculation modal for selected event
-            modal = PayrollCalculationModal(ore_prices, selected_event_id)
-            await interaction.response.send_modal(modal)
+            # Show participant donation selection view
+            donation_view = ParticipantDonationView(participants_data, selected_event_id, ore_prices)
+            
+            embed = discord.Embed(
+                title="👥 Select Participants for Donation",
+                description=f"Found **{len(participants_data)}** participants in this mining event.\n\n"
+                           "Select participants who want to **donate their earnings** to others.\n"
+                           "Donated amounts will be redistributed among non-donating participants.",
+                color=discord.Color.blue()
+            )
+            
+            # Show participant preview
+            participant_preview = []
+            for member_id, data in list(participants_data.items())[:10]:
+                hours = data['hours']
+                participant_preview.append(f"• **{data['username']}** - {hours:.1f} hours")
+            
+            embed.add_field(
+                name=f"Participants ({len(participants_data)} total)",
+                value="\n".join(participant_preview) + (f"\n+ {len(participants_data) - 10} more..." if len(participants_data) > 10 else ""),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="How Donations Work",
+                value="• Selected participants donate their calculated earnings\n"
+                      "• Donations are redistributed to remaining participants\n" 
+                      "• Final payouts reflect both original earnings + donation bonuses",
+                inline=False
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=donation_view)
             
         except Exception as e:
             await interaction.response.send_message(
                 f"❌ Error selecting event: {str(e)}",
                 ephemeral=True
             )
+    
+    async def _get_event_participants(self, event_id):
+        """Get participants for a specific event."""
+        try:
+            from database.operations import get_mining_session_participants
+            from config.settings import get_database_url
+            
+            db_url = get_database_url()
+            if not db_url:
+                return None
+            
+            participants_data = get_mining_session_participants(db_url, event_id=event_id)
+            if not participants_data:
+                return None
+            
+            participants = {}
+            for member_id, username, total_time_seconds, primary_channel_id, last_activity, is_org_member in participants_data:
+                if total_time_seconds > 30:  # Minimum 30 seconds participation
+                    participants[int(member_id)] = {
+                        'username': username,
+                        'duration': total_time_seconds,
+                        'is_org_member': is_org_member,
+                        'hours': total_time_seconds / 3600,
+                        'primary_channel': primary_channel_id,
+                        'last_activity': last_activity
+                    }
+            
+            return participants
+            
+        except Exception as e:
+            print(f"Error getting event participants: {e}")
+            return None
     
     async def _fetch_uex_prices(self):
         """Fetch current UEX ore prices using cached data."""
@@ -131,8 +501,349 @@ class EventSelectionView(discord.ui.View):
             return {}
 
 
+class EnhancedPayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Final Payroll Calculation'):
+    """Enhanced modal with donation support and custom UEX prices."""
+    
+    def __init__(self, participants_data, event_id, ore_prices, donations):
+        super().__init__(timeout=300)  # 5 minute timeout
+        self.participants_data = participants_data
+        self.event_id = event_id
+        self.ore_prices = ore_prices
+        self.donations = donations
+        
+        # Show donation summary in modal description
+        donation_count = len(donations)
+        total_participants = len(participants_data)
+        
+        # Total value field - pre-filled with calculation but editable
+        self.total_value = discord.ui.TextInput(
+            label='Total Mining Value (aUEC) - Editable',
+            placeholder='Auto-calculated from custom UEX prices + SCU amounts, or enter manually',
+            max_length=15,
+            required=True
+        )
+        
+        # Ore amounts field for SCU tracking
+        self.ore_amounts = discord.ui.TextInput(
+            label='Ore Amounts (SCU)',
+            placeholder='e.g., Quantanium: 50, Laranite: 100, Beryl: 75',
+            style=discord.TextStyle.paragraph,
+            max_length=1000,
+            required=True
+        )
+        
+        # Donation summary field (read-only)
+        donation_summary = f"{donation_count} participants donating earnings to {total_participants - donation_count} recipients"
+        self.donation_info = discord.ui.TextInput(
+            label=f'Donation Summary ({donation_count} donors)',
+            placeholder='Donation earnings will be redistributed automatically',
+            default=donation_summary,
+            max_length=100,
+            required=False
+        )
+        
+        self.add_item(self.total_value)
+        self.add_item(self.ore_amounts) 
+        self.add_item(self.donation_info)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Calculate and display enhanced payroll distribution with donations."""
+        try:
+            # Calculate total value from ore amounts using custom UEX prices
+            total_value = 0
+            
+            if self.ore_amounts.value:
+                calculated_value = await self._calculate_total_value_from_ores(self.ore_amounts.value)
+                if calculated_value and calculated_value > 0:
+                    if not self.total_value.value or self.total_value.value.lower() == "calculate":
+                        total_value = calculated_value
+                    else:
+                        try:
+                            total_value = float(self.total_value.value.replace(',', ''))
+                        except ValueError:
+                            total_value = calculated_value
+            
+            if total_value <= 0:
+                try:
+                    total_value = float(self.total_value.value.replace(',', ''))
+                    if total_value <= 0:
+                        await interaction.response.send_message(
+                            "❌ Total value must be greater than 0",
+                            ephemeral=True
+                        )
+                        return
+                except ValueError:
+                    await interaction.response.send_message(
+                        f"❌ Invalid total value format: {self.total_value.value}",
+                        ephemeral=True
+                    )
+                    return
+            
+            # Calculate enhanced participation shares with donations
+            distribution_data = await self._calculate_enhanced_participation_shares(total_value)
+            
+            if not distribution_data:
+                await interaction.response.send_message(
+                    "❌ No valid participants for payroll distribution",
+                    ephemeral=True
+                )
+                return
+            
+            # Create enhanced payroll embed
+            embed = await self._create_enhanced_payroll_embed(
+                distribution_data, 
+                total_value,
+                self.ore_amounts.value
+            )
+            
+            # Finalize event
+            await self._finalize_event(total_value, self.ore_amounts.value, interaction)
+            
+            await interaction.response.send_message(embed=embed)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error calculating enhanced payroll: {str(e)}",
+                ephemeral=True
+            )
+            import traceback
+            traceback.print_exc()
+    
+    async def _calculate_total_value_from_ores(self, ore_text):
+        """Calculate total value from ore amounts using custom UEX prices."""
+        try:
+            if not self.ore_prices:
+                return None
+            
+            total_value = 0
+            ore_breakdown = []
+            
+            # Parse ore amounts from text
+            ore_entries = ore_text.split(',')
+            
+            for entry in ore_entries:
+                if ':' not in entry:
+                    continue
+                
+                ore_name, amount_str = entry.split(':', 1)
+                ore_name = ore_name.strip().upper()
+                
+                try:
+                    amount = float(amount_str.strip())
+                    
+                    # Find matching ore in our custom prices
+                    price_per_scu = None
+                    for price_ore_name, price_data in self.ore_prices.items():
+                        if ore_name in price_ore_name.upper():
+                            price_per_scu = price_data.get('max_price', price_data) if isinstance(price_data, dict) else price_data
+                            break
+                    
+                    if price_per_scu and amount > 0:
+                        ore_value = amount * price_per_scu
+                        total_value += ore_value
+                        ore_breakdown.append(f"{ore_name}: {amount} SCU × {price_per_scu:,.0f} = {ore_value:,.0f} aUEC")
+                    
+                except ValueError:
+                    continue
+            
+            print(f"✅ Enhanced ore calculation: {total_value:,.0f} aUEC total")
+            for line in ore_breakdown:
+                print(f"   {line}")
+            
+            return total_value
+            
+        except Exception as e:
+            print(f"Error calculating ore values with custom prices: {e}")
+            return None
+    
+    async def _calculate_enhanced_participation_shares(self, total_value):
+        """Calculate enhanced payroll with donation redistribution."""
+        try:
+            if not self.participants_data:
+                return None
+            
+            # Calculate base time shares
+            total_time = sum(data['duration'] for data in self.participants_data.values())
+            if total_time == 0:
+                return None
+            
+            # Step 1: Calculate base payouts for everyone
+            base_payouts = {}
+            donated_amount = 0
+            recipient_ids = []
+            
+            for member_id, data in self.participants_data.items():
+                time_share = data['duration'] / total_time
+                base_payout = total_value * time_share
+                
+                if member_id in self.donations:
+                    # This participant is donating their earnings
+                    donated_amount += base_payout
+                    base_payouts[member_id] = {
+                        'base_payout': base_payout,
+                        'final_payout': 0,  # Donating everything
+                        'donation_bonus': 0,
+                        'is_donor': True,
+                        **data
+                    }
+                else:
+                    # This participant will receive donations
+                    recipient_ids.append(member_id)
+                    base_payouts[member_id] = {
+                        'base_payout': base_payout,
+                        'final_payout': base_payout,  # Will be increased by donation bonus
+                        'donation_bonus': 0,  # To be calculated
+                        'is_donor': False,
+                        **data
+                    }
+            
+            # Step 2: Redistribute donated amount among recipients
+            if donated_amount > 0 and recipient_ids:
+                # Calculate recipient time share (only among non-donors)
+                recipient_total_time = sum(self.participants_data[rid]['duration'] for rid in recipient_ids)
+                
+                for member_id in recipient_ids:
+                    if recipient_total_time > 0:
+                        recipient_time_share = self.participants_data[member_id]['duration'] / recipient_total_time
+                        donation_bonus = donated_amount * recipient_time_share
+                        
+                        base_payouts[member_id]['donation_bonus'] = donation_bonus
+                        base_payouts[member_id]['final_payout'] += donation_bonus
+            
+            print(f"✅ Enhanced payroll calculated: {donated_amount:,.0f} aUEC donated by {len(self.donations)} participants")
+            
+            return {
+                'participants': base_payouts,
+                'total_donated': donated_amount,
+                'donor_count': len(self.donations),
+                'recipient_count': len(recipient_ids),
+                'total_value': total_value
+            }
+            
+        except Exception as e:
+            print(f"Error calculating enhanced participation shares: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    async def _create_enhanced_payroll_embed(self, distribution_data, total_value, ore_amounts):
+        """Create enhanced payroll embed showing donations."""
+        try:
+            participants = distribution_data['participants']
+            total_donated = distribution_data['total_donated']
+            donor_count = distribution_data['donor_count']
+            recipient_count = distribution_data['recipient_count']
+            
+            embed = discord.Embed(
+                title="💰 Enhanced Sunday Mining Payroll Distribution",
+                description=f"**Total Mining Value:** {total_value:,.0f} aUEC\n"
+                           f"**💸 Total Donated:** {total_donated:,.0f} aUEC by {donor_count} miners\n"
+                           f"**🎁 Recipients:** {recipient_count} miners receiving donation bonuses",
+                color=discord.Color.gold(),
+                timestamp=datetime.now()
+            )
+            
+            # Separate donors and recipients
+            donors = {k: v for k, v in participants.items() if v['is_donor']}
+            recipients = {k: v for k, v in participants.items() if not v['is_donor']}
+            
+            # Show recipients with bonuses
+            if recipients:
+                recipient_lines = []
+                for member_id, data in sorted(recipients.items(), key=lambda x: x[1]['final_payout'], reverse=True)[:15]:
+                    base = data['base_payout']
+                    bonus = data['donation_bonus']
+                    final = data['final_payout']
+                    hours = data['hours']
+                    
+                    if bonus > 0:
+                        recipient_lines.append(f"• **{data['username']}** - {final:,.0f} aUEC ({hours:.1f}h) *+{bonus:,.0f} bonus*")
+                    else:
+                        recipient_lines.append(f"• **{data['username']}** - {final:,.0f} aUEC ({hours:.1f}h)")
+                
+                embed.add_field(
+                    name=f"🎁 Recipients ({len(recipients)} miners)",
+                    value="\n".join(recipient_lines),
+                    inline=False
+                )
+            
+            # Show donors
+            if donors:
+                donor_lines = []
+                for member_id, data in donors.items():
+                    donated = data['base_payout']
+                    hours = data['hours']
+                    donor_lines.append(f"• **{data['username']}** - Donated {donated:,.0f} aUEC ({hours:.1f}h) 💝")
+                
+                embed.add_field(
+                    name=f"💝 Generous Donors ({len(donors)} miners)",
+                    value="\n".join(donor_lines),
+                    inline=False
+                )
+            
+            # Show ore breakdown if available
+            if ore_amounts:
+                embed.add_field(
+                    name="⛏️ Ore Collection Summary",
+                    value=f"```{ore_amounts}```",
+                    inline=False
+                )
+            
+            # Summary stats
+            total_participants = len(participants)
+            avg_payout = sum(p['final_payout'] for p in participants.values()) / len(recipients) if recipients else 0
+            
+            embed.add_field(name="📊 Summary", value=(
+                f"**Total Participants:** {total_participants}\n"
+                f"**Average Payout:** {avg_payout:,.0f} aUEC\n"
+                f"**Donation Rate:** {(donor_count/total_participants*100):.1f}%"
+            ), inline=True)
+            
+            embed.set_footer(text="Enhanced Payroll System • Donations redistributed based on participation time")
+            
+            return embed
+            
+        except Exception as e:
+            print(f"Error creating enhanced payroll embed: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    async def _finalize_event(self, total_value, ore_amounts, interaction):
+        """Finalize the mining event with enhanced data."""
+        try:
+            # Update event in database with final totals
+            from config.settings import get_database_url
+            from database.connection import get_legacy_connection
+            
+            db_url = get_database_url()
+            if not db_url:
+                return
+            
+            conn = get_legacy_connection(db_url)
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE mining_events 
+                    SET total_value_auec = %s, 
+                        status = 'completed',
+                        payroll_processed = true,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE event_id = %s
+                """, (total_value, self.event_id))
+                
+                conn.commit()
+            conn.close()
+            
+            print(f"✅ Enhanced mining event {self.event_id} finalized with {total_value:,.0f} aUEC")
+            
+        except Exception as e:
+            print(f"Error finalizing enhanced event: {e}")
+            import traceback
+            traceback.print_exc()
+
+
 class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll Calculation'):
-    """Modal for payroll officer to enter total mining haul and calculate shares."""
+    """Legacy modal for payroll officer to enter total mining haul and calculate shares."""
     
     def __init__(self, ore_prices=None, event_id=None):
         super().__init__(timeout=300)  # 5 minute timeout
