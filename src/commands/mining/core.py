@@ -482,14 +482,42 @@ class EventSelectionView(discord.ui.View):
             for code, data in cached_prices.items():
                 ore_name = data.get('name', code).upper()
                 
-                # Only process ores we care about
-                if ore_name in ORE_TYPES and data.get('price_sell', 0) > 0:
-                    ore_prices[ore_name] = {
+                print(f"🔍 Processing cache item: {code} -> {ore_name} (price: {data.get('price_sell', 0)})")
+                
+                # Try multiple matching strategies for ORE_TYPES
+                matched_key = None
+                
+                # Strategy 1: Direct name match
+                if ore_name in ORE_TYPES:
+                    matched_key = ore_name
+                
+                # Strategy 2: Code match
+                if not matched_key and code.upper() in ORE_TYPES:
+                    matched_key = code.upper()
+                
+                # Strategy 3: Partial name matching (remove " (ORE)" suffix etc)
+                if not matched_key:
+                    clean_name = ore_name.replace(' (ORE)', '').replace(' (RAW)', '').strip()
+                    if clean_name in ORE_TYPES:
+                        matched_key = clean_name
+                
+                # Strategy 4: Look for any ORE_TYPES key contained in the name
+                if not matched_key:
+                    for ore_key in ORE_TYPES.keys():
+                        if ore_key in ore_name or ore_name in ore_key:
+                            matched_key = ore_key
+                            break
+                
+                if matched_key and data.get('price_sell', 0) > 0:
+                    ore_prices[matched_key] = {
                         'max_price': float(data['price_sell']),
-                        'display_name': ORE_TYPES[ore_name],
+                        'display_name': ORE_TYPES[matched_key],
                         'code': data.get('code', code),
                         'kind': 'commodity'
                     }
+                    print(f"✅ Matched {ore_name} -> {matched_key}: {data['price_sell']}")
+                else:
+                    print(f"❌ No match for {ore_name} (code: {code})")
             
             print(f"✅ Retrieved {len(ore_prices)} ore prices from cache")
             return ore_prices

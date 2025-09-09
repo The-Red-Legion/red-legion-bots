@@ -170,6 +170,9 @@ class UEXCache:
     async def _fetch_uex_api(self, category: str) -> Optional[Dict]:
         """Make actual API call to UEX."""
         try:
+            print(f"🔍 Attempting UEX API call for category: {category}")
+            print(f"🔍 API URL: {UEX_API_CONFIG['base_url']}")
+            
             headers = {
                 'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
                 'Accept': 'application/json'
@@ -182,16 +185,26 @@ class UEXCache:
             
             connector = aiohttp.TCPConnector(ssl=ssl_context)
             async with aiohttp.ClientSession(connector=connector) as session:
+                print(f"🌐 Making HTTP GET request to UEX API...")
                 async with session.get(
                     UEX_API_CONFIG['base_url'], 
                     headers=headers,
                     timeout=UEX_API_CONFIG.get('timeout', 30)
                 ) as response:
+                    print(f"📡 UEX API response status: {response.status}")
+                    
                     if response.status == 200:
+                        print(f"✅ UEX API request successful, parsing JSON...")
                         data = await response.json()
-                        return self._process_uex_data(data, category)
+                        print(f"🔍 Raw data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+                        
+                        processed = self._process_uex_data(data, category)
+                        print(f"✅ Processed {len(processed)} items for category {category}")
+                        return processed
                     else:
                         print(f"❌ UEX API returned status {response.status}")
+                        response_text = await response.text()
+                        print(f"❌ Response body: {response_text[:200]}...")
                         return None
                         
         except asyncio.TimeoutError:
@@ -219,41 +232,22 @@ class UEXCache:
                 name = item.get('name', 'Unknown')
                 code = item.get('code', 'UNKNOWN')
                 
-                # Get price information
-                locations = item.get('locations', [])
-                if not locations:
+                # Get price information directly from item (UEX API v2.0 structure)
+                sell_price = item.get('price_sell', 0)
+                buy_price = item.get('price_buy', 0)
+                
+                # Skip items with no sell price
+                if sell_price <= 0:
                     continue
-                
-                # Find highest sell price
-                best_sell_price = 0
-                best_buy_price = 0
-                price_locations = []
-                
-                for location in locations:
-                    sell_price = location.get('price_sell', 0)
-                    buy_price = location.get('price_buy', 0)
-                    location_name = location.get('name', 'Unknown Location')
-                    
-                    if sell_price > best_sell_price:
-                        best_sell_price = sell_price
-                    
-                    if buy_price > best_buy_price:
-                        best_buy_price = buy_price
-                    
-                    price_locations.append({
-                        'name': location_name,
-                        'sell_price': sell_price,
-                        'buy_price': buy_price
-                    })
                 
                 # Filter by category
                 if self._should_include_item(name, code, category):
                     processed[code] = {
                         'name': name,
                         'code': code,
-                        'price_sell': best_sell_price,
-                        'price_buy': best_buy_price,
-                        'locations': price_locations,
+                        'price_sell': sell_price,
+                        'price_buy': buy_price,
+                        'locations': [{'name': 'Best Available Price', 'sell_price': sell_price, 'buy_price': buy_price}],  # Simple location for compatibility
                         'updated': datetime.now().isoformat()
                     }
                     
