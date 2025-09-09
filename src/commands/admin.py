@@ -160,47 +160,106 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"❌ Failed to list mining channels: {str(e)}")
 
     @app_commands.command(name="redsyncommands", description="Force sync Discord slash commands (Admin only)")
+    @app_commands.describe(
+        guild_only="Sync commands only to this guild (faster) or globally (slower)"
+    )
     @app_commands.default_permissions(administrator=True)
-    async def sync_commands(self, interaction: discord.Interaction):
-        """Force sync Discord slash commands"""
+    async def sync_commands(self, interaction: discord.Interaction, guild_only: bool = True):
+        """Force sync slash commands to Discord."""
         try:
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             
-            # Sync commands
-            synced = await self.bot.tree.sync()
+            start_time = datetime.now()
+            
+            if guild_only:
+                # Guild-specific sync (much faster, appears immediately)
+                synced = await self.bot.tree.sync(guild=interaction.guild)
+                sync_type = f"guild '{interaction.guild.name}'"
+            else:
+                # Global sync (slower, takes 1-10 minutes)
+                synced = await self.bot.tree.sync()
+                sync_type = "globally"
+            
+            sync_duration = (datetime.now() - start_time).total_seconds()
             
             embed = discord.Embed(
-                title="🔄 Command Sync Complete",
-                description=f"Successfully synced {len(synced)} slash commands with Discord",
+                title="🔄 Commands Synced",
+                description=f"Successfully synced {len(synced)} slash commands {sync_type}",
                 color=discord.Color.green(),
                 timestamp=datetime.now()
             )
             
-            # List some of the synced commands
-            if synced:
-                command_list = []
-                for i, cmd in enumerate(synced[:10]):  # Show first 10
-                    command_list.append(f"• {cmd.name}")
-                
-                if len(synced) > 10:
-                    command_list.append(f"• ... and {len(synced) - 10} more")
-                
+            embed.add_field(
+                name="⚡ Sync Duration",
+                value=f"{sync_duration:.1f} seconds",
+                inline=True
+            )
+            
+            if guild_only:
                 embed.add_field(
-                    name="Synced Commands",
-                    value="\n".join(command_list),
+                    name="📍 Availability",
+                    value="Commands available immediately in this server",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="🌍 Availability",
+                    value="Commands will appear globally in 1-10 minutes",
+                    inline=True
+                )
+            
+            # List synced commands
+            command_list = []
+            red_commands = []
+            other_commands = []
+            
+            for cmd in synced:
+                if hasattr(cmd, 'name'):
+                    if cmd.name.startswith('red'):
+                        red_commands.append(f"/{cmd.name}")
+                    else:
+                        other_commands.append(f"/{cmd.name}")
+                    command_list.append(f"/{cmd.name}")
+            
+            if red_commands:
+                if len(red_commands) <= 15:
+                    embed.add_field(
+                        name=f"✅ Red Legion Commands ({len(red_commands)})",
+                        value="\n".join(sorted(red_commands)),
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name=f"✅ Red Legion Commands ({len(red_commands)})",
+                        value="\n".join(sorted(red_commands)[:15]) + f"\n...and {len(red_commands) - 15} more",
+                        inline=False
+                    )
+            
+            if other_commands:
+                embed.add_field(
+                    name=f"⚠️ Other Commands ({len(other_commands)})",
+                    value="\n".join(sorted(other_commands)[:10]),
                     inline=False
                 )
             
             embed.add_field(
-                name="⏰ Note",
-                value="Discord may take a few minutes to update the slash command menu",
+                name="🧪 Quick Test",
+                value="Try typing `/red` to see available commands",
                 inline=False
             )
             
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, ephemeral=True)
             
         except Exception as e:
-            await interaction.followup.send(f"❌ Failed to sync commands: {str(e)}")
+            error_embed = discord.Embed(
+                title="❌ Sync Failed",
+                description=f"Error syncing commands: {str(e)}",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            await interaction.followup.send(embed=error_embed, ephemeral=True)
+            import traceback
+            print(f"Command sync error: {traceback.format_exc()}")
 
 
 async def setup(bot):
