@@ -88,7 +88,7 @@ def resolve_database_url(database_url: str) -> str:
             encoded_password = quote(password, safe='')
             
             # Get database name from the path, default to the production database
-            database_name = parsed.path.lstrip('/') if parsed.path else 'arccorp_data_store'
+            database_name = parsed.path.lstrip('/') if parsed.path else 'red_legion_arccorp_data_store'
             resolved_url = f"postgresql://{CLOUD_SQL_USERNAME}:{encoded_password}@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}"
             
             logger.info(f"Resolved database URL: postgresql://{CLOUD_SQL_USERNAME}:***@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}")
@@ -106,7 +106,7 @@ def resolve_database_url(database_url: str) -> str:
             password = _get_db_password_from_secrets()
             from urllib.parse import quote
             encoded_password = quote(password, safe='')
-            fallback_url = f"postgresql://arccorp_sys_admin:{encoded_password}@10.92.0.3:5432/arccorp_data_store"
+            fallback_url = f"postgresql://arccorp_sys_admin:{encoded_password}@10.92.0.3:5432/red_legion_arccorp_data_store"
             logger.info("Using fallback URL with secrets manager password")
             return fallback_url
         except:

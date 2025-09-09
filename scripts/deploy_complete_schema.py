@@ -80,7 +80,7 @@ def get_resolved_database_url(database_url):
             port = parsed.port if parsed.port else 5432
             
             # Get database name from the path, default to the production database
-            database_name = parsed.path.lstrip('/') if parsed.path else 'arccorp_data_store'
+            database_name = parsed.path.lstrip('/') if parsed.path else 'red_legion_arccorp_data_store'
             resolved_url = f"postgresql://{CLOUD_SQL_USERNAME}:{encoded_password}@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}"
             
             logger.info(f"Resolved database URL: postgresql://{CLOUD_SQL_USERNAME}:***@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}")
