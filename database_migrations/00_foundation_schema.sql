@@ -202,11 +202,44 @@ CREATE INDEX IF NOT EXISTS idx_events_guild ON events(guild_id);
 CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
 CREATE INDEX IF NOT EXISTS idx_events_open ON events(is_open);
 
-CREATE INDEX IF NOT EXISTS idx_mining_participation_event ON mining_participation(event_id);
-CREATE INDEX IF NOT EXISTS idx_mining_participation_user ON mining_participation(member_id);
-CREATE INDEX IF NOT EXISTS idx_mining_participation_channel ON mining_participation(channel_id);
-CREATE INDEX IF NOT EXISTS idx_mining_participation_session ON mining_participation(session_start, session_end);
-CREATE INDEX IF NOT EXISTS idx_mining_participation_org_member ON mining_participation(is_org_member);
+-- Create indexes safely with error handling
+DO $$
+BEGIN
+    CREATE INDEX IF NOT EXISTS idx_mining_participation_event ON mining_participation(event_id);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Could not create index idx_mining_participation_event: %', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+    CREATE INDEX IF NOT EXISTS idx_mining_participation_user ON mining_participation(member_id);
+EXCEPTION WHEN undefined_column THEN
+    RAISE NOTICE 'Column member_id does not exist in mining_participation - creating index on user_id instead';
+    CREATE INDEX IF NOT EXISTS idx_mining_participation_user ON mining_participation(user_id);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Could not create index idx_mining_participation_user: %', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+    CREATE INDEX IF NOT EXISTS idx_mining_participation_channel ON mining_participation(channel_id);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Could not create index idx_mining_participation_channel: %', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+    CREATE INDEX IF NOT EXISTS idx_mining_participation_session ON mining_participation(session_start, session_end);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Could not create index idx_mining_participation_session: %', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+    CREATE INDEX IF NOT EXISTS idx_mining_participation_org_member ON mining_participation(is_org_member);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Could not create index idx_mining_participation_org_member: %', SQLERRM;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_loans_guild_borrower ON loans(guild_id, borrower_id);
 CREATE INDEX IF NOT EXISTS idx_loans_status ON loans(status);
