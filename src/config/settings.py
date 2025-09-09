@@ -129,13 +129,34 @@ def validate_config():
     
     return True
 
-# Mining Materials List
-ORE_TYPES = [
-    "Stileron", "Quantainium", "Riccite", "Taranite", "Bexalite",
-    "Gold", "Borase", "Laranite", "Beryl", "Agricium",
-    "Hephaestanite", "Tungsten", "Titanium", "Iron", "Quartz",
-    "Corundum", "Copper", "Tin", "Aluminum", "Silicon"
-]
+# Mining Materials - Common ore names for payroll calculations
+ORE_TYPES = {
+    # High-value ores
+    "QUANTAINIUM": "Quantainium",
+    "STILERON": "Stileron", 
+    "RICCITE": "Riccite",
+    "TARANITE": "Taranite",
+    "BEXALITE": "Bexalite",
+    
+    # Mid-value ores  
+    "GOLD": "Gold",
+    "BORASE": "Borase",
+    "LARANITE": "Laranite",
+    "BERYL": "Beryl",
+    "AGRICIUM": "Agricium",
+    "HEPHAESTANITE": "Hephaestanite",
+    
+    # Common ores
+    "TUNGSTEN": "Tungsten",
+    "TITANIUM": "Titanium", 
+    "IRON": "Iron",
+    "QUARTZ": "Quartz",
+    "CORUNDUM": "Corundum",
+    "COPPER": "Copper",
+    "TIN": "Tin",
+    "ALUMINUM": "Aluminum",
+    "SILICON": "Silicon"
+}
 
 # Sunday Mining Configuration
 SUNDAY_MINING_CHANNELS_FALLBACK = {

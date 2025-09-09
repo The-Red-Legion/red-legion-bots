@@ -96,28 +96,61 @@ class EventSelectionView(discord.ui.View):
             )
     
     async def _fetch_uex_prices(self):
-        """Fetch current UEX ore prices."""
+        """Fetch current UEX ore prices - uses highest sell price per SCU."""
         try:
-            headers = {'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}'}
+            headers = {
+                'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
+                'Accept': 'application/json'
+            }
             
-            async with aiohttp.ClientSession() as session:
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(
                     UEX_API_CONFIG['base_url'], 
-                    headers=headers
+                    headers=headers,
+                    timeout=UEX_API_CONFIG.get('timeout', 30)
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
                         ore_prices = {}
                         
+                        # Track highest prices per ore (multiple entries per ore across locations)
                         for commodity in data.get('data', []):
                             commodity_name = commodity.get('name', '').upper()
-                            if commodity_name in ORE_TYPES:
-                                ore_prices[commodity_name] = commodity.get('price_sell', 0)
+                            
+                            # Only process mineral ores we care about
+                            if (commodity.get('is_mineral') == 1 and 
+                                commodity.get('is_extractable') == 1 and
+                                commodity_name in ORE_TYPES):
+                                
+                                # Use sell price (what miners get when selling)
+                                price = float(commodity.get('price_sell', 0))
+                                
+                                if price > 0:
+                                    # Keep highest price for each ore across all locations
+                                    if commodity_name not in ore_prices or price > ore_prices[commodity_name]['max_price']:
+                                        ore_prices[commodity_name] = {
+                                            'max_price': price,
+                                            'display_name': ORE_TYPES[commodity_name],
+                                            'code': commodity.get('code', ''),
+                                            'kind': commodity.get('kind', '')
+                                        }
                         
+                        print(f"✅ Fetched {len(ore_prices)} ore prices from UEX API")
                         return ore_prices
+                    else:
+                        print(f"❌ UEX API error: HTTP {response.status}")
+                        return {}
                     
         except Exception as e:
-            print(f"Error fetching UEX prices: {e}")
+            print(f"❌ Error fetching UEX prices: {e}")
+            import traceback
+            traceback.print_exc()
         
         return {}
 
@@ -311,13 +344,10 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
             for member_id, data in participants.items():
                 time_share = data['duration'] / total_time
                 
-                # Apply org member bonus (org members get 100%, guests get 80%)
-                if data['is_org_member']:
-                    effective_share = time_share
-                else:
-                    effective_share = time_share * 0.8  # 20% reduction for non-org members
-                
+                # Equal pay for all participants - no guest penalty
+                effective_share = time_share
                 payout = total_value * effective_share
+                
                 data['time_share'] = time_share
                 data['effective_share'] = effective_share
                 data['payout'] = payout
@@ -399,7 +429,8 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
             value="• Payouts based on voice channel participation time\n"
                   "• Minimum 30 seconds participation required\n"
                   "• Time share = Individual time ÷ Total time\n"
-                  "• Payout = Total value × Time share",
+                  "• Payout = Total value × Time share\n"
+                  "• **Equal pay for all participants** (no guest penalties)",
             inline=False
         )
         
@@ -971,37 +1002,63 @@ class SundayMiningCommands(commands.Cog):
             print(f"✅ Auto-ended Sunday mining session: {current_session['session_id']}")
     
     async def _fetch_uex_prices(self) -> Optional[Dict]:
-        """Fetch current ore prices from UEX API."""
+        """Fetch current ore prices from UEX API - uses highest sell price per SCU."""
         try:
             headers = {
                 'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
                 'Accept': 'application/json'
             }
             
-            async with aiohttp.ClientSession() as session:
-                async with session.get(UEX_API_CONFIG['base_url'], headers=headers) as response:
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.get(
+                    UEX_API_CONFIG['base_url'], 
+                    headers=headers,
+                    timeout=UEX_API_CONFIG.get('timeout', 30)
+                ) as response:
                     if response.status == 200:
                         data = await response.json()
-                        
-                        # Parse UEX data and map to our ore types
                         ore_prices = {}
+                        
+                        # Track highest prices per ore (multiple entries per ore across locations)
                         for commodity in data.get('data', []):
                             commodity_name = commodity.get('name', '').upper()
-                            if commodity_name in ORE_TYPES:
-                                ore_prices[commodity_name] = {
-                                    'max_price': float(commodity.get('price_max', 0)),
-                                    'min_price': float(commodity.get('price_min', 0)),
-                                    'avg_price': float(commodity.get('price_avg', 0)),
-                                    'display_name': ORE_TYPES[commodity_name]
-                                }
+                            
+                            # Only process mineral ores we care about
+                            if (commodity.get('is_mineral') == 1 and 
+                                commodity.get('is_extractable') == 1 and
+                                commodity_name in ORE_TYPES):
+                                
+                                # Use sell price (what miners get when selling)
+                                price = float(commodity.get('price_sell', 0))
+                                
+                                if price > 0:
+                                    # Keep highest price for each ore across all locations
+                                    if commodity_name not in ore_prices or price > ore_prices[commodity_name]['max_price']:
+                                        ore_prices[commodity_name] = {
+                                            'max_price': price,
+                                            'min_price': float(commodity.get('price_buy', 0)),
+                                            'avg_price': price,  # For display purposes
+                                            'display_name': ORE_TYPES[commodity_name],
+                                            'code': commodity.get('code', ''),
+                                            'kind': commodity.get('kind', '')
+                                        }
                         
+                        print(f"✅ Fetched {len(ore_prices)} ore prices from UEX API")
                         return ore_prices
                     else:
-                        print(f"UEX API error: {response.status}")
+                        print(f"❌ UEX API error: HTTP {response.status}")
                         return None
         
         except Exception as e:
-            print(f"Error fetching UEX prices: {e}")
+            print(f"❌ Error fetching UEX prices: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     async def _create_ore_prices_embed(self, ore_prices: Dict) -> discord.Embed:
