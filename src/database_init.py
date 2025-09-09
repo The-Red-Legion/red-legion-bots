@@ -38,8 +38,8 @@ def init_database_for_deployment(db_url=None):
         db_manager = initialize_database(db_url)
         logger.info("Global database manager initialized")
         
-        # Initialize schema using the properly initialized manager
-        if schema_init(db_url):
+        # Initialize schema using the existing manager (don't pass URL to avoid double initialization)
+        if schema_init():
             logger.info("✅ Database schema initialized successfully")
             return True
         else:

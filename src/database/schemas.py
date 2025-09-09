@@ -306,6 +306,40 @@ def init_database(database_url=None):
             
             cursor.execute(schema_sql)
             
+            # Add migration logic for missing columns
+            cursor.execute("""
+                -- Check if join_time column exists in mining_participation, add if missing
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                  WHERE table_name='mining_participation' AND column_name='join_time') THEN
+                        ALTER TABLE mining_participation ADD COLUMN join_time TIMESTAMP;
+                        -- Set default value for existing rows
+                        UPDATE mining_participation SET join_time = created_at WHERE join_time IS NULL;
+                        -- Make the column NOT NULL after setting values
+                        ALTER TABLE mining_participation ALTER COLUMN join_time SET NOT NULL;
+                    END IF;
+                END $$;
+                
+                -- Check if leave_time column exists in mining_participation, add if missing
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                  WHERE table_name='mining_participation' AND column_name='leave_time') THEN
+                        ALTER TABLE mining_participation ADD COLUMN leave_time TIMESTAMP;
+                    END IF;
+                END $$;
+                
+                -- Check if duration_minutes column exists in mining_participation, add if missing
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                  WHERE table_name='mining_participation' AND column_name='duration_minutes') THEN
+                        ALTER TABLE mining_participation ADD COLUMN duration_minutes INTEGER DEFAULT 0;
+                    END IF;
+                END $$;
+            """)
+            
         print("✅ Database schema initialized successfully")
         return True
         
