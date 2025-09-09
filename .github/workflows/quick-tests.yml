@@ -133,10 +133,10 @@ jobs:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
-          echo "🧪 Running Sunday Mining quick validation..."
+          echo "🧪 Running Sunday Mining quick validation (offline mode)..."
+          echo "ℹ️ Using offline tests - GitHub runners cannot access private GCP database"
           timeout 120 python3 test_sunday_mining_offline.py || echo "⚠️ Sunday Mining tests timed out or failed"
           echo "✅ Sunday Mining quick tests completed!"
 
