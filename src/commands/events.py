@@ -27,8 +27,9 @@ class EventManagement(commands.Cog):
     def __init__(self, bot):
         try:
             print("🔧 EventManagement.__init__ starting...")
+            super().__init__()  # Call parent Cog __init__
             self.bot = bot
-            print("✅ Event Management Cog initialized - step 1: bot assigned")
+            print("✅ Event Management Cog initialized - step 1: bot assigned and super() called")
             
             # Create command group as instance attribute
             self.events = app_commands.Group(name="red-events", description="Red Legion event management system")
