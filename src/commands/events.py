@@ -26,76 +26,15 @@ class EventManagement(commands.Cog):
     
     def __init__(self, bot):
         try:
+            print("🔧 EventManagement.__init__ starting...")
             self.bot = bot
-            print("✅ Event Management Cog initialized - step 1")
+            print("✅ Event Management Cog initialized - step 1: bot assigned")
             
             # Create command group as instance attribute
             self.events = app_commands.Group(name="red-events", description="Red Legion event management system")
             print(f"✅ Created events group: {self.events}")
             print(f"✅ self.events exists: {hasattr(self, 'events')}")
             
-            # Create commands with proper decorators and add them to the group
-            create_cmd = app_commands.Command(
-                name="create",
-                description="Create a new Red Legion event",
-                callback=self.create_event
-            )
-            print("✅ Created create_cmd")
-            create_cmd = app_commands.describe(
-                category="Event category",
-                name="Event name", 
-                description="Event description (optional)"
-            )(create_cmd)
-            print("✅ Applied describe to create_cmd")
-            create_cmd = app_commands.choices(category=[
-                app_commands.Choice(name="Mining", value="mining"),
-                app_commands.Choice(name="Training", value="training"),
-                app_commands.Choice(name="Combat Operations", value="combat_operations"),
-                app_commands.Choice(name="Salvage", value="salvage"),
-                app_commands.Choice(name="Miscellaneous", value="misc")
-            ])(create_cmd)
-            print("✅ Applied choices to create_cmd")
-            self.events.add_command(create_cmd)
-            print(f"✅ Added create command to events group")
-            
-            delete_cmd = app_commands.Command(
-                name="delete",
-                description="Delete a Red Legion event (Admin only)",
-                callback=self.delete_event
-            )
-            delete_cmd = app_commands.describe(event_id="ID of the event to delete")(delete_cmd)
-            delete_cmd = app_commands.default_permissions(administrator=True)(delete_cmd)
-            self.events.add_command(delete_cmd)
-            print(f"✅ Added delete command to events group")
-            
-            lookup_cmd = app_commands.Command(
-                name="lookup",
-                description="Look up Red Legion events by category and status",
-                callback=self.lookup_events
-            )
-            lookup_cmd = app_commands.describe(
-                category="Event category to filter by",
-                status="Event status to filter by (optional)",
-                event_id="Specific event ID to view details (optional)"
-            )(lookup_cmd)
-            lookup_cmd = app_commands.choices(category=[
-                app_commands.Choice(name="All Categories", value="all"),
-                app_commands.Choice(name="Mining", value="mining"),
-                app_commands.Choice(name="Training", value="training"),
-                app_commands.Choice(name="Combat Operations", value="combat_operations"),
-                app_commands.Choice(name="Salvage", value="salvage"),
-                app_commands.Choice(name="Miscellaneous", value="misc")
-            ], status=[
-                app_commands.Choice(name="All Statuses", value="all"),
-                app_commands.Choice(name="Upcoming", value="upcoming"),
-                app_commands.Choice(name="Active", value="active"),
-                app_commands.Choice(name="Completed", value="completed"),
-                app_commands.Choice(name="Cancelled", value="cancelled")
-            ])(lookup_cmd)
-            self.events.add_command(lookup_cmd)
-            print(f"✅ Added lookup command to events group")
-            print(f"✅ Final events group has {len(self.events.commands)} commands")
-            print(f"✅ Final self.events exists: {hasattr(self, 'events')}")
             print("✅ Event Management Cog initialized successfully!")
         except Exception as e:
             print(f"❌ Error in EventManagement.__init__: {e}")
@@ -946,24 +885,34 @@ class DeleteConfirmationView(discord.ui.View):
 async def setup(bot):
     """Setup function for discord.py extension loading."""
     print("🔧 Starting EventManagement setup...")
-    cog = EventManagement(bot)
-    print(f"🔧 Created cog, checking for events attribute: {hasattr(cog, 'events')}")
-    if hasattr(cog, 'events'):
-        print(f"🔧 cog.events exists: {cog.events}")
-        print(f"🔧 cog.events commands: {len(cog.events.commands)}")
-    else:
-        print("❌ cog.events does not exist!")
-        return
-        
-    await bot.add_cog(cog)
-    print("🔧 Added cog to bot")
     
-    # Add the command group to the bot's tree using the instance
     try:
-        bot.tree.add_command(cog.events)
-        print("✅ Event Management commands loaded")
-        print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
+        cog = EventManagement(bot)
+        print(f"🔧 Created cog successfully")
+        print(f"🔧 Checking for events attribute: {hasattr(cog, 'events')}")
+        
+        if hasattr(cog, 'events') and cog.events is not None:
+            print(f"🔧 cog.events exists: {cog.events}")
+            print(f"🔧 cog.events commands: {len(cog.events.commands)}")
+        else:
+            print("❌ cog.events does not exist or is None!")
+            # Let's try to manually create the command group
+            print("🔧 Attempting to manually create command group...")
+            cog.events = app_commands.Group(name="red-events", description="Red Legion event management system")
+            print(f"🔧 Manually created events group: {cog.events}")
+            
+        await bot.add_cog(cog)
+        print("🔧 Added cog to bot")
+        
+        # Add the command group to the bot's tree using the instance
+        if hasattr(cog, 'events') and cog.events is not None and len(cog.events.commands) > 0:
+            bot.tree.add_command(cog.events)
+            print("✅ Event Management commands loaded")
+            print(f"✅ Added red-events command group with {len(cog.events.commands)} subcommands")
+        else:
+            print("❌ Cannot add empty or None command group")
+            
     except Exception as e:
-        print(f"❌ Failed to add command group: {e}")
+        print(f"❌ Error in setup function: {e}")
         import traceback
         traceback.print_exc()
