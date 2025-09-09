@@ -1,0 +1,82 @@
+---
+# Apply a single database migration file
+# Called by database_migrations.yml for each migration
+
+- name: Display migration being applied
+  debug:
+    msg: "🔄 Applying migration: {{ migration_name }}"
+
+- name: Apply migration {{ migration_name }}
+  block:
+    - name: Execute migration SQL
+      command: |
+        python3 -c "
+        import sys
+        sys.path.insert(0, '{{ app_dir }}/src')
+        from config.settings import get_database_url
+        from database.connection import resolve_database_url
+        import psycopg2
+        
+        # Read migration file
+        with open('{{ migration_file.path }}', 'r') as f:
+            migration_sql = f.read()
+        
+        # Apply migration
+        db_url = get_database_url()
+        conn = psycopg2.connect(resolve_database_url(db_url))
+        
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(migration_sql)
+            conn.commit()
+            
+            # Record successful migration
+            with conn.cursor() as cursor:
+                cursor.execute('''
+                    INSERT INTO schema_migrations (migration_name, success, applied_at) 
+                    VALUES (%s, TRUE, CURRENT_TIMESTAMP)
+                    ON CONFLICT (migration_name) 
+                    DO UPDATE SET success = TRUE, applied_at = CURRENT_TIMESTAMP, error_message = NULL
+                ''', ('{{ migration_name }}',))
+            conn.commit()
+            print('SUCCESS')
+            
+        except Exception as e:
+            conn.rollback()
+            # Record failed migration
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute('''
+                        INSERT INTO schema_migrations (migration_name, success, error_message, applied_at) 
+                        VALUES (%s, FALSE, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (migration_name) 
+                        DO UPDATE SET success = FALSE, error_message = %s, applied_at = CURRENT_TIMESTAMP
+                    ''', ('{{ migration_name }}', str(e), str(e)))
+                conn.commit()
+            except:
+                pass  # If we can't record the failure, continue anyway
+            
+            print(f'ERROR: {e}')
+            raise e
+            
+        finally:
+            conn.close()
+        "
+      args:
+        chdir: "{{ app_dir }}"
+      register: migration_result
+      failed_when: migration_result.stdout.startswith('ERROR')
+
+    - name: Migration {{ migration_name }} successful
+      debug:
+        msg: "✅ Migration {{ migration_name }} applied successfully"
+
+  rescue:
+    - name: Migration {{ migration_name }} failed
+      debug:
+        msg: "❌ Migration {{ migration_name }} failed: {{ migration_result.stdout | default('Unknown error') }}"
+      
+    - name: Fail deployment on critical migration failure
+      fail:
+        msg: "Critical migration failed: {{ migration_name }}"
+      when: migration_name in ['00_foundation_schema.sql', '05_fix_event_schema_consistency.sql']

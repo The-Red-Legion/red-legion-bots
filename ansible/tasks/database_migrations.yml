@@ -1,0 +1,196 @@
+---
+# Database Migration Tasks for Red Legion Bot
+# Handles automated database schema updates during deployment
+
+- name: Database Migration - Setup and Execute
+  block:
+    - name: Display migration info
+      debug:
+        msg: |
+          ===== DATABASE MIGRATIONS =====
+          Running database schema migrations...
+          Time: {{ ansible_date_time.iso8601 }}
+          ================================
+
+    - name: Check if migration tracking table exists
+      command: |
+        python3 -c "
+        import sys
+        sys.path.insert(0, '{{ app_dir }}/src')
+        from config.settings import get_database_url
+        from database.connection import resolve_database_url
+        import psycopg2
+        
+        db_url = get_database_url()
+        if not db_url:
+            print('NO_DB_URL')
+            exit(1)
+        
+        try:
+            conn = psycopg2.connect(resolve_database_url(db_url))
+            with conn.cursor() as cursor:
+                cursor.execute('''
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'schema_migrations'
+                    );
+                ''')
+                exists = cursor.fetchone()[0]
+                print('EXISTS' if exists else 'NOT_EXISTS')
+            conn.close()
+        except Exception as e:
+            print(f'ERROR: {e}')
+            exit(1)
+        "
+      args:
+        chdir: "{{ app_dir }}"
+      register: migration_table_check
+      failed_when: migration_table_check.stdout.startswith('ERROR') or migration_table_check.stdout == 'NO_DB_URL'
+
+    - name: Create migration tracking table if needed
+      command: |
+        python3 -c "
+        import sys
+        sys.path.insert(0, '{{ app_dir }}/src')
+        from config.settings import get_database_url
+        from database.connection import resolve_database_url
+        import psycopg2
+        
+        db_url = get_database_url()
+        conn = psycopg2.connect(resolve_database_url(db_url))
+        with conn.cursor() as cursor:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    migration_name VARCHAR(255) PRIMARY KEY,
+                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    success BOOLEAN DEFAULT TRUE,
+                    error_message TEXT
+                );
+            ''')
+            conn.commit()
+        conn.close()
+        print('MIGRATION_TABLE_CREATED')
+        "
+      args:
+        chdir: "{{ app_dir }}"
+      when: migration_table_check.stdout == 'NOT_EXISTS'
+      register: create_migration_table
+
+    - name: Find all migration files
+      find:
+        paths: "{{ app_dir }}/database_migrations"
+        patterns: "*.sql"
+        file_type: file
+      register: migration_files
+
+    - name: Sort migration files by name
+      set_fact:
+        sorted_migrations: "{{ migration_files.files | sort(attribute='path') }}"
+
+    - name: Check which migrations have already been applied
+      command: |
+        python3 -c "
+        import sys
+        sys.path.insert(0, '{{ app_dir }}/src')
+        from config.settings import get_database_url
+        from database.connection import resolve_database_url
+        import psycopg2
+        import json
+        
+        db_url = get_database_url()
+        conn = psycopg2.connect(resolve_database_url(db_url))
+        with conn.cursor() as cursor:
+            cursor.execute('SELECT migration_name FROM schema_migrations WHERE success = TRUE')
+            applied = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        print(json.dumps(applied))
+        "
+      args:
+        chdir: "{{ app_dir }}"
+      register: applied_migrations_result
+
+    - name: Parse applied migrations
+      set_fact:
+        applied_migrations: "{{ applied_migrations_result.stdout | from_json }}"
+
+    - name: Apply pending migrations
+      include_tasks: apply_single_migration.yml
+      loop: "{{ sorted_migrations }}"
+      loop_control:
+        loop_var: migration_file
+      vars:
+        migration_name: "{{ migration_file.path | basename }}"
+      when: migration_name not in applied_migrations
+
+    - name: Display migration completion
+      debug:
+        msg: |
+          ✅ DATABASE MIGRATIONS COMPLETED ✅
+          Total migration files found: {{ sorted_migrations | length }}
+          Already applied: {{ applied_migrations | length }}
+          Newly applied: {{ (sorted_migrations | length) - (applied_migrations | length) }}
+          =======================================
+
+  rescue:
+    - name: Migration failure handling
+      debug:
+        msg: |
+          ❌ DATABASE MIGRATION FAILED ❌
+          Error occurred during migration process.
+          Check the logs above for specific error details.
+          Bot deployment will continue but may have database issues.
+          =========================================
+      
+    - name: Continue deployment despite migration failure
+      debug:
+        msg: "Continuing deployment - manual migration may be required"
+
+- name: Verify database schema after migrations
+  command: |
+    python3 -c "
+    import sys
+    sys.path.insert(0, '{{ app_dir }}/src')
+    from config.settings import get_database_url
+    from database.connection import resolve_database_url
+    import psycopg2
+    
+    db_url = get_database_url()
+    conn = psycopg2.connect(resolve_database_url(db_url))
+    with conn.cursor() as cursor:
+        # Check critical tables exist
+        critical_tables = ['events', 'mining_participation', 'users', 'guilds']
+        missing_tables = []
+        
+        for table in critical_tables:
+            cursor.execute('''
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = %s
+                );
+            ''', (table,))
+            if not cursor.fetchone()[0]:
+                missing_tables.append(table)
+        
+        if missing_tables:
+            print(f'MISSING_TABLES: {missing_tables}')
+            exit(1)
+        else:
+            print('SCHEMA_VALID')
+    conn.close()
+    "
+  args:
+    chdir: "{{ app_dir }}"
+  register: schema_validation
+  failed_when: schema_validation.stdout.startswith('MISSING_TABLES')
+  ignore_errors: yes
+
+- name: Display schema validation result
+  debug:
+    msg: |
+      {% if schema_validation.stdout == 'SCHEMA_VALID' %}
+      ✅ Database schema validation passed
+      {% else %}
+      ⚠️ Database schema validation issues: {{ schema_validation.stdout }}
+      {% endif %}
