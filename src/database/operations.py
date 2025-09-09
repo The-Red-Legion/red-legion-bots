@@ -9,12 +9,93 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
+import random
+import string
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database.connection import DatabaseManager, resolve_database_url
 from database.models import User, Guild, MiningEvent, MiningParticipation
+
+# Event ID Prefix Configuration
+EVENT_ID_PREFIXES = {
+    'mining': 'sm',        # Sunday Mining
+    'operation': 'op',     # Military Operations  
+    'training': 'tr',      # Training Events
+    'social': 'sc',        # Social Events
+    'tournament': 'tm',    # Tournaments
+    'expedition': 'ex',    # Exploration Expeditions
+    'test': 'test'         # Test Events
+}
+
+def generate_prefixed_event_id(event_type: str = 'mining', length: int = 6) -> str:
+    """
+    Generate a prefixed event ID based on event type.
+    
+    Args:
+        event_type: Type of event ('mining', 'operation', 'training', etc.)
+        length: Length of random suffix (default: 6)
+        
+    Returns:
+        Prefixed event ID (e.g., 'sm-a7k2m9', 'op-b3x8n4')
+    """
+    prefix = EVENT_ID_PREFIXES.get(event_type, 'ev')  # Default to 'ev' if unknown
+    
+    # Generate random alphanumeric suffix (excluding confusing characters)
+    chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    chars = chars.replace('o', '').replace('0', '').replace('l', '').replace('1')  # Remove confusing chars
+    
+    suffix = ''.join(random.choice(chars) for _ in range(length))
+    
+    return f"{prefix}-{suffix}"
+
+def validate_event_id_format(event_id: str) -> bool:
+    """
+    Validate that an event ID follows the expected prefix format.
+    
+    Args:
+        event_id: Event ID to validate
+        
+    Returns:
+        True if valid format, False otherwise
+    """
+    if not event_id or '-' not in event_id:
+        return False
+    
+    prefix, suffix = event_id.split('-', 1)
+    
+    # Check if prefix is known
+    if prefix not in EVENT_ID_PREFIXES.values():
+        return False
+        
+    # Check suffix format (alphanumeric, reasonable length)
+    if not suffix.isalnum() or len(suffix) < 4 or len(suffix) > 10:
+        return False
+        
+    return True
+
+def get_event_type_from_id(event_id: str) -> str:
+    """
+    Extract event type from prefixed event ID.
+    
+    Args:
+        event_id: Prefixed event ID (e.g., 'sm-a7k2m9')
+        
+    Returns:
+        Event type string ('mining', 'operation', etc.) or 'unknown'
+    """
+    if not event_id or '-' not in event_id:
+        return 'unknown'
+    
+    prefix = event_id.split('-')[0]
+    
+    # Find event type by prefix
+    for event_type, type_prefix in EVENT_ID_PREFIXES.items():
+        if type_prefix == prefix:
+            return event_type
+    
+    return 'unknown'
 
 class BaseOperations:
     """Base class for database operations."""
@@ -759,54 +840,80 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
                 print(f"✅ Found existing mining event {existing_event[0]} for {event_date}")
                 return existing_event[0]
             
+            # Generate prefixed event ID
+            prefixed_event_id = generate_prefixed_event_id('mining')
+            
+            # Ensure ID is unique by checking database
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                cursor.execute("SELECT COUNT(*) FROM mining_events WHERE event_id = %s", (prefixed_event_id,))
+                if cursor.fetchone()[0] == 0:
+                    break  # ID is unique
+                prefixed_event_id = generate_prefixed_event_id('mining')
+                if attempt == max_attempts - 1:
+                    print(f"❌ Could not generate unique event ID after {max_attempts} attempts")
+                    return None
+            
             # Create new event - using flexible column structure
-            print(f"🔍 Attempting to create event with guild_id={guild_id}, name='{event_name}', date={event_date}")
+            print(f"🔍 Attempting to create event with guild_id={guild_id}, event_id='{prefixed_event_id}', name='{event_name}', date={event_date}")
             
             try:
                 # Try the new schema format first (with event_id primary key)
                 cursor.execute("""
                     INSERT INTO mining_events (
-                        guild_id, name, event_date, event_type, status, 
+                        event_id, guild_id, name, event_date, event_type, status, 
                         start_time, is_active, created_at, updated_at
                     ) VALUES (
-                        %s, %s, %s, 'mining', 'active', 
+                        %s, %s, %s, %s, 'mining', 'active', 
                         %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                     ) RETURNING event_id
                 """, (
+                    prefixed_event_id,
                     str(guild_id), 
                     event_name, 
                     event_date,
                     datetime.now()
                 ))
-                event_id = cursor.fetchone()[0]
-                print(f"✅ Created event using new schema format, event_id: {event_id}")
+                returned_event_id = cursor.fetchone()[0]
+                print(f"✅ Created event using new schema format, event_id: {returned_event_id}")
                 
             except Exception as schema_error:
-                print(f"⚠️ New schema failed: {schema_error}")
-                print(f"🔄 Trying legacy schema format...")
+                print(f"⚠️ New schema with prefixed ID failed: {schema_error}")
+                print(f"🔄 Trying legacy schema with integer ID...")
                 
-                # Try legacy schema format (with id primary key)
-                cursor.execute("""
-                    INSERT INTO mining_events (
-                        guild_id, event_name, event_date, event_type, status, 
-                        start_time, is_active, created_at, updated_at
-                    ) VALUES (
-                        %s, %s, %s, 'mining', 'active', 
-                        %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                    ) RETURNING id
-                """, (
-                    str(guild_id), 
-                    event_name, 
-                    event_date,
-                    datetime.now()
-                ))
-                event_id = cursor.fetchone()[0]
-                print(f"✅ Created event using legacy schema format, id: {event_id}")
+                # Fallback to legacy schema format (auto-incrementing integer id)
+                # This will return an integer ID instead of prefixed string
+                try:
+                    cursor.execute("""
+                        INSERT INTO mining_events (
+                            guild_id, event_name, event_date, event_type, status, 
+                            start_time, is_active, created_at, updated_at
+                        ) VALUES (
+                            %s, %s, %s, 'mining', 'active', 
+                            %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                        ) RETURNING id
+                    """, (
+                        str(guild_id), 
+                        event_name, 
+                        event_date,
+                        datetime.now()
+                    ))
+                    legacy_event_id = cursor.fetchone()[0]
+                    
+                    # Convert integer ID to prefixed format for consistency
+                    returned_event_id = f"sm-{legacy_event_id:06d}"  # sm-000001 format
+                    print(f"✅ Created event using legacy schema format, id: {legacy_event_id} -> prefixed: {returned_event_id}")
+                    
+                except Exception as legacy_error:
+                    print(f"❌ Both new and legacy schema formats failed")
+                    print(f"New schema error: {schema_error}")
+                    print(f"Legacy schema error: {legacy_error}")
+                    return None
             
             conn.commit()
             
-            print(f"✅ Created mining event {event_id} for guild {guild_id} on {event_date}")
-            return event_id
+            print(f"✅ Created mining event {returned_event_id} for guild {guild_id} on {event_date}")
+            return returned_event_id
             
     except Exception as e:
         print(f"❌ Error creating mining event: {e}")

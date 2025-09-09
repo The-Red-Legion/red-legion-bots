@@ -2502,22 +2502,51 @@ class SundayMiningCommands(commands.Cog):
                     inline=False
                 )
                 
-                # Check mining_events table schema
+                # Check mining_events table schema with detailed info
                 cursor.execute("""
-                    SELECT column_name, data_type 
+                    SELECT column_name, data_type, character_maximum_length, is_nullable,
+                           column_default
                     FROM information_schema.columns 
                     WHERE table_name = 'mining_events' 
                     ORDER BY ordinal_position
                 """)
                 
                 schema_info = cursor.fetchall()
-                schema_text = "\n".join([f"• {row[0]}: {row[1]}" for row in schema_info])
+                schema_text = []
+                event_id_details = None
+                
+                for row in schema_info:
+                    col_name, data_type, max_length, nullable, default = row
+                    if col_name == 'event_id':
+                        event_id_details = row
+                    
+                    length_info = f"({max_length})" if max_length else ""
+                    nullable_info = "NULL" if nullable == 'YES' else "NOT NULL"
+                    default_info = f" DEFAULT {default}" if default else ""
+                    
+                    schema_text.append(f"• {col_name}: {data_type}{length_info} {nullable_info}{default_info}")
                 
                 embed.add_field(
                     name="📋 Table Schema",
-                    value=f"```\n{schema_text[:800]}{'...' if len(schema_text) > 800 else ''}\n```",
+                    value=f"```\n{chr(10).join(schema_text[:15])}\n```",
                     inline=False
                 )
+                
+                # Special attention to event_id column for prefix compatibility
+                if event_id_details:
+                    col_name, data_type, max_length, nullable, default = event_id_details
+                    can_store_prefixed = data_type in ['character varying', 'varchar', 'text', 'character']
+                    max_length_ok = max_length is None or max_length >= 20  # Need at least 20 chars for prefixed IDs
+                    
+                    prefix_compat = "✅ Compatible" if (can_store_prefixed and max_length_ok) else "❌ Needs Migration"
+                    
+                    embed.add_field(
+                        name="🏷️ Event ID Prefix Compatibility",
+                        value=f"**Current**: {data_type}" + (f"({max_length})" if max_length else "") + f"\n"
+                              f"**Prefixed ID Support**: {prefix_compat}\n"
+                              f"**Required**: VARCHAR(50) or TEXT for prefixed IDs like 'sm-a7k2m9'",
+                        inline=False
+                    )
                 
                 # Check recent events in this guild
                 cursor.execute("""
