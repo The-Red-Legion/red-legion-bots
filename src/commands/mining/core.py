@@ -1990,27 +1990,58 @@ class SundayMiningCommands(commands.Cog):
                 price = price_data['max_price']
                 ore_name = price_data['display_name']
                 
-                # Try to find location information
+                # Try to find location information using improved matching
                 location_info = "Location Unknown"
                 if detailed_prices:
-                    # Look for this ore in detailed cache data
-                    for code, cache_data in detailed_prices.items():
-                        if (cache_data.get('name', '').upper() == ore_key or 
-                            code.upper() == ore_key or
-                            cache_data.get('name', '') == ore_name):
+                    # Debug: print available keys for first ore to understand the data structure
+                    if i == 0 and ore_key == list(ore_prices.keys())[0]:
+                        print(f"🔍 Debug ore prices structure - Looking for: {ore_key} ({ore_name})")
+                        print(f"🔍 Available detailed cache keys: {list(detailed_prices.keys())[:5]}...")
+                        if detailed_prices:
+                            sample_key = list(detailed_prices.keys())[0]
+                            print(f"🔍 Sample cache data structure: {detailed_prices[sample_key]}")
+                    
+                    # Look for this ore in detailed cache data with more flexible matching
+                    found_data = None
+                    
+                    # Try exact code match first (most reliable)
+                    if ore_key in detailed_prices:
+                        found_data = detailed_prices[ore_key]
+                    else:
+                        # Try case-insensitive matching on codes and names
+                        for code, cache_data in detailed_prices.items():
+                            cache_name = cache_data.get('name', '').upper()
+                            ore_key_upper = ore_key.upper()
+                            ore_name_upper = ore_name.upper()
                             
-                            # Find best location from locations array
-                            locations = cache_data.get('locations', [])
-                            if locations:
-                                # Find location with highest sell price
-                                best_location = max(locations, 
-                                                  key=lambda x: x.get('sell_price', 0))
-                                location_name = best_location.get('name', 'Unknown Location')
-                                # Truncate long location names
-                                if len(location_name) > 20:
-                                    location_name = location_name[:17] + "..."
-                                location_info = location_name
-                            break
+                            if (code.upper() == ore_key_upper or 
+                                cache_name == ore_key_upper or
+                                cache_name == ore_name_upper or
+                                ore_key_upper in cache_name or
+                                cache_name in ore_key_upper):
+                                found_data = cache_data
+                                break
+                    
+                    if found_data:
+                        # Find best location from locations array
+                        locations = found_data.get('locations', [])
+                        
+                        if locations:
+                            # Find location with highest sell price
+                            best_location = max(locations, 
+                                              key=lambda x: x.get('sell_price', 0))
+                            location_name = best_location.get('name', 'Unknown Location')
+                            
+                            # Truncate long location names but keep important parts
+                            if len(location_name) > 25:
+                                # Try to keep the important part (usually the first part)
+                                location_name = location_name[:22] + "..."
+                            
+                            location_info = location_name
+                        else:
+                            location_info = "No trading locations"
+                    else:
+                        location_info = "Data not cached"
                 
                 price_list.append(
                     f"• **{ore_name}**: {price:,.0f} aUEC/SCU\n"

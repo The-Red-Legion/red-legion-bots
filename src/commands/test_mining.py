@@ -49,6 +49,9 @@ class TestMiningCommands(app_commands.Group):
             event_date = date.today() - timedelta(days=(1 if hours_ago > 12 else 0))
             event_name = f"TEST Sunday Mining - {event_date.strftime('%Y-%m-%d')}"
             
+            print(f"🔍 Creating test mining event: {event_name} for guild {interaction.guild.id} on {event_date}")
+            print(f"🔍 Database URL available: {db_url is not None}")
+            
             event_id = create_mining_event(
                 db_url,
                 interaction.guild.id,
@@ -56,8 +59,10 @@ class TestMiningCommands(app_commands.Group):
                 event_name
             )
             
+            print(f"🔍 Event creation result: {event_id}")
+            
             if not event_id:
-                await interaction.followup.send("❌ Failed to create test mining event", ephemeral=True)
+                await interaction.followup.send("❌ Failed to create test mining event - Check server logs for details", ephemeral=True)
                 return
             
             # Get mining channels for this guild
@@ -202,9 +207,15 @@ class TestMiningCommands(app_commands.Group):
             await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            await interaction.followup.send(f"❌ Error creating test data: {str(e)}")
+            error_msg = f"❌ Error creating test data: {str(e)}"
+            await interaction.followup.send(error_msg)
             import traceback
             print(f"Test data creation error: {traceback.format_exc()}")
+            
+            # Also log specific database connection info
+            print(f"🔍 Database URL type: {type(db_url)}")
+            print(f"🔍 Guild ID: {interaction.guild.id}")
+            print(f"🔍 Event date: {event_date}")
     
     @app_commands.command(name="delete", description="Delete all test mining data (Admin only)")
     @app_commands.describe(
