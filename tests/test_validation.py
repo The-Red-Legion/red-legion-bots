@@ -47,25 +47,37 @@ def test_main_bot_syntax():
 sys.path.insert(0, os.path.join(project_root, 'src'))
 
 def test_main_bot_file_syntax():
-    """Test that the main bot file has valid syntax."""
+    """Test that the main bot files have valid syntax."""
     print("🧪 Testing main bot file syntax...")
     
-    try:
-        # Test that we can compile the file
-        with open('src/participation_bot.py', 'r') as f:
-            code = f.read()
-        
-        compile(code, 'src/participation_bot.py', 'exec')
-        print("  ✅ Main bot file syntax is valid")
-        assert True  # File syntax is valid
-        
-    except SyntaxError as e:
-        print(f"  ❌ Syntax error in main bot file: {e}")
-        print(f"     Line {e.lineno}: {e.text}")
-        assert False, f"Syntax error in main bot file: {e}"
-    except Exception as e:
-        print(f"  ❌ Error reading main bot file: {e}")
-        assert False, f"Error reading main bot file: {e}"
+    # Test the current bot client files
+    bot_files = [
+        'src/bot/client.py',
+        'src/bot/client_clean.py',
+        'src/main.py'
+    ]
+    
+    for bot_file in bot_files:
+        if not os.path.exists(bot_file):
+            print(f"  ⚠️ {bot_file} not found (may be expected)")
+            continue
+            
+        try:
+            with open(bot_file, 'r') as f:
+                code = f.read()
+            
+            compile(code, bot_file, 'exec')
+            print(f"  ✅ {bot_file} syntax is valid")
+            
+        except SyntaxError as e:
+            print(f"  ❌ Syntax error in {bot_file}: {e}")
+            print(f"     Line {e.lineno}: {e.text}")
+            assert False, f"Syntax error in {bot_file}: {e}"
+        except Exception as e:
+            print(f"  ❌ Error reading {bot_file}: {e}")
+            assert False, f"Error reading {bot_file}: {e}"
+    
+    assert True  # Test passed
 
 
 def test_critical_imports():
@@ -73,11 +85,11 @@ def test_critical_imports():
     print("\n🧪 Testing critical imports...")
     
     critical_imports = [
-        ('src.config', 'DISCORD_TOKEN, get_database_url'),
-        ('src.database', 'init_db'),
+        ('src.config.settings', 'DISCORD_CONFIG, get_database_url'),
+        ('src.database', 'init_database'),
         ('src.core.bot_setup', 'create_bot_instance'),
         ('src.commands', 'register_all_commands'),
-        ('src.event_handlers', 'setup_event_handlers'),
+        ('src.handlers.core', 'setup'),
     ]
     
     all_passed = True
@@ -196,11 +208,11 @@ def test_database_function_availability():
     print("\n🧪 Testing database function availability...")
     
     try:
-        from database import init_db
-        print("  ✅ init_db function available")
+        from src.database import init_database
+        print("  ✅ init_database function available")
         
         # Test config database URL function
-        from config import get_database_url
+        from src.config.settings import get_database_url
         print("  ✅ get_database_url function available")
         
         assert True  # Test passed
@@ -212,21 +224,20 @@ def test_file_structure():
     print("\n🧪 Testing file structure...")
     
     expected_files = [
-        'src/main.py',  # New entry point
-        'src/participation_bot.py',  # Legacy file (still exists)
-        'src/config.py',  # Legacy file (still exists)
-        'src/database.py',  # Legacy file (still exists) 
-        'src/event_handlers.py',  # Legacy file (still exists)
+        'src/main.py',  # Entry point
         
-        # New modular structure
+        # Modular structure (cleaned up)
         'src/config/__init__.py',
         'src/config/settings.py',
         'src/config/channels.py',
         'src/database/__init__.py',
         'src/database/models.py',
         'src/database/operations.py',
+        'src/database/connection.py',
+        'src/database/schemas.py',
         'src/bot/__init__.py',
         'src/bot/client.py',
+        'src/bot/client_clean.py',
         'src/bot/utils.py',
         'src/utils/__init__.py',
         'src/utils/decorators.py',
@@ -237,10 +248,12 @@ def test_file_structure():
         'src/core/bot_setup.py',
         'src/core/decorators.py',
         
-        # Commands (modular)
+        # Commands (cleaned up structure)
         'src/commands/__init__.py',
-        'src/commands/market.py',
-        'src/commands/loans.py',
+        'src/commands/market_subcommand.py',  # Fixed: now subcommand files
+        'src/commands/loans_subcommand.py',   # Fixed: now subcommand files
+        'src/commands/events_subcommand.py',  # Fixed: now subcommand files
+        'src/commands/join_subcommand.py',    # Fixed: now subcommand files
         'src/commands/events/__init__.py',
         'src/commands/events/mining.py',
         'src/commands/events/combat.py',
