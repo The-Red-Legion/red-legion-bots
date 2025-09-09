@@ -43,7 +43,7 @@ from utils import can_manage_payroll
 current_session = {
     'active': False,
     'start_time': None,
-    'session_id': None,
+    'event_id': None,
     'participants': {}  # {user_id: participation_data}
 }
 
@@ -1082,7 +1082,7 @@ class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll C
         """Create the payroll distribution embed."""
         embed = discord.Embed(
             title="💰 Sunday Mining Payroll Distribution",
-            description=f"Session: `{current_session.get('session_id', 'Unknown')}`",
+            description=f"Event: `{current_session.get('event_id', 'Recent Session')}`",
             color=0x00ff00,
             timestamp=datetime.now()
         )
@@ -1324,10 +1324,7 @@ class SundayMiningCommands(commands.Cog):
                 await interaction.response.send_message(embed=embed)
                 return
             
-            # Initialize session and create database event
-            session_id = f"sunday_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
-            # Create event in database
+            # Create database event for participation tracking
             import sys
             from pathlib import Path
             
@@ -1352,7 +1349,7 @@ class SundayMiningCommands(commands.Cog):
                         datetime.now().date(),
                         f"Sunday Mining - {datetime.now().strftime('%Y-%m-%d')}"
                     )
-                    print(f"✅ Created mining event {event_id} for session {session_id} in guild {interaction.guild.name}")
+                    print(f"✅ Created mining event {event_id} in guild {interaction.guild.name}")
                     
                     if event_id is None:
                         print(f"❌ create_mining_event returned None - database operation failed")
@@ -1369,8 +1366,7 @@ class SundayMiningCommands(commands.Cog):
             current_session.update({
                 'active': True,
                 'start_time': datetime.now(),
-                'session_id': session_id,
-                'event_id': event_id,  # Store event_id for later use
+                'event_id': event_id,  # Store event_id for participation tracking
                 'participants': {}
             })
             
@@ -1435,8 +1431,7 @@ class SundayMiningCommands(commands.Cog):
             if event_id:
                 session_details += f"\n• **Event ID**: `{event_id}` (for payroll reference)"
             else:
-                session_details += f"\n• **Session ID**: `{session_id}` (local tracking only)"
-                session_details += f"\n• ⚠️ Database event creation failed - check logs"
+                session_details += f"\n• ⚠️ Database event creation failed - payroll may not work properly"
             
             embed.add_field(
                 name="📊 Session Details",
@@ -1606,8 +1601,8 @@ class SundayMiningCommands(commands.Cog):
             
             # Create session summary
             embed = discord.Embed(
-                title="⏹️ Sunday Mining Session Ended",
-                description=f"Session ID: `{current_session['session_id']}`\nEvent ID: `{current_session.get('event_id', 'N/A')}`",
+                title="⏹️ Sunday Mining Session Ended", 
+                description=f"Event ID: `{current_session.get('event_id', 'N/A')}`",
                 color=0xff6b6b,
                 timestamp=datetime.now()
             )
@@ -1638,7 +1633,7 @@ class SundayMiningCommands(commands.Cog):
             current_session.update({
                 'active': False,
                 'start_time': None,
-                'session_id': None
+                'event_id': None
             })
             
         except Exception as e:
@@ -1778,7 +1773,7 @@ class SundayMiningCommands(commands.Cog):
             
             embed = discord.Embed(
                 title="📊 Current Mining Participation Summary",
-                description=f"Session: `{current_session.get('session_id', 'Recent Activity')}`",
+                description=f"Event: `{current_session.get('event_id', 'Recent Activity')}`",
                 color=0x3498db,
                 timestamp=datetime.now()
             )
@@ -1856,7 +1851,7 @@ class SundayMiningCommands(commands.Cog):
             
             # Reset session
             current_session['active'] = False
-            print(f"✅ Auto-ended Sunday mining session: {current_session['session_id']}")
+            print(f"✅ Auto-ended Sunday mining session: {current_session.get('event_id', 'Unknown')}")
     
     async def _fetch_uex_prices(self) -> Optional[Dict]:
         """Fetch current ore prices from UEX API - uses highest sell price per SCU."""
