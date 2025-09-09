@@ -304,6 +304,13 @@ def init_database(database_url=None):
             CREATE INDEX IF NOT EXISTS idx_admin_actions_type ON admin_actions(action_type);
             """
             
+            # Drop and recreate mining_participation table if it exists in corrupted state
+            try:
+                cursor.execute("DROP TABLE IF EXISTS mining_participation CASCADE;")
+                print("✅ Dropped existing mining_participation table")
+            except Exception as e:
+                print(f"Info: mining_participation table cleanup: {e}")
+            
             cursor.execute(schema_sql)
             
             # Migration queries removed - columns already defined in table creation above
