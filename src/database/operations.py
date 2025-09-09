@@ -178,15 +178,8 @@ def get_user_loans(database_url, user_id, guild_id=None):
         import psycopg2
         from urllib.parse import urlparse
         
-        parsed = urlparse(database_url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            port=parsed.port or 5432
-        )
+        # Use utility function with URL resolution
+        conn = get_legacy_connection(database_url)
         
         with conn.cursor() as cursor:
             if guild_id:
@@ -270,15 +263,8 @@ def issue_loan(database_url, user_id, guild_id, amount, issued_date, due_date, i
         import psycopg2
         from urllib.parse import urlparse
         
-        parsed = urlparse(database_url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            port=parsed.port or 5432
-        )
+        # Use utility function with URL resolution
+        conn = get_legacy_connection(database_url)
         
         with conn.cursor() as cursor:
             # Insert new loan
@@ -326,15 +312,8 @@ def save_mining_participation(database_url, event_id, user_id, username, channel
         import psycopg2
         from urllib.parse import urlparse
         
-        parsed = urlparse(database_url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            port=parsed.port or 5432
-        )
+        # Use utility function with URL resolution
+        conn = get_legacy_connection(database_url)
         
         with conn.cursor() as cursor:
             # First ensure the user exists in users table
@@ -385,15 +364,8 @@ def add_mining_channel(database_url, guild_id, channel_id, channel_name, descrip
         import psycopg2
         from urllib.parse import urlparse
         
-        parsed = urlparse(database_url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            port=parsed.port or 5432
-        )
+        # Use utility function with URL resolution
+        conn = get_legacy_connection(database_url)
         
         with conn.cursor() as cursor:
             # Check if channel already exists
@@ -431,15 +403,8 @@ def remove_mining_channel(database_url, guild_id, channel_id):
         import psycopg2
         from urllib.parse import urlparse
         
-        parsed = urlparse(database_url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            port=parsed.port or 5432
-        )
+        # Use utility function with URL resolution
+        conn = get_legacy_connection(database_url)
         
         with conn.cursor() as cursor:
             # Check if channel exists
@@ -678,15 +643,8 @@ def get_mining_session_participants(database_url, hours_back=None, event_id=None
         import psycopg2
         from urllib.parse import urlparse
         
-        parsed = urlparse(database_url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            port=parsed.port or 5432
-        )
+        # Use utility function with URL resolution
+        conn = get_legacy_connection(database_url)
         
         with conn.cursor() as cursor:
             if event_id:
@@ -785,15 +743,8 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
         if event_date is None:
             event_date = date.today()
         
-        parsed = urlparse(database_url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname,
-            database=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            port=parsed.port or 5432
-        )
+        # Use utility function with URL resolution
+        conn = get_legacy_connection(database_url)
         
         with conn.cursor() as cursor:
             # Check if event already exists for this date and guild
