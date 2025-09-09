@@ -60,9 +60,9 @@ def resolve_database_url(database_url: str) -> str:
         Resolved database URL with correct IP and credentials
     """
     try:
-        logger.info(f"Processing database URL: {database_url[:30]}...")
+        logger.info("Processing database URL for connection resolution...")
         parsed = urlparse(database_url)
-        logger.info(f"Parsed hostname: {parsed.hostname}, port: {parsed.port}, username: {parsed.username}")
+        logger.info(f"Parsed hostname: {parsed.hostname or '[redacted]'}, port: {parsed.port or '[default]'}, username: {parsed.username or '[redacted]'}")
         
         # Known Cloud SQL configuration
         CLOUD_SQL_INTERNAL_IP = "10.92.0.3"
@@ -100,7 +100,7 @@ def resolve_database_url(database_url: str) -> str:
         
     except Exception as e:
         logger.error(f"Error resolving database URL: {e}")
-        logger.error(f"Original URL was: {database_url[:50]}...")
+        logger.error("Failed to resolve database URL - check connection parameters")
         # Return a safe fallback URL
         try:
             password = _get_db_password_from_secrets()
@@ -176,10 +176,10 @@ class DatabaseManager:
     def _initialize_pool(self):
         """Initialize the connection pool."""
         try:
-            # Parse URL to validate format
-            logger.info(f"Initializing connection pool with URL: {self.database_url[:50]}...")
+            # Parse URL to validate format (log safely without credentials)
             parsed = urlparse(self.database_url)
-            logger.info(f"Parsed URL - scheme: {parsed.scheme}, hostname: {parsed.hostname}, port: {parsed.port}")
+            logger.info("Initializing database connection pool...")
+            logger.info(f"Database - scheme: {parsed.scheme}, hostname: {parsed.hostname or '[redacted]'}, port: {parsed.port or '[default]'}")
             
             if not parsed.scheme == 'postgresql':
                 raise ValueError("Database URL must be a PostgreSQL URL")
