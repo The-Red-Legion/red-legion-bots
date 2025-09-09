@@ -859,6 +859,7 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
             
             try:
                 # Try the new schema format first (with event_id primary key)
+                print(f"🔄 Attempting new schema INSERT with prefixed_event_id: {prefixed_event_id}")
                 cursor.execute("""
                     INSERT INTO mining_events (
                         event_id, guild_id, name, event_date, event_type, status, 
@@ -884,6 +885,7 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
                 # Fallback to legacy schema format (auto-incrementing integer id)
                 # This will return an integer ID instead of prefixed string
                 try:
+                    print(f"🔄 Attempting legacy schema INSERT...")
                     cursor.execute("""
                         INSERT INTO mining_events (
                             guild_id, event_name, event_date, event_type, status, 
@@ -908,7 +910,23 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
                     print(f"❌ Both new and legacy schema formats failed")
                     print(f"New schema error: {schema_error}")
                     print(f"Legacy schema error: {legacy_error}")
-                    return None
+                    # Try one more fallback - very basic insert
+                    try:
+                        print(f"🔄 Attempting basic schema INSERT as final fallback...")
+                        cursor.execute("""
+                            INSERT INTO mining_events (guild_id, name, event_date, status, is_active)
+                            VALUES (%s, %s, %s, 'active', true)
+                            RETURNING id
+                        """, (str(guild_id), event_name, event_date))
+                        basic_event_id = cursor.fetchone()[0]
+                        returned_event_id = f"sm-{basic_event_id:06d}"
+                        print(f"✅ Created event using basic schema, id: {basic_event_id} -> prefixed: {returned_event_id}")
+                    except Exception as basic_error:
+                        print(f"❌ All schema formats failed:")
+                        print(f"  - New schema: {schema_error}")
+                        print(f"  - Legacy schema: {legacy_error}")
+                        print(f"  - Basic schema: {basic_error}")
+                        return None
             
             conn.commit()
             

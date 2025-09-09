@@ -1386,14 +1386,16 @@ class SundayMiningCommands(commands.Cog):
             
             mining_channels = get_sunday_mining_channels(interaction.guild.id)
             print(f"🔍 DEBUG: Retrieved mining channels: {mining_channels}")
+            print(f"🔍 DEBUG: Mining channels type: {type(mining_channels)}")
+            print(f"🔍 DEBUG: Mining channels keys: {list(mining_channels.keys()) if mining_channels else 'None'}")
             
             dispatch_join_success = False
             dispatch_error = None
             
             for channel_name, channel_id in mining_channels.items():
                 # Only join the dispatch channel (check if channel name contains 'dispatch' - case insensitive)
-                should_join = 'dispatch' in channel_name.lower()
-                print(f"🔍 DEBUG: Channel '{channel_name}' -> lowercase: '{channel_name.lower()}' -> contains 'dispatch': {should_join}")
+                should_join = 'dispatch' in channel_name.lower() or 'main' in channel_name.lower()
+                print(f"🔍 DEBUG: Channel '{channel_name}' -> lowercase: '{channel_name.lower()}' -> contains 'dispatch' or 'main': {should_join}")
                 print(f"Adding channel {channel_name} ({channel_id}) to tracking, join={should_join}")
                 
                 try:
@@ -1409,13 +1411,14 @@ class SundayMiningCommands(commands.Cog):
                     print(f"❌ Error adding channel {channel_name} ({channel_id}): {e}")
             
             # Log dispatch channel join result for debugging
-            if 'dispatch' in mining_channels:
+            dispatch_channel_found = any('dispatch' in name.lower() or 'main' in name.lower() for name in mining_channels.keys())
+            if dispatch_channel_found:
                 if dispatch_join_success:
                     print("✅ Bot successfully joined dispatch channel")
                 else:
                     print(f"❌ Bot failed to join dispatch channel: {dispatch_error}")
             else:
-                print("⚠️ No dispatch channel configured in mining channels")
+                print("⚠️ No dispatch/main channel configured in mining channels")
             
             start_voice_tracking()
             
@@ -1449,7 +1452,10 @@ class SundayMiningCommands(commands.Cog):
             for name, channel_id in mining_channels.items():
                 try:
                     # Get the actual channel object to display proper name and members
+                    print(f"🔍 DEBUG: Looking up channel {name} with ID {channel_id}")
                     channel = interaction.guild.get_channel(int(channel_id))
+                    print(f"🔍 DEBUG: Channel object found: {channel is not None}, type: {type(channel) if channel else 'None'}")
+                    
                     if channel and hasattr(channel, 'members'):
                         # Count current members (excluding bots)
                         human_members = [member for member in channel.members if not member.bot]
@@ -1494,9 +1500,16 @@ class SundayMiningCommands(commands.Cog):
             
             # Add dispatch troubleshooting if there was an issue
             if dispatch_error:
+                # Find the dispatch/main channel ID for troubleshooting
+                dispatch_channel_id = "N/A"
+                for name, channel_id in mining_channels.items():
+                    if 'dispatch' in name.lower() or 'main' in name.lower():
+                        dispatch_channel_id = channel_id
+                        break
+                
                 embed.add_field(
                     name="⚠️ Dispatch Channel Issue",
-                    value=f"{dispatch_error}\n\n**Troubleshooting:**\n• Check bot has 'Connect' permission in dispatch channel\n• Verify channel ID `{mining_channels.get('dispatch', 'N/A')}` is correct\n• Ensure bot can see the voice channel",
+                    value=f"{dispatch_error}\n\n**Troubleshooting:**\n• Check bot has 'Connect' permission in dispatch channel\n• Verify channel ID `{dispatch_channel_id}` is correct\n• Ensure bot can see the voice channel",
                     inline=False
                 )
             
