@@ -130,12 +130,12 @@ def init_database(database_url=None):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             
-            -- Mining participation table
+            -- Mining participation table (foreign keys added separately to avoid order issues)
             CREATE TABLE IF NOT EXISTS mining_participation (
                 participation_id SERIAL PRIMARY KEY,
-                event_id INTEGER REFERENCES mining_events(event_id),
-                user_id VARCHAR(20) REFERENCES users(user_id),
-                channel_id VARCHAR(20) REFERENCES mining_channels(channel_id),
+                event_id INTEGER,
+                user_id VARCHAR(20),
+                channel_id VARCHAR(20),
                 join_time TIMESTAMP NOT NULL,
                 leave_time TIMESTAMP,
                 duration_minutes INTEGER DEFAULT 0,
@@ -302,6 +302,14 @@ def init_database(database_url=None):
             CREATE INDEX IF NOT EXISTS idx_command_usage_command ON command_usage(command_name);
             CREATE INDEX IF NOT EXISTS idx_admin_actions_guild ON admin_actions(guild_id);
             CREATE INDEX IF NOT EXISTS idx_admin_actions_type ON admin_actions(action_type);
+            
+            -- Add foreign key constraints after all tables are created
+            ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_event 
+                FOREIGN KEY (event_id) REFERENCES mining_events(event_id);
+            ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_user 
+                FOREIGN KEY (user_id) REFERENCES users(user_id);
+            ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_channel 
+                FOREIGN KEY (channel_id) REFERENCES mining_channels(channel_id);
             """
             
             # Drop and recreate mining_participation table if it exists in corrupted state
