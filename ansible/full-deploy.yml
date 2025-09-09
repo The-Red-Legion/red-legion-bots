@@ -214,10 +214,11 @@
           pip:
             requirements: "{{ app_dir }}/requirements.txt"
             executable: pip3
-            state: forcereinstall  # Force reinstall to ensure clean state
+            state: present
+            extra_args: "--upgrade"  # Upgrade instead of force reinstall
       rescue:
         - name: Install requirements with python3 -m pip (system-wide)
-          command: python3 -m pip install --force-reinstall -r "{{ app_dir }}/requirements.txt"
+          command: python3 -m pip install --upgrade -r "{{ app_dir }}/requirements.txt"
 
     - name: Install additional packages (fresh installation)
       block:
@@ -226,10 +227,11 @@
             name:
               - psycopg2-binary
             executable: pip3
-            state: forcereinstall  # Force reinstall for clean state
+            state: present
+            extra_args: "--upgrade"  # Upgrade instead of force reinstall
       rescue:
         - name: Install psycopg2-binary with python3 -m pip (system-wide)
-          command: python3 -m pip install --force-reinstall psycopg2-binary
+          command: python3 -m pip install --upgrade psycopg2-binary
 
     - name: Set up environment variables
       include_tasks: tasks/setup_environment.yml
