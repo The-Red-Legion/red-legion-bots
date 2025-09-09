@@ -16,7 +16,12 @@
       command: |
         python3 -c "
         import sys
+        import logging
         sys.path.insert(0, '{{ app_dir }}/src')
+        
+        # Suppress logging output
+        logging.disable(logging.CRITICAL)
+        
         from config.settings import get_database_url
         from database.connection import resolve_database_url
         import psycopg2
@@ -52,7 +57,12 @@
       command: |
         python3 -c "
         import sys
+        import logging
         sys.path.insert(0, '{{ app_dir }}/src')
+        
+        # Suppress logging output
+        logging.disable(logging.CRITICAL)
+        
         from config.settings import get_database_url
         from database.connection import resolve_database_url
         import psycopg2
@@ -92,7 +102,13 @@
       command: |
         python3 -c "
         import sys
+        import os
         sys.path.insert(0, '{{ app_dir }}/src')
+        
+        # Suppress logging output by redirecting stderr
+        import logging
+        logging.disable(logging.CRITICAL)
+        
         from config.settings import get_database_url
         from database.connection import resolve_database_url
         import psycopg2
@@ -112,7 +128,7 @@
 
     - name: Parse applied migrations
       set_fact:
-        applied_migrations: "{{ applied_migrations_result.stdout | from_json }}"
+        applied_migrations: "{{ applied_migrations_result.stdout_lines | last | from_json }}"
 
     - name: Apply pending migrations
       include_tasks: apply_single_migration.yml
@@ -150,7 +166,12 @@
   command: |
     python3 -c "
     import sys
+    import logging
     sys.path.insert(0, '{{ app_dir }}/src')
+    
+    # Suppress logging output
+    logging.disable(logging.CRITICAL)
+    
     from config.settings import get_database_url
     from database.connection import resolve_database_url
     import psycopg2

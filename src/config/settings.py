@@ -43,6 +43,9 @@ def get_database_url():
 
 def _fix_database_url_encoding(db_url):
     """Fix URL encoding issues in database connection strings."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if not db_url:
         return db_url
     
@@ -63,7 +66,7 @@ def _fix_database_url_encoding(db_url):
             
             # Check if password is already URL-encoded by looking for % patterns
             if '%' in password and any(c in password for c in ['%23', '%2A', '%3F', '%21']):
-                print("Database URL encoding: Password already URL-encoded, using as-is")
+                logger.debug("Database URL encoding: Password already URL-encoded, using as-is")
                 return db_url
             
             # URL-encode only the password if it contains special characters
@@ -71,18 +74,18 @@ def _fix_database_url_encoding(db_url):
                 encoded_password = quote(password, safe='')
                 # Reconstruct the URL
                 fixed_url = f"{protocol}{username}:{encoded_password}@{host_port_db}"
-                print("Database URL encoding: Fixed special characters in password")
+                logger.debug("Database URL encoding: Fixed special characters in password")
                 return fixed_url
             else:
-                print("Database URL encoding: No special characters found, using as-is")
+                logger.debug("Database URL encoding: No special characters found, using as-is")
                 return db_url
         else:
             # If the regex doesn't match, return the original URL
-            print("Database URL encoding: Could not parse URL format, using as-is")
+            logger.debug("Database URL encoding: Could not parse URL format, using as-is")
             return db_url
             
     except Exception as e:
-        print(f"Warning: Could not fix database URL encoding: {e}")
+        logger.warning(f"Could not fix database URL encoding: {e}")
         return db_url
 
 # UEX API Configuration
