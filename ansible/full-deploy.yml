@@ -197,6 +197,45 @@
         dest: "/tmp/full_codebase.tar.gz"
         mode: '0644'
 
+    - name: Debug tarball before extraction
+      block:
+        - name: Check if tarball exists
+          stat:
+            path: "/tmp/full_codebase.tar.gz"
+          register: tarball_check
+          
+        - name: Show tarball info
+          debug:
+            msg: |
+              Tarball debug info:
+              - Exists: {{ tarball_check.stat.exists }}
+              - Size: {{ tarball_check.stat.size | default('N/A') }} bytes
+              
+        - name: Test tarball contents
+          command: tar -tzf /tmp/full_codebase.tar.gz | head -10
+          register: tarball_contents
+          
+        - name: Show tarball contents sample
+          debug:
+            msg: |
+              Tarball contents (first 10 files):
+              {{ tarball_contents.stdout }}
+              
+        - name: Check app directory before extraction
+          stat:
+            path: "{{ app_dir }}"
+          register: app_dir_before
+          
+        - name: Show app directory status
+          debug:
+            msg: |
+              App directory before extraction:
+              - Path: {{ app_dir }}
+              - Exists: {{ app_dir_before.stat.exists }}
+              - Is directory: {{ app_dir_before.stat.isdir | default(false) }}
+              - Mode: {{ app_dir_before.stat.mode | default('N/A') }}
+              - Owner: {{ app_dir_before.stat.pw_name | default('N/A') }}
+
     - name: Extract complete codebase to application directory
       unarchive:
         src: "/tmp/full_codebase.tar.gz"
@@ -204,6 +243,14 @@
         remote_src: yes
         extra_opts:
           - "--strip-components=1"
+      register: extract_result
+      
+    - name: Show extraction result
+      debug:
+        msg: |
+          Extraction result:
+          - Changed: {{ extract_result.changed }}
+          - Files extracted: {{ extract_result.files | default([]) | length }}
     
     - name: Fix ownership of deployed files
       file:
@@ -212,6 +259,7 @@
         group: "{{ ansible_user }}"
         recurse: yes
         state: directory
+      when: extract_result.changed
 
     - name: Clean up temporary files
       block:
