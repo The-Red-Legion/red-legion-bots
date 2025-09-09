@@ -1,5 +1,17 @@
 """
-Training Events Management Commands
+Timport discord
+from discord.ext import commands
+from discord import app_commands
+from typing import Optional
+import logging
+
+# Import from the operations.py file by avoiding the directory
+from database import operations
+get_all_events = operations.get_all_events
+create_event = operations.create_event  
+delete_event = operations.delete_event
+
+logger = logging.getLogger(__name__)vents Management Commands
 Handles training-related event creation, deletion, and viewing
 """
 

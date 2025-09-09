@@ -9,7 +9,11 @@ from discord import app_commands
 from typing import Optional
 import logging
 
-from database.operations import get_all_events, create_event, delete_event
+# Import from the operations.py file by avoiding the directory
+from database import operations
+get_all_events = operations.get_all_events
+create_event = operations.create_event  
+delete_event = operations.delete_event
 
 logger = logging.getLogger(__name__)
 
