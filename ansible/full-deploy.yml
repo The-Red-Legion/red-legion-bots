@@ -202,10 +202,16 @@
         src: "/tmp/full_codebase.tar.gz"
         dest: "{{ app_dir }}"
         remote_src: yes
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
         extra_opts:
           - "--strip-components=1"
+    
+    - name: Fix ownership of deployed files
+      file:
+        path: "{{ app_dir }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        recurse: yes
+        state: directory
 
     - name: Clean up temporary files
       block:
