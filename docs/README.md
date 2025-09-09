@@ -18,7 +18,6 @@ Welcome to the Red Legion Discord Bot documentation! This bot is designed specif
 ### 🚢 [Deployment](./deployment/)
 - [Ansible Deployment](./deployment/ansible-deployment.md)
 - [Infrastructure Migration](./deployment/INFRASTRUCTURE_MIGRATION.md)
-- [Full Redeploy](./deployment/FULL_REDEPLOY.md)
 
 ### 🔍 [Troubleshooting](./troubleshooting/)
 - [Troubleshooting Fixes](./troubleshooting/TROUBLESHOOTING_FIXES.md)
