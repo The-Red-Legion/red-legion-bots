@@ -180,10 +180,7 @@ def init_database(database_url=None):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             
-            -- Create indexes for performance
-            CREATE INDEX IF NOT EXISTS idx_mining_participation_user_id ON mining_participation(user_id);
-            CREATE INDEX IF NOT EXISTS idx_mining_participation_event_id ON mining_participation(event_id);
-            CREATE INDEX IF NOT EXISTS idx_mining_participation_join_time ON mining_participation(join_time);
+            -- Create indexes for performance (mining_participation indexes created separately)
             CREATE INDEX IF NOT EXISTS idx_guild_memberships_guild_user ON guild_memberships(guild_id, user_id);
             CREATE INDEX IF NOT EXISTS idx_loans_user_id ON loans(user_id);
             CREATE INDEX IF NOT EXISTS idx_mining_yields_participation ON mining_yields(participation_id);
@@ -339,6 +336,21 @@ def init_database(database_url=None):
                 except Exception as e:
                     print(f"⚠️ Foreign key constraint {constraint_name} failed (may already exist): {e}")
                     # Continue with other constraints
+            
+            # Add mining_participation indexes separately
+            mp_indexes = [
+                "CREATE INDEX IF NOT EXISTS idx_mining_participation_user_id ON mining_participation(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_mining_participation_event_id ON mining_participation(event_id)",
+                "CREATE INDEX IF NOT EXISTS idx_mining_participation_join_time ON mining_participation(join_time)"
+            ]
+            
+            for index_sql in mp_indexes:
+                try:
+                    cursor.execute(index_sql)
+                    print(f"✅ Created mining_participation index")
+                except Exception as e:
+                    print(f"⚠️ Mining_participation index creation failed: {e}")
+                    # Continue with other indexes
             
         print("✅ Database schema initialized successfully")
         return True
