@@ -27,8 +27,10 @@ def test_database_connection_manager():
     print("\n🧪 Testing DatabaseManager connection pooling...")
     
     try:
-        # Mock the connection pool at the module level where it's imported
-        with patch('database.connection.SimpleConnectionPool') as mock_pool_class:
+        # Mock both the connection pool and the test connection
+        with patch('database.connection.SimpleConnectionPool') as mock_pool_class, \
+             patch('database.connection.psycopg2.connect') as mock_connect:
+            
             mock_pool_instance = Mock()
             mock_pool_class.return_value = mock_pool_instance
             
@@ -44,6 +46,11 @@ def test_database_connection_manager():
             mock_conn.cursor.return_value = mock_cursor
             mock_pool_instance.getconn.return_value = mock_conn
             mock_pool_instance.putconn.return_value = None
+            
+            # Mock the test connection (added for debugging)
+            mock_test_conn = Mock()
+            mock_connect.return_value = mock_test_conn
+            mock_test_conn.close.return_value = None
             
             # Import after setting up mocks
             from database.connection import DatabaseManager
