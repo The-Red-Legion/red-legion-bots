@@ -50,17 +50,80 @@ def get_database_url():
     
     raise ValueError("No database URL found. Set DATABASE_URL environment variable or ensure config is available.")
 
-def get_proxy_url(database_url):
-    """Convert database URL to use Cloud SQL proxy if needed."""
+def get_resolved_database_url(database_url):
+    """Resolve database URL to use Cloud SQL internal IP and correct credentials."""
     try:
+        from urllib.parse import quote
         parsed = urlparse(database_url)
-        if parsed.hostname and parsed.hostname != '127.0.0.1' and parsed.hostname != 'localhost':
-            # Assume we're using Cloud SQL proxy on localhost:5433
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            return proxy_url
+        
+        # Known Cloud SQL configuration
+        CLOUD_SQL_INTERNAL_IP = "10.92.0.3"
+        CLOUD_SQL_USERNAME = "arccorp_sys_admin"
+        
+        # If hostname looks like a Cloud SQL instance name or non-IP, use the known internal IP
+        if parsed.hostname and not _is_ip_address(parsed.hostname):
+            logger = logging.getLogger(__name__)
+            logger.info(f"Resolving hostname {parsed.hostname} to Cloud SQL internal IP {CLOUD_SQL_INTERNAL_IP}")
+            
+            # Get password from Google Secrets Manager
+            try:
+                password = _get_db_password_from_secrets()
+                logger.info("Successfully retrieved password from Google Secrets Manager")
+            except Exception as e:
+                logger.warning(f"Could not get password from secrets, using original: {e}")
+                password = parsed.password if parsed.password else "fallback_password"
+            
+            # URL-encode the password to handle special characters
+            encoded_password = quote(password, safe='')
+            
+            # Use original port or default to 5432
+            port = parsed.port if parsed.port else 5432
+            
+            # Get database name from the path, default to the production database
+            database_name = parsed.path.lstrip('/') if parsed.path else 'arccorp_data_store'
+            resolved_url = f"postgresql://{CLOUD_SQL_USERNAME}:{encoded_password}@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}"
+            
+            logger.info(f"Resolved database URL: postgresql://{CLOUD_SQL_USERNAME}:***@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}")
+            return resolved_url
+        
+        # If hostname is already an IP or localhost, return as-is
         return database_url
-    except Exception:
+        
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Error resolving database URL: {e}")
         return database_url
+
+def _is_ip_address(hostname: str) -> bool:
+    """Check if hostname is already an IP address."""
+    try:
+        parts = hostname.split('.')
+        if len(parts) == 4:
+            return all(0 <= int(part) <= 255 for part in parts)
+    except (ValueError, AttributeError):
+        pass
+    return hostname in ['localhost', '127.0.0.1']
+
+def _get_db_password_from_secrets() -> str:
+    """Get database password from Google Secrets Manager."""
+    try:
+        from google.cloud import secretmanager
+        
+        # Initialize the client
+        client = secretmanager.SecretManagerServiceClient()
+        
+        # Get project ID from environment or use default
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
+        
+        # Use the correct secret name for database password
+        secret_name = "db-password"
+        name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+        
+        # Access the secret version
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+        
+    except Exception as e:
+        raise Exception(f"Error getting database password from secrets: {e}")
 
 def deploy_complete_schema():
     """Deploy the complete database schema."""
@@ -71,11 +134,11 @@ def deploy_complete_schema():
         logger.info("Getting database connection URL...")
         db_url = get_database_url()
         
-        # Check if we need to use proxy
-        proxy_url = get_proxy_url(db_url)
-        if proxy_url != db_url:
-            logger.info("Using Cloud SQL proxy connection")
-            db_url = proxy_url
+        # Resolve database URL to use correct IP and credentials
+        resolved_url = get_resolved_database_url(db_url)
+        if resolved_url != db_url:
+            logger.info("Using resolved Cloud SQL connection with internal IP")
+            db_url = resolved_url
         
         # Read the complete schema file
         schema_file = Path(__file__).parent.parent / 'database_migrations' / 'complete_schema.sql'
