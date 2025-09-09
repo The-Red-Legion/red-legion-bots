@@ -2784,6 +2784,153 @@ class SundayMiningCommands(commands.Cog):
                 ephemeral=True
             )
 
+    @app_commands.command(name="redapidebug", description="Debug UEX API response structure (Admin only)")
+    @app_commands.describe(
+        commodity="Specific commodity code to debug (optional)",
+        raw_output="Show raw JSON response"
+    )
+    @app_commands.default_permissions(administrator=True)
+    async def debug_uex_api(self, interaction: discord.Interaction, commodity: str = None, raw_output: bool = False):
+        """Debug the actual UEX API response to understand location data structure."""
+        
+        await interaction.response.defer()
+        
+        try:
+            from services.uex_cache import get_uex_cache
+            import json
+            
+            # Get fresh data from UEX API
+            cache = get_uex_cache()
+            
+            # Force a fresh API call
+            print("🔍 Making direct UEX API debug call...")
+            raw_data = await cache._fetch_uex_api("ores")
+            
+            if not raw_data:
+                await interaction.followup.send("❌ Failed to fetch UEX API data", ephemeral=True)
+                return
+            
+            if raw_output:
+                # Show raw JSON response (truncated for Discord limits)
+                raw_json = json.dumps(raw_data, indent=2)
+                if len(raw_json) > 1800:
+                    raw_json = raw_json[:1800] + "...\n[TRUNCATED]"
+                
+                embed = discord.Embed(
+                    title="🔍 Raw UEX API Response",
+                    description=f"```json\n{raw_json}\n```",
+                    color=0x00ff00
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
+            
+            # Analyze structure
+            if commodity:
+                # Debug specific commodity
+                commodity = commodity.upper()
+                if commodity in raw_data:
+                    item = raw_data[commodity]
+                    
+                    embed = discord.Embed(
+                        title=f"🔍 UEX API Debug: {commodity}",
+                        description=f"**{item.get('name', 'Unknown')}**",
+                        color=0x00ff00
+                    )
+                    
+                    # Show all available fields
+                    embed.add_field(
+                        name="📊 Basic Data",
+                        value=f"• Price Sell: {item.get('price_sell', 'N/A')}\n• Price Buy: {item.get('price_buy', 'N/A')}\n• Code: {item.get('code', 'N/A')}",
+                        inline=False
+                    )
+                    
+                    # Show all keys in the item
+                    all_keys = list(item.keys())
+                    embed.add_field(
+                        name="🗝️ All API Fields",
+                        value=f"```{', '.join(all_keys)}```",
+                        inline=False
+                    )
+                    
+                    # Check for location data in various forms
+                    location_fields = []
+                    for key in ['locations', 'terminals', 'trades', 'prices', 'best_location', 'location_data']:
+                        if key in item:
+                            location_fields.append(f"• **{key}**: {type(item[key]).__name__} - {item[key]}")
+                    
+                    if location_fields:
+                        location_text = '\n'.join(location_fields)
+                        if len(location_text) > 1000:
+                            location_text = location_text[:1000] + "...\n[TRUNCATED]"
+                        embed.add_field(
+                            name="📍 Location Data Found",
+                            value=location_text,
+                            inline=False
+                        )
+                    else:
+                        embed.add_field(
+                            name="❌ Location Data",
+                            value="No location fields found in this commodity",
+                            inline=False
+                        )
+                    
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                else:
+                    await interaction.followup.send(f"❌ Commodity '{commodity}' not found in API response", ephemeral=True)
+            else:
+                # Show general API structure
+                embed = discord.Embed(
+                    title="🔍 UEX API Structure Analysis",
+                    description=f"Found **{len(raw_data)}** commodities in response",
+                    color=0x00ff00
+                )
+                
+                # Sample a few commodities to understand structure
+                sample_items = list(raw_data.items())[:3]
+                
+                for code, item in sample_items:
+                    # Check what location-related fields exist
+                    location_keys = []
+                    for key in item.keys():
+                        if any(loc_word in key.lower() for loc_word in ['location', 'terminal', 'trade', 'price', 'sell', 'buy']):
+                            location_keys.append(key)
+                    
+                    embed.add_field(
+                        name=f"📦 {code} ({item.get('name', 'Unknown')})",
+                        value=f"**Location-related fields**: {', '.join(location_keys) if location_keys else 'None'}\n**All fields**: {len(item.keys())} total",
+                        inline=False
+                    )
+                
+                # Show common field analysis
+                all_fields = set()
+                location_fields = set()
+                for item in raw_data.values():
+                    all_fields.update(item.keys())
+                    for key in item.keys():
+                        if any(loc_word in key.lower() for loc_word in ['location', 'terminal', 'trade', 'sell', 'buy']):
+                            location_fields.add(key)
+                
+                embed.add_field(
+                    name="🌐 All Fields Across API",
+                    value=f"```{', '.join(sorted(all_fields))}```",
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="📍 Potential Location Fields",
+                    value=f"```{', '.join(sorted(location_fields)) if location_fields else 'None found'}```",
+                    inline=False
+                )
+                
+                embed.set_footer(text="Use 'commodity' parameter to debug a specific ore (e.g. QUANTAINIUM)")
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                
+        except Exception as e:
+            await interaction.followup.send(f"❌ Debug error: {str(e)}", ephemeral=True)
+            print(f"❌ UEX API debug error: {e}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
+
 
 async def setup(bot):
     """Setup function for the mining cog."""
