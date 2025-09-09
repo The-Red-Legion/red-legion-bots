@@ -25,9 +25,19 @@ class EventManagement(commands.Cog):
     """Complete event management system for mining events."""
     
     def __init__(self, bot):
-        super().__init__()
-        self.bot = bot
-        print("✅ Event Management Cog initialized successfully!")
+        print("🔧 EventManagement.__init__ called!")
+        try:
+            print("🔧 About to call super().__init__()...")
+            super().__init__()
+            print("🔧 super().__init__() completed")
+            self.bot = bot
+            print("🔧 self.bot assigned")
+            print("✅ Event Management Cog initialized successfully!")
+        except Exception as e:
+            print(f"❌ Error in EventManagement.__init__: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     @app_commands.command(name="red-test-event", description="Test command to verify event system works")
     async def test_event(self, interaction: discord.Interaction):
@@ -884,8 +894,14 @@ async def setup(bot):
     """Setup function for discord.py extension loading."""
     print("🔧 Starting EventManagement setup with simple test command...")
     try:
+        print("🔧 Step 1: About to create EventManagement instance...")
         cog = EventManagement(bot)
+        print(f"🔧 Step 2: Created cog object: {cog}")
+        print(f"🔧 Step 3: Cog type: {type(cog)}")
+        print(f"🔧 Step 4: About to add cog to bot...")
         await bot.add_cog(cog)
+        print("🔧 Step 5: Successfully added cog to bot")
+        print(f"🔧 Step 6: Bot cogs now: {list(bot.cogs.keys())}")
         print("✅ Event Management test command loaded")
         print("✅ Added red-test-event command")
     except Exception as e:
