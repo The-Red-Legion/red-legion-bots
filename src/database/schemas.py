@@ -306,30 +306,7 @@ def init_database(database_url=None):
             
             cursor.execute(schema_sql)
             
-            # Add migration logic for missing columns (PostgreSQL compatible)
-            migration_queries = [
-                "ALTER TABLE mining_participation ADD COLUMN join_time TIMESTAMP",
-                "ALTER TABLE mining_participation ADD COLUMN leave_time TIMESTAMP", 
-                "ALTER TABLE mining_participation ADD COLUMN duration_minutes INTEGER DEFAULT 0"
-            ]
-            
-            for query in migration_queries:
-                try:
-                    cursor.execute(query)
-                    print(f"✅ Migration: {query}")
-                except Exception as e:
-                    # Column likely already exists, which is fine
-                    print(f"Info: {query} - {e}")
-                    continue
-            
-            # Set default values for join_time if needed
-            try:
-                cursor.execute("UPDATE mining_participation SET join_time = created_at WHERE join_time IS NULL")
-                cursor.execute("ALTER TABLE mining_participation ALTER COLUMN join_time SET NOT NULL")
-                print("✅ Set join_time defaults and NOT NULL constraint")
-            except Exception as e:
-                print(f"Info: join_time constraint setup: {e}")
-                # This is fine if already set or if table is empty
+            # Migration queries removed - columns already defined in table creation above
             
         print("✅ Database schema initialized successfully")
         return True
