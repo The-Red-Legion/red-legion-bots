@@ -2664,7 +2664,7 @@ class SundayMiningCommands(commands.Cog):
                 
                 # Check recent events in this guild
                 cursor.execute("""
-                    SELECT event_id, guild_id, COALESCE(name, event_name) as name, 
+                    SELECT event_id, guild_id, name, 
                            status, event_date, created_at 
                     FROM mining_events 
                     WHERE guild_id = %s AND created_at >= NOW() - INTERVAL '7 days'
@@ -2710,10 +2710,10 @@ class SundayMiningCommands(commands.Cog):
                 # Search for specific session ID (if provided)
                 search_session = "sunday_20250909_180124"
                 cursor.execute("""
-                    SELECT event_id, guild_id, COALESCE(name, event_name) as name, 
+                    SELECT event_id, guild_id, name, 
                            status, event_date, created_at 
                     FROM mining_events 
-                    WHERE COALESCE(name, event_name) ILIKE %s
+                    WHERE name ILIKE %s
                        OR event_id::text = %s
                     ORDER BY created_at DESC
                 """, (f'%{search_session}%', search_session))

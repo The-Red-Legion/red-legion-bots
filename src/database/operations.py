@@ -857,26 +857,28 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
             # Create new event - using flexible column structure
             print(f"🔍 Attempting to create event with guild_id={guild_id}, event_id='{prefixed_event_id}', name='{event_name}', date={event_date}")
             
+            # Skip the prefixed ID approach since database uses integer event_id
+            # Go directly to the working schema based on diagnostics
             try:
-                # Try the new schema format first (with event_id primary key)
-                print(f"🔄 Attempting new schema INSERT with prefixed_event_id: {prefixed_event_id}")
+                print(f"🔄 Creating event using current database schema (integer event_id)")
                 cursor.execute("""
                     INSERT INTO mining_events (
-                        event_id, guild_id, name, event_date, event_type, status, 
+                        guild_id, name, event_date, event_type, status, 
                         start_time, is_active, created_at, updated_at
                     ) VALUES (
-                        %s, %s, %s, %s, 'mining', 'active', 
+                        %s, %s, %s, 'mining', 'active', 
                         %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                     ) RETURNING event_id
                 """, (
-                    prefixed_event_id,
                     str(guild_id), 
                     event_name, 
                     event_date,
                     datetime.now()
                 ))
-                returned_event_id = cursor.fetchone()[0]
-                print(f"✅ Created event using new schema format, event_id: {returned_event_id}")
+                integer_event_id = cursor.fetchone()[0]
+                # Convert to prefixed format for display consistency
+                returned_event_id = f"sm-{integer_event_id:06d}"
+                print(f"✅ Created event using current schema, integer_id: {integer_event_id} -> display_id: {returned_event_id}")
                 
             except Exception as schema_error:
                 print(f"⚠️ New schema with prefixed ID failed: {schema_error}")
@@ -888,12 +890,12 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
                     print(f"🔄 Attempting legacy schema INSERT...")
                     cursor.execute("""
                         INSERT INTO mining_events (
-                            guild_id, event_name, event_date, event_type, status, 
+                            guild_id, name, event_date, event_type, status, 
                             start_time, is_active, created_at, updated_at
                         ) VALUES (
                             %s, %s, %s, 'mining', 'active', 
                             %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                        ) RETURNING id
+                        ) RETURNING event_id
                     """, (
                         str(guild_id), 
                         event_name, 
@@ -916,7 +918,7 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
                         cursor.execute("""
                             INSERT INTO mining_events (guild_id, name, event_date, status, is_active)
                             VALUES (%s, %s, %s, 'active', true)
-                            RETURNING id
+                            RETURNING event_id
                         """, (str(guild_id), event_name, event_date))
                         basic_event_id = cursor.fetchone()[0]
                         returned_event_id = f"sm-{basic_event_id:06d}"
