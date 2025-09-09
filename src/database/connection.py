@@ -60,7 +60,9 @@ def resolve_database_url(database_url: str) -> str:
         Resolved database URL with correct IP and credentials
     """
     try:
+        logger.info(f"Processing database URL: {database_url[:30]}...")
         parsed = urlparse(database_url)
+        logger.info(f"Parsed hostname: {parsed.hostname}, port: {parsed.port}, username: {parsed.username}")
         
         # Known Cloud SQL configuration
         CLOUD_SQL_INTERNAL_IP = "10.92.0.3"
@@ -73,33 +75,43 @@ def resolve_database_url(database_url: str) -> str:
             # Get password from Google Secrets Manager
             try:
                 password = _get_db_password_from_secrets()
+                logger.info("Successfully retrieved password from Google Secrets Manager")
             except Exception as e:
                 logger.warning(f"Could not get password from secrets, using original: {e}")
-                password = parsed.password
+                password = parsed.password if parsed.password else "fallback_password"
             
-            # Replace hostname and credentials with known values
-            netloc = f"{CLOUD_SQL_USERNAME}:{password}@{CLOUD_SQL_INTERNAL_IP}"
-            if parsed.port:
-                netloc += f":{parsed.port}"
-                
-            resolved_url = urlunparse((
-                parsed.scheme,
-                netloc,
-                parsed.path,
-                parsed.params,
-                parsed.query,
-                parsed.fragment
-            ))
+            # Use original port or default to 5432
+            port = parsed.port if parsed.port else 5432
             
-            logger.info("Resolved database URL using Cloud SQL internal IP and credentials")
+            # URL-encode the password to handle special characters
+            from urllib.parse import quote
+            encoded_password = quote(password, safe='')
+            
+            # Get database name from the path, default to the production database
+            database_name = parsed.path.lstrip('/') if parsed.path else 'arccorp_data_store'
+            resolved_url = f"postgresql://{CLOUD_SQL_USERNAME}:{encoded_password}@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}"
+            
+            logger.info(f"Resolved database URL: postgresql://{CLOUD_SQL_USERNAME}:***@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}")
             return resolved_url
         
         # If hostname is already an IP or localhost, return as-is
+        logger.info("Database URL already has IP address, returning as-is")
         return database_url
         
     except Exception as e:
-        logger.warning(f"Error resolving database URL: {e}")
-        return database_url
+        logger.error(f"Error resolving database URL: {e}")
+        logger.error(f"Original URL was: {database_url[:50]}...")
+        # Return a safe fallback URL
+        try:
+            password = _get_db_password_from_secrets()
+            from urllib.parse import quote
+            encoded_password = quote(password, safe='')
+            fallback_url = f"postgresql://arccorp_sys_admin:{encoded_password}@10.92.0.3:5432/arccorp_data_store"
+            logger.info("Using fallback URL with secrets manager password")
+            return fallback_url
+        except:
+            logger.error("Could not create fallback URL, returning original")
+            return database_url
 
 def _get_db_password_from_secrets() -> str:
     """Get database password from Google Secrets Manager."""
