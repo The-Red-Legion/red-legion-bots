@@ -227,30 +227,51 @@
           delegate_to: localhost
 
     - name: Verify complete codebase deployment
-      stat:
-        path: "{{ app_dir }}/src/main.py"
-      register: main_file_check
-      failed_when: not main_file_check.stat.exists
-
-    - name: Display full deployment timestamp and file count
       block:
-        - name: Count deployed files
+        - name: Check if src directory exists
+          stat:
+            path: "{{ app_dir }}/src"
+          register: src_dir_check
+          
+        - name: Check if main.py exists
+          stat:
+            path: "{{ app_dir }}/src/main.py"
+          register: main_file_check
+          
+        - name: List deployed files for debugging
           find:
             paths: "{{ app_dir }}"
             recurse: yes
             file_type: file
-          register: file_count
-        
-        - name: Display deployment stats
+          register: deployed_files
+          
+        - name: Show deployment structure
           debug:
             msg: |
-              ===== FULL DEPLOYMENT COMPLETED =====
-              Method: Complete file copy (not rsync)
-              Files deployed: {{ file_count.matched }}
-              Deployment time: {{ ansible_date_time.iso8601 }}
-              Target: {{ app_dir }}
-              Backup: {{ backup_dir }} (if existed)
-              =====================================
+              Deployment verification:
+              - App directory exists: {{ src_dir_check.stat.exists | default(false) }}
+              - Main.py exists: {{ main_file_check.stat.exists | default(false) }}
+              - Total files deployed: {{ deployed_files.matched }}
+              
+        - name: Fail if main.py not found
+          fail:
+            msg: |
+              Deployment verification failed:
+              - src/ directory: {{ 'EXISTS' if src_dir_check.stat.exists else 'MISSING' }}
+              - src/main.py: {{ 'EXISTS' if main_file_check.stat.exists else 'MISSING' }}
+              - Files deployed: {{ deployed_files.matched }}
+          when: not main_file_check.stat.exists
+
+    - name: Display full deployment stats
+      debug:
+        msg: |
+          ===== FULL DEPLOYMENT COMPLETED =====
+          Method: Complete file copy (not rsync)
+          Files deployed: {{ deployed_files.matched }}
+          Deployment time: {{ ansible_date_time.iso8601 }}
+          Target: {{ app_dir }}
+          Backup: {{ backup_dir }} (if existed)
+          =====================================
 
     - name: Install Python dependencies (fresh installation)
       block:
