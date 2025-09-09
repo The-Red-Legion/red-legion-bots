@@ -158,15 +158,15 @@ ORE_TYPES = {
     "SILICON": "Silicon"
 }
 
-# Sunday Mining Configuration
+# Sunday Mining Configuration - Updated with correct Discord channel IDs
 SUNDAY_MINING_CHANNELS_FALLBACK = {
-    'dispatch': '1385774416755163247',
-    'alpha': '1386367354753257583',
-    'bravo': '1386367395643449414',
-    'charlie': '1386367464279478313',
-    'delta': '1386368182421635224',
-    'echo': '1386368221877272616',
-    'foxtrot': '1386368253712375828'
+    'dispatch': '1385774416755163247',  # Dispatch/Main
+    'alpha': '1386367354753257583',     # Group Alpha  
+    'bravo': '1385774498745159762',     # Group Bravo
+    'charlie': '1386344354930757782',   # Group Charlie
+    'delta': '1386344411151204442',     # Group Delta
+    'echo': '1386344461541445643',      # Group Echo
+    'foxtrot': '1386344513076854895'    # Group Foxtrot
 }
 
 def get_sunday_mining_channels(guild_id=None):
