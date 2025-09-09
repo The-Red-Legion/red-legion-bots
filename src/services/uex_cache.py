@@ -44,8 +44,8 @@ class UEXCache:
     """
     
     def __init__(self, 
-                 default_ttl: int = 300,  # 5 minutes default TTL
-                 refresh_interval: int = 240,  # 4 minutes refresh interval
+                 default_ttl: int = 86400,  # 24 hours default TTL (matches UEX API refresh)
+                 refresh_interval: int = 86400,  # 24 hours refresh interval
                  max_retries: int = 3):
         self.default_ttl = default_ttl
         self.refresh_interval = refresh_interval

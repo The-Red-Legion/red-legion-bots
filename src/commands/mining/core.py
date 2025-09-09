@@ -2059,7 +2059,7 @@ class SundayMiningCommands(commands.Cog):
             name="💡 Usage Tips",
             value="• Prices show the highest available sell price per location\n"
                   "• Use `/redpayroll calculate` to enter ore amounts and auto-calculate total value\n"
-                  "• Prices update automatically every 4 minutes from UEX Corp",
+                  "• Prices update automatically every 24 hours from UEX Corp",
             inline=False
         )
         
