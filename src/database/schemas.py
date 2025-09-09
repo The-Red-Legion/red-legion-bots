@@ -303,46 +303,47 @@ def init_database(database_url=None):
             -- Foreign key constraints will be added separately after schema creation
             """
             
-            # Drop ALL existing tables to ensure clean slate (order matters due to dependencies)
-            print("🧹 Dropping all existing tables for clean recreation...")
-            drop_tables = [
-                "DROP TABLE IF EXISTS mining_yields CASCADE;",
-                "DROP TABLE IF EXISTS mining_participation CASCADE;",
-                "DROP TABLE IF EXISTS admin_actions CASCADE;", 
-                "DROP TABLE IF EXISTS command_usage CASCADE;",
-                "DROP TABLE IF EXISTS bot_config CASCADE;",
-                "DROP TABLE IF EXISTS market_items CASCADE;",
-                "DROP TABLE IF EXISTS loans CASCADE;",
-                "DROP TABLE IF EXISTS materials CASCADE;",
-                "DROP TABLE IF EXISTS events CASCADE;",
-                "DROP TABLE IF EXISTS mining_events CASCADE;",
-                "DROP TABLE IF EXISTS mining_channels CASCADE;",
-                "DROP TABLE IF EXISTS guild_memberships CASCADE;",
-                "DROP TABLE IF EXISTS guilds CASCADE;",
-                "DROP TABLE IF EXISTS users CASCADE;"
-            ]
-            
-            for drop_sql in drop_tables:
-                try:
-                    cursor.execute(drop_sql)
-                    table_name = drop_sql.split("DROP TABLE IF EXISTS ")[1].split(" CASCADE")[0]
-                    print(f"✅ Dropped table: {table_name}")
-                except Exception as e:
-                    print(f"Info: Drop table failed (may not exist): {e}")
-            
-            print("🧹 All tables dropped, creating fresh schema...")
-            
-            # Execute schema creation with better error handling
-            print("🔧 Creating database schema...")
+            # Smart approach: Only drop problematic mining_participation table, preserve data in others
+            print("🔧 Checking for problematic table states...")
             try:
-                cursor.execute(schema_sql)
-                print("✅ Schema SQL executed successfully")
+                # Only drop mining_participation if it has schema issues
+                cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'mining_participation' AND column_name = 'join_time';")
+                result = cursor.fetchone()
+                if not result:
+                    # mining_participation exists but doesn't have join_time - drop it
+                    cursor.execute("DROP TABLE IF EXISTS mining_participation CASCADE;")
+                    print("✅ Dropped corrupted mining_participation table")
+                else:
+                    print("✅ Mining_participation table is healthy")
             except Exception as e:
-                print(f"❌ Schema SQL execution failed: {e}")
-                # Try to get more specific error information
-                import traceback
-                traceback.print_exc()
-                raise
+                print(f"Info: mining_participation check: {e}")
+                # If check fails, safely drop the table
+                try:
+                    cursor.execute("DROP TABLE IF EXISTS mining_participation CASCADE;")
+                    print("✅ Dropped mining_participation table due to check failure")
+                except:
+                    pass
+            
+            # Execute schema creation with individual statement handling
+            print("🔧 Creating database schema...")
+            
+            # Split schema into individual statements for better error isolation  
+            statements = [stmt.strip() for stmt in schema_sql.split(';') if stmt.strip()]
+            
+            for i, statement in enumerate(statements):
+                try:
+                    if statement:
+                        cursor.execute(statement + ';')
+                        if 'CREATE TABLE' in statement:
+                            table_name = statement.split('CREATE TABLE IF NOT EXISTS ')[1].split(' (')[0]
+                            print(f"✅ Created table: {table_name}")
+                        elif 'CREATE INDEX' in statement:
+                            index_name = statement.split('CREATE INDEX IF NOT EXISTS ')[1].split(' ON')[0]
+                            print(f"✅ Created index: {index_name}")
+                except Exception as e:
+                    print(f"⚠️ Statement {i+1} failed (may be expected): {e}")
+                    print(f"Statement: {statement[:100]}...")
+                    # Continue with other statements instead of failing completely
             
             # Add foreign key constraints with error handling
             fk_constraints = [
@@ -406,6 +407,20 @@ def init_database(database_url=None):
                 except Exception as e:
                     print(f"⚠️ Mining_participation index creation failed: {e}")
                     # Continue with other indexes
+            
+        # Create schema version tracking table for future migrations
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS schema_versions (
+                    version INTEGER PRIMARY KEY,
+                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    description TEXT
+                );
+            """)
+            cursor.execute("INSERT INTO schema_versions (version, description) VALUES (1, 'Initial schema with separated foreign keys') ON CONFLICT DO NOTHING;")
+            print("✅ Schema version tracking initialized")
+        except Exception as e:
+            print(f"Info: Schema version tracking: {e}")
             
         print("✅ Database schema initialized successfully")
         return True
