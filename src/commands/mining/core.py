@@ -8,9 +8,9 @@ This module handles Sunday mining operations including:
 - Mining session management and reporting
 
 Commands:
-- /sunday_mining_start: Start a Sunday mining session
-- /sunday_mining_stop: Stop the current mining session 
-- /payroll: Calculate and display payroll for the last session
+- /redsundayminingstart: Start a Sunday mining session
+- /redsundayminingstop: Stop the current mining session 
+- /redpayroll: Calculate and display payroll for the last session
 """
 
 import discord
@@ -694,7 +694,7 @@ class SundayMiningCommands(commands.Cog):
             
             embed.add_field(
                 name="📝 Next Steps",
-                value="1. **Look for the bot in Dispatch channel** - this confirms tracking is active\n2. Join any tracked voice channels to track participation\n3. Mine ore and deposit in central storage\n4. Use `/sunday_mining_stop` when done\n5. Payroll officer uses `/payroll` to calculate distribution",
+                value="1. **Look for the bot in Dispatch channel** - this confirms tracking is active\n2. Join any tracked voice channels to track participation\n3. Mine ore and deposit in central storage\n4. Use `/redsundayminingstop` when done\n5. Payroll officer uses `/redpayroll calculate` to calculate distribution",
                 inline=False
             )
             
@@ -713,7 +713,7 @@ class SundayMiningCommands(commands.Cog):
             if not current_session['active']:
                 embed = discord.Embed(
                     title="⚠️ No Active Mining Session",
-                    description="Use `/sunday_mining_start` to begin a session",
+                    description="Use `/redsundayminingstart` to begin a session",
                     color=0xffaa00
                 )
                 await interaction.response.send_message(embed=embed)
@@ -730,24 +730,84 @@ class SundayMiningCommands(commands.Cog):
             
             stop_voice_tracking()
             
+            # Get participants data
+            participants_text = "No participants tracked"
+            participant_count = 0
+            
+            try:
+                # Try to get participants from database first
+                if current_session.get('event_id'):
+                    from database.operations import get_mining_session_participants
+                    from config.settings import get_database_url
+                    
+                    db_url = get_database_url()
+                    if db_url:
+                        participants_data = get_mining_session_participants(db_url, event_id=current_session['event_id'])
+                        if participants_data:
+                            participant_count = len(participants_data)
+                            # Group participants by name and sum their time
+                            participant_summary = {}
+                            for p in participants_data:
+                                name = p[2]  # participant_name is 3rd element
+                                duration_mins = p[7] / 60 if len(p) > 7 else 0  # duration_seconds converted to minutes
+                                if name in participant_summary:
+                                    participant_summary[name] += duration_mins
+                                else:
+                                    participant_summary[name] = duration_mins
+                            
+                            # Create display text
+                            if participant_summary:
+                                participants_list = []
+                                for name, total_mins in sorted(participant_summary.items()):
+                                    participants_list.append(f"• {name}: {total_mins:.1f} mins")
+                                participants_text = "\n".join(participants_list[:15])  # Limit to 15 to avoid embed limits
+                                if len(participant_summary) > 15:
+                                    participants_text += f"\n• ... and {len(participant_summary) - 15} more"
+                
+                # Fallback to in-memory tracking
+                if participant_count == 0:
+                    from handlers.voice_tracking import get_all_mining_participants
+                    in_memory_participants = get_all_mining_participants(interaction.client)
+                    if in_memory_participants:
+                        participant_count = len(in_memory_participants)
+                        participants_list = []
+                        for member_id, data in in_memory_participants.items():
+                            username = data.get('username', f'User {member_id}')
+                            total_mins = data.get('total_time', 0) / 60
+                            participants_list.append(f"• {username}: {total_mins:.1f} mins")
+                        participants_text = "\n".join(participants_list[:15])
+                        if len(in_memory_participants) > 15:
+                            participants_text += f"\n• ... and {len(in_memory_participants) - 15} more"
+                            
+            except Exception as e:
+                print(f"❌ Error retrieving participants: {e}")
+                participants_text = "Error retrieving participant data"
+            
             # Create session summary
             embed = discord.Embed(
                 title="⏹️ Sunday Mining Session Ended",
-                description=f"Session ID: `{current_session['session_id']}`",
+                description=f"Session ID: `{current_session['session_id']}`\nEvent ID: `{current_session.get('event_id', 'N/A')}`",
                 color=0xff6b6b,
                 timestamp=datetime.now()
             )
             
             embed.add_field(
                 name="📊 Session Summary",
-                value=f"• Duration: {duration_hours:.1f} hours\n• Participants tracked via voice channels\n• 🤖 Bot has left all voice channels",
+                value=f"• Duration: {duration_hours:.1f} hours\n• Participants: {participant_count}\n• 🤖 Bot has left all voice channels",
                 inline=False
             )
+            
+            if participant_count > 0:
+                embed.add_field(
+                    name="👥 Participants",
+                    value=participants_text,
+                    inline=False
+                )
             
             # Calculate total ore collected - removed since payroll officer handles this
             embed.add_field(
                 name="💰 Next Steps",
-                value="Payroll officer should use `/payroll calculate` to determine earnings distribution",
+                value="Payroll officer should use `/redpayroll calculate` to determine earnings distribution",
                 inline=False
             )
             
@@ -807,7 +867,7 @@ class SundayMiningCommands(commands.Cog):
                     # No events found - provide helpful message
                     embed = discord.Embed(
                         title="❌ No Mining Events Found",
-                        description="No recent Sunday mining events found. Start a mining session first with `/sunday_mining_start`",
+                        description="No recent Sunday mining events found. Start a mining session first with `/redsundayminingstart`",
                         color=0xff0000
                     )
                     embed.add_field(
@@ -950,7 +1010,7 @@ class SundayMiningCommands(commands.Cog):
             
             embed.add_field(
                 name="💡 Next Steps",
-                value="Use `/payroll calculate` to enter total mining value and calculate distribution",
+                value="Use `/redpayroll calculate` to enter total mining value and calculate distribution",
                 inline=False
             )
             
@@ -1089,7 +1149,7 @@ class SundayMiningCommands(commands.Cog):
         
         embed = discord.Embed(
             title=f"📊 UEX Corp Price Check - {category_names.get(category, category.title())}",
-            description="Live prices from UEX API (highest available per SCU)",
+            description="Live prices from UEX API with best selling locations",
             color=0x3498db,
             timestamp=datetime.now()
         )
@@ -1109,9 +1169,9 @@ class SundayMiningCommands(commands.Cog):
             reverse=True
         )
         
-        # Split into chunks for multiple fields (Discord limit)
-        chunk_size = 10
-        chunks = [sorted_items[i:i + chunk_size] for i in range(0, min(len(sorted_items), 50), chunk_size)]
+        # Split into chunks for better readability - use single wide columns
+        chunk_size = 8
+        chunks = [sorted_items[i:i + chunk_size] for i in range(0, min(len(sorted_items), 25), chunk_size)]
         
         for i, chunk in enumerate(chunks):
             price_list = []
@@ -1125,16 +1185,31 @@ class SundayMiningCommands(commands.Cog):
                 
                 indicator_str = "".join(indicators) + " " if indicators else ""
                 
+                # Get location information for best price
+                location_info = "Location Unknown"
+                locations = commodity_data.get('locations', [])
+                if locations:
+                    # Find location with highest sell price
+                    best_location = max(locations, 
+                                      key=lambda x: x.get('sell_price', 0))
+                    location_name = best_location.get('name', 'Unknown Location')
+                    # Truncate long location names for better readability
+                    if len(location_name) > 30:
+                        location_name = location_name[:27] + "..."
+                    location_info = location_name
+                
+                # More spaced out formatting with better alignment
                 price_list.append(
-                    f"{indicator_str}**{commodity_data['name']}** ({commodity_data['code']})"
-                    f"\n└ {commodity_data['price_sell']:>8,.0f} aUEC/SCU"
+                    f"{indicator_str}**{commodity_data['name']}** ({commodity_data['code']})\n"
+                    f"💰 **{commodity_data['price_sell']:,.0f}** aUEC/SCU\n"
+                    f"📍 {location_info}"
                 )
             
-            field_name = f"💰 Prices ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Current Prices"
+            field_name = f"💰 Prices & Locations ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Prices & Best Locations"
             embed.add_field(
                 name=field_name,
-                value="\n".join(price_list),
-                inline=True if len(chunks) > 1 else False
+                value="\n\n".join(price_list),  # Double spacing between items
+                inline=False  # Always use full width for better readability
             )
         
         # Add summary statistics
@@ -1152,8 +1227,8 @@ class SundayMiningCommands(commands.Cog):
         # Add legend
         embed.add_field(
             name="🔍 Legend",
-            value="⛏️ Mineable Ore • ⚠️ Illegal Commodity\n"
-                  "💡 Use `/payroll calculate` to calculate mining payouts",
+            value="⛏️ Mineable Ore • ⚠️ Illegal Commodity • 📍 Best Selling Location\n"
+                  "💡 Use `/redpayroll calculate` to calculate mining payouts",
             inline=False
         )
         
@@ -1241,7 +1316,7 @@ class SundayMiningCommands(commands.Cog):
         embed.add_field(
             name="💡 Usage Tips",
             value="• Prices show the highest available sell price per location\n"
-                  "• Use `/payroll calculate` to enter ore amounts and auto-calculate total value\n"
+                  "• Use `/redpayroll calculate` to enter ore amounts and auto-calculate total value\n"
                   "• Prices update automatically every 4 minutes from UEX Corp",
             inline=False
         )
@@ -1262,25 +1337,25 @@ class SundayMiningCommands(commands.Cog):
             print(f"📋 Found {len(events)} open mining events")
             
             if not events:
-                # If no open events, get recent closed events as fallback for this guild
+                # If no open events, get recent events from mining_events table
                 import psycopg2
                 conn = psycopg2.connect(db_url)
                 c = conn.cursor()
                 c.execute(
                     """
-                    SELECT id, event_name, event_time, created_at
-                    FROM events 
+                    SELECT event_id, name, start_time, created_at, status
+                    FROM mining_events 
                     WHERE guild_id = %s 
-                       AND (event_name ILIKE '%%sunday%%mining%%' OR event_name ILIKE '%%mining%%')
+                       AND is_active = true
                        AND created_at >= NOW() - INTERVAL '7 days'
                     ORDER BY created_at DESC
                     LIMIT 10
                     """,
-                    (guild_id,)
+                    (str(guild_id),)
                 )
                 events = c.fetchall()
                 conn.close()
-                print(f"📋 Found {len(events)} recent events as fallback")
+                print(f"📋 Found {len(events)} recent mining events as fallback")
             
             return events
             
@@ -1531,7 +1606,7 @@ class SundayMiningCommands(commands.Cog):
                 value="1. Review failed tests above\n"
                       "2. Check bot permissions in voice channels\n"
                       "3. Verify mining channel configuration\n"
-                      "4. Test with `/sunday_mining_start` after fixes",
+                      "4. Test with `/redsundayminingstart` after fixes",
                 inline=False
             )
             
@@ -1575,7 +1650,7 @@ def register_commands(bot):
         )
         embed.add_field(
             name="New Commands",
-            value="• `/sunday_mining_start` - Start mining session\n• `/payroll` - Submit ore collections\n• `/sunday_mining_stop` - End session",
+            value="• `/redsundayminingstart` - Start mining session\n• `/redpayroll` - Submit ore collections\n• `/redsundayminingstop` - End session",
             inline=False
         )
         await ctx.send(embed=embed)

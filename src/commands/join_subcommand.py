@@ -115,7 +115,7 @@ class ApplicationFormModal(discord.ui.Modal, title='Red Legion Application'):
                 value="• Complete the RSI website application above\n"
                       "• Your application will be reviewed by our officers\n"
                       "• You'll be notified of any status changes\n"
-                      "• Use `/red-join status` to check your application\n"
+                      "• Use `/redjoin status` to check your application\n"
                       "• Questions? Contact an officer directly",
                 inline=False
             )
@@ -162,7 +162,7 @@ class ApplicationFormModal(discord.ui.Modal, title='Red Legion Application'):
             
             embed.add_field(
                 name="Review Actions",
-                value="Use `/red-join review` to start the review process",
+                value="Use `/redjoin review` to start the review process",
                 inline=False
             )
             
