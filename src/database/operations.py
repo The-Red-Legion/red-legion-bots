@@ -8,6 +8,7 @@ Includes both new architecture classes and legacy compatibility functions.
 import sys
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+from datetime import datetime, date
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -668,6 +669,167 @@ def get_entries(database_url, month_year):
     """Legacy function - get entries"""
     return []
 
+# ================================
+# Event Management Functions
+# ================================
+
+async def create_event(name: str, description: str, category: str, date: str, time: str, 
+                      created_by: int, subcategory: str = None, guild_id: str = None) -> int:
+    """
+    Create a new event in the mining_events table.
+    
+    Args:
+        name: Event name
+        description: Event description  
+        category: Event category (mining, combat, training, etc.)
+        date: Event date (YYYY-MM-DD format)
+        time: Event time (HH:MM format)
+        created_by: Discord user ID who created the event
+        subcategory: Optional subcategory for more specific event types
+        guild_id: Guild ID (optional, can be derived from context)
+        
+    Returns:
+        int: The created event ID
+    """
+    try:
+        # Use global db manager
+        from config.settings import get_database_url
+        database_url = get_database_url()
+        
+        # Combine date and time into a datetime
+        datetime_str = f"{date} {time}:00"
+        start_time = datetime.fromisoformat(datetime_str)
+        
+        # Default guild_id if not provided
+        if guild_id is None:
+            from config.settings import GUILD_ID
+            guild_id = str(GUILD_ID)
+        
+        import psycopg2
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Insert into mining_events table (works for all event types)
+        cursor.execute("""
+            INSERT INTO mining_events 
+            (guild_id, name, description, event_type, start_time, organizer_id, status, event_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING event_id
+        """, (guild_id, name, description, category, start_time, str(created_by), 'planned', start_time.date()))
+        
+        event_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        
+        return event_id
+        
+    except Exception as e:
+        print(f"Error creating event: {e}")
+        raise
+
+async def get_all_events(category: str = None, guild_id: str = None) -> List[Dict]:
+    """
+    Get all events, optionally filtered by category.
+    
+    Args:
+        category: Optional category filter
+        guild_id: Guild ID (optional)
+        
+    Returns:
+        List of event dictionaries
+    """
+    try:
+        from config.settings import get_database_url
+        database_url = get_database_url()
+        
+        # Default guild_id if not provided
+        if guild_id is None:
+            from config.settings import GUILD_ID
+            guild_id = str(GUILD_ID)
+        
+        import psycopg2
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        if category:
+            cursor.execute("""
+                SELECT event_id, name, description, event_type, start_time, event_date, 
+                       status, organizer_id, organizer_name
+                FROM mining_events 
+                WHERE guild_id = %s AND event_type = %s AND is_active = true
+                ORDER BY start_time ASC
+            """, (guild_id, category))
+        else:
+            cursor.execute("""
+                SELECT event_id, name, description, event_type, start_time, event_date,
+                       status, organizer_id, organizer_name
+                FROM mining_events 
+                WHERE guild_id = %s AND is_active = true
+                ORDER BY start_time ASC
+            """, (guild_id,))
+        
+        events = []
+        for row in cursor.fetchall():
+            event_dict = {
+                'id': row[0],
+                'name': row[1],
+                'description': row[2],
+                'category': row[3],
+                'start_time': row[4],
+                'date': row[5].strftime('%Y-%m-%d') if row[5] else None,
+                'time': row[4].strftime('%H:%M') if row[4] else None,
+                'status': row[6],
+                'organizer_id': row[7],
+                'organizer_name': row[8]
+            }
+            events.append(event_dict)
+        
+        conn.close()
+        return events
+        
+    except Exception as e:
+        print(f"Error getting events: {e}")
+        return []
+
+async def delete_event(event_id: int, guild_id: str = None) -> bool:
+    """
+    Delete an event by setting is_active to false.
+    
+    Args:
+        event_id: Event ID to delete
+        guild_id: Guild ID (optional)
+        
+    Returns:
+        bool: True if successful
+    """
+    try:
+        from config.settings import get_database_url
+        database_url = get_database_url()
+        
+        # Default guild_id if not provided
+        if guild_id is None:
+            from config.settings import GUILD_ID
+            guild_id = str(GUILD_ID)
+        
+        import psycopg2
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE mining_events 
+            SET is_active = false, updated_at = CURRENT_TIMESTAMP
+            WHERE event_id = %s AND guild_id = %s
+        """, (event_id, guild_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error deleting event: {e}")
+        return False
+
 __all__ = [
     'init_db',
     'get_market_items',
@@ -690,4 +852,8 @@ __all__ = [
     'get_mining_events',
     'update_entries',
     'get_entries',
+    # Event management functions
+    'create_event',
+    'get_all_events',
+    'delete_event',
 ]
