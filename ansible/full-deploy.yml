@@ -192,8 +192,6 @@
         path: "{{ temp_dir.path }}"
         dest: "{{ temp_dir.path }}.tar.gz"
         format: gz
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
       delegate_to: localhost
 
     - name: Copy tarball to remote server
