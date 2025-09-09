@@ -187,3 +187,13 @@ def get_sunday_mining_channels(guild_id=None):
     # Fallback to hardcoded channels
     print("Using fallback mining channels")
     return SUNDAY_MINING_CHANNELS_FALLBACK
+
+def get_config():
+    """Get complete bot configuration for admin commands."""
+    return {
+        'discord': get_discord_config(),
+        'database_url': get_database_url(),
+        'mining_channels': get_sunday_mining_channels(),
+        'uex_api': UEX_API_CONFIG,
+        'ore_types': ORE_TYPES
+    }

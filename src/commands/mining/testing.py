@@ -18,6 +18,11 @@ class SundayMiningTester:
         self.guild = guild
         self.test_results = {}
     
+    async def run_all_tests(self):
+        """Run all tests - alias for run_comprehensive_test for backward compatibility."""
+        # This method is called by the mining test command
+        return await self.run_comprehensive_test(None)
+    
     async def run_comprehensive_test(self, interaction: discord.Interaction):
         """Run all tests and return detailed results."""
         self.test_results = {}
@@ -26,16 +31,17 @@ class SundayMiningTester:
         await self._test_database_schema()
         
         # Test 2: Voice Channel Configuration  
-        await self._test_voice_channel_config(interaction.guild)
-        
-        # Test 3: Bot Voice Permissions
-        await self._test_bot_voice_permissions(interaction.guild)
+        if interaction and interaction.guild:
+            await self._test_voice_channel_config(interaction.guild)
+            
+            # Test 3: Bot Voice Permissions
+            await self._test_bot_voice_permissions(interaction.guild)
+            
+            # Test 5: Guild Verification
+            await self._test_guild_verification(interaction.guild)
         
         # Test 4: Voice Channel Connection Test
         await self._test_voice_channel_connection()
-        
-        # Test 5: Guild Verification
-        await self._test_guild_verification(interaction.guild)
         
         # Return comprehensive results
         return self._generate_test_report()
