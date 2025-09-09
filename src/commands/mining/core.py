@@ -1343,25 +1343,34 @@ class SundayMiningCommands(commands.Cog):
                 try:
                     # Use interaction.guild.id for proper guild-aware event creation
                     print(f"🔍 Creating mining event for guild {interaction.guild.id} ({interaction.guild.name})")
+                    print(f"🔍 Database URL: {db_url[:50]}...")
+                    print(f"🔍 Event date: {datetime.now().date()}")
+                    print(f"🔍 Event name: Sunday Mining - {datetime.now().strftime('%Y-%m-%d')}")
+                    
                     event_id = database_operations.create_mining_event(
                         db_url, 
                         interaction.guild.id, 
                         datetime.now().date(),
                         f"Sunday Mining - {datetime.now().strftime('%Y-%m-%d')}"
                     )
-                    print(f"✅ Created mining event {event_id} in guild {interaction.guild.name}")
+                    
+                    print(f"🔍 create_mining_event returned: {event_id} (type: {type(event_id)})")
                     
                     if event_id is None:
                         print(f"❌ create_mining_event returned None - database operation failed")
+                        print(f"❌ Check database logs for specific error details")
                     else:
+                        print(f"✅ Created mining event {event_id} in guild {interaction.guild.name}")
                         print(f"🎯 Event ID {event_id} will be used for participation tracking")
                         
                 except Exception as e:
-                    print(f"⚠️ Could not create database event: {e}")
+                    print(f"❌ Exception during database event creation: {e}")
                     import traceback
                     print(f"Full traceback: {traceback.format_exc()}")
+                    event_id = None
             else:
                 print(f"❌ No database URL available, cannot create mining event")
+                print(f"🔍 Database URL check result: {get_database_url()}")
             
             current_session.update({
                 'active': True,
@@ -1602,7 +1611,7 @@ class SundayMiningCommands(commands.Cog):
             # Create session summary
             embed = discord.Embed(
                 title="⏹️ Sunday Mining Session Ended", 
-                description=f"Event ID: `{current_session.get('event_id', 'N/A')}`",
+                description=f"Event ID: {current_session.get('event_id', 'None')}",
                 color=0xff6b6b,
                 timestamp=datetime.now()
             )
@@ -2930,6 +2939,89 @@ class SundayMiningCommands(commands.Cog):
             print(f"❌ UEX API debug error: {e}")
             import traceback
             print(f"Full traceback: {traceback.format_exc()}")
+
+    @app_commands.command(name="redchanneldiag", description="Diagnose voice channel configuration (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def channel_diagnostic(self, interaction: discord.Interaction):
+        """Diagnose voice channel configuration and permissions."""
+        
+        await interaction.response.defer(ephemeral=True)
+        
+        embed = discord.Embed(
+            title="🔧 Voice Channel Diagnostics",
+            description="Analyzing voice channel configuration and bot permissions",
+            color=0x3498db,
+            timestamp=datetime.now()
+        )
+        
+        # Get configured mining channels
+        from config.channels import get_sunday_mining_channels
+        mining_channels = get_sunday_mining_channels(interaction.guild.id)
+        
+        embed.add_field(
+            name="📋 Configured Mining Channels",
+            value=f"Found {len(mining_channels)} configured channels:\n```" + 
+                  "\n".join([f"{name}: {channel_id}" for name, channel_id in mining_channels.items()]) + "```",
+            inline=False
+        )
+        
+        # Check each channel
+        channel_status = []
+        actual_voice_channels = []
+        
+        for name, channel_id in mining_channels.items():
+            try:
+                channel = interaction.guild.get_channel(int(channel_id))
+                if channel:
+                    if hasattr(channel, 'members'):  # Voice channel
+                        perms = channel.permissions_for(interaction.guild.me)
+                        status = f"✅ **{name}**: `{channel.name}` (ID: {channel_id})"
+                        status += f"\n   • Connect: {'✅' if perms.connect else '❌'}"
+                        status += f"\n   • Speak: {'✅' if perms.speak else '❌'}"
+                        status += f"\n   • View: {'✅' if perms.view_channel else '❌'}"
+                        status += f"\n   • Members: {len([m for m in channel.members if not m.bot])}"
+                        channel_status.append(status)
+                    else:
+                        channel_status.append(f"⚠️ **{name}**: `{channel.name}` - NOT a voice channel (ID: {channel_id})")
+                else:
+                    channel_status.append(f"❌ **{name}**: Channel not found (ID: {channel_id})")
+            except Exception as e:
+                channel_status.append(f"❌ **{name}**: Error - {str(e)} (ID: {channel_id})")
+        
+        if channel_status:
+            embed.add_field(
+                name="🎤 Channel Status & Permissions",
+                value="\n".join(channel_status[:10]),  # Limit for Discord embed
+                inline=False
+            )
+        
+        # Show actual voice channels in guild
+        voice_channels = [ch for ch in interaction.guild.channels if hasattr(ch, 'members')]
+        if voice_channels:
+            voice_list = []
+            for ch in voice_channels[:15]:  # Limit display
+                members = len([m for m in ch.members if not m.bot])
+                voice_list.append(f"• `{ch.name}` (ID: {ch.id}) - {members} members")
+            
+            embed.add_field(
+                name="🔍 All Voice Channels in Guild",
+                value="\n".join(voice_list),
+                inline=False
+            )
+        
+        # Bot permissions check
+        bot_perms = interaction.guild.me.guild_permissions
+        embed.add_field(
+            name="🤖 Bot Guild Permissions",
+            value=f"• Connect: {'✅' if bot_perms.connect else '❌'}\n"
+                  f"• Speak: {'✅' if bot_perms.speak else '❌'}\n"
+                  f"• Move Members: {'✅' if bot_perms.move_members else '❌'}\n"
+                  f"• Manage Channels: {'✅' if bot_perms.manage_channels else '❌'}",
+            inline=False
+        )
+        
+        embed.set_footer(text="Use this information to fix channel configuration issues")
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot):
