@@ -232,6 +232,11 @@ class UEXCache:
                 name = item.get('name', 'Unknown')
                 code = item.get('code', 'UNKNOWN')
                 
+                # DEBUG: Let's see what the API actually returns
+                print(f"🔍 UEX API item structure for {code}: {list(item.keys())}")
+                if len(processed) < 2:  # Only log first 2 items to avoid spam
+                    print(f"🔍 Full item data for {code}: {item}")
+                
                 # Get price information directly from item (UEX API v2.0 structure)
                 sell_price = item.get('price_sell', 0)
                 buy_price = item.get('price_buy', 0)
@@ -242,12 +247,46 @@ class UEXCache:
                 
                 # Filter by category
                 if self._should_include_item(name, code, category):
+                    # Look for actual location data in the API response
+                    locations_data = []
+                    
+                    # Check various possible fields for location data
+                    if 'locations' in item:
+                        locations_data = item['locations']
+                        print(f"🔍 Found 'locations' field for {code}: {locations_data}")
+                    elif 'terminals' in item:
+                        locations_data = item['terminals'] 
+                        print(f"🔍 Found 'terminals' field for {code}: {locations_data}")
+                    elif 'trades' in item:
+                        locations_data = item['trades']
+                        print(f"🔍 Found 'trades' field for {code}: {locations_data}")
+                    elif 'prices' in item:
+                        locations_data = item['prices']
+                        print(f"🔍 Found 'prices' field for {code}: {locations_data}")
+                    
+                    # Process location data if found, otherwise use fallback
+                    if locations_data and isinstance(locations_data, list) and len(locations_data) > 0:
+                        processed_locations = []
+                        for loc in locations_data:
+                            if isinstance(loc, dict):
+                                loc_name = loc.get('name', loc.get('location', loc.get('terminal', 'Unknown Location')))
+                                loc_sell = loc.get('price_sell', loc.get('sell', sell_price))
+                                loc_buy = loc.get('price_buy', loc.get('buy', buy_price))
+                                processed_locations.append({
+                                    'name': loc_name,
+                                    'sell_price': loc_sell,
+                                    'buy_price': loc_buy
+                                })
+                        locations_final = processed_locations if processed_locations else [{'name': 'UEX Best Price', 'sell_price': sell_price, 'buy_price': buy_price}]
+                    else:
+                        locations_final = [{'name': 'UEX Best Price', 'sell_price': sell_price, 'buy_price': buy_price}]
+                    
                     processed[code] = {
                         'name': name,
                         'code': code,
                         'price_sell': sell_price,
                         'price_buy': buy_price,
-                        'locations': [{'name': 'Best Available Price', 'sell_price': sell_price, 'buy_price': buy_price}],  # Simple location for compatibility
+                        'locations': locations_final,
                         'updated': datetime.now().isoformat()
                     }
                     
