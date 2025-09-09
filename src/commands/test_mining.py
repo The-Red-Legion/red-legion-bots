@@ -259,7 +259,7 @@ class TestMiningCommands(app_commands.Group):
                 
                 # Delete test mining events
                 cursor.execute("""
-                    DELETE FROM mining_events 
+                    DELETE FROM events 
                     WHERE name LIKE 'TEST Sunday Mining%'
                 """)
                 deleted_counts['events'] = cursor.rowcount

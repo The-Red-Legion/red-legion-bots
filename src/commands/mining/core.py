@@ -1714,7 +1714,8 @@ class SundayMiningCommands(commands.Cog):
                 if events:
                     event_list = ""
                     for i, event in enumerate(events[:5], 1):  # Show first 5 events
-                        event_id, event_name, event_time, *rest = event
+                        # Unpack based on get_open_mining_events format: id, guild_id, event_date, start_time, name, status, ...
+                        event_id, guild_id, event_date, event_time, event_name, *rest = event
                         event_list += f"{i}. **{event_name}** - {event_time}\n"
                     embed.add_field(name="Available Events", value=event_list, inline=False)
                 
@@ -2190,25 +2191,33 @@ class SundayMiningCommands(commands.Cog):
             print(f"📋 Found {len(events)} open mining events")
             
             if not events:
-                # If no open events, get recent events from mining_events table
-                import psycopg2
-                conn = psycopg2.connect(db_url)
-                c = conn.cursor()
-                c.execute(
-                    """
-                    SELECT event_id, name, start_time, created_at, status
-                    FROM mining_events 
-                    WHERE guild_id = %s 
-                       AND is_active = true
-                       AND created_at >= NOW() - INTERVAL '7 days'
-                    ORDER BY created_at DESC
-                    LIMIT 10
-                    """,
-                    (str(guild_id),)
-                )
-                events = c.fetchall()
-                conn.close()
-                print(f"📋 Found {len(events)} recent mining events as fallback")
+                # If no open events, get recent events from events table
+                from database.operations import get_mining_events
+                print(f"🔄 No open events found, searching recent events...")
+                recent_events = get_mining_events(db_url, guild_id)
+                
+                if recent_events:
+                    # Convert to same format as get_open_mining_events for consistency
+                    events = []
+                    for event in recent_events:
+                        # Map from get_mining_events format to expected format
+                        events.append((
+                            event['id'], 
+                            event['guild_id'], 
+                            event['event_date'],
+                            event['start_time'], 
+                            event['event_name'],
+                            event['status'],
+                            event.get('total_participants', 0),
+                            event.get('total_value', 0.0),
+                            event.get('payroll_processed', False),
+                            event.get('pdf_generated', False),
+                            event.get('created_at'),
+                            event.get('updated_at')
+                        ))
+                    print(f"📋 Found {len(events)} recent mining events as fallback")
+                else:
+                    events = []
             
             return events
             
