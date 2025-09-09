@@ -2343,6 +2343,112 @@ class SundayMiningCommands(commands.Cog):
                 ephemeral=True
             )
     
+    @app_commands.command(name="redpricerefresh", description="Force refresh UEX price data immediately (Admin/OrgLeaders only)")
+    @app_commands.describe(category="Category of commodities to refresh")
+    @app_commands.choices(category=[
+        app_commands.Choice(name="Ores (Mineable)", value="ores"),
+        app_commands.Choice(name="All Commodities", value="all"),
+        app_commands.Choice(name="High Value Only", value="high_value")
+    ])
+    async def force_price_refresh(self, interaction: discord.Interaction, category: str = "ores"):
+        """Force refresh UEX price data bypassing the 24-hour cache."""
+        try:
+            # Check permissions
+            if not can_manage_payroll(interaction.user):
+                await interaction.response.send_message(
+                    "❌ Access denied. Only Admin or OrgLeaders can force price refresh.",
+                    ephemeral=True
+                )
+                return
+            
+            await interaction.response.defer()
+            
+            # Get UEX cache instance and force refresh
+            from services.uex_cache import get_uex_cache
+            
+            cache = get_uex_cache()
+            
+            # Show current cache status before refresh
+            cache_stats = cache.get_cache_stats()
+            cache_key = f"prices_{category}"
+            
+            if cache_key in cache_stats.get("entries", {}):
+                old_age = cache_stats["entries"][cache_key]["age_seconds"]
+                old_age_minutes = old_age / 60
+                old_valid = cache_stats["entries"][cache_key]["valid"]
+            else:
+                old_age_minutes = 0
+                old_valid = False
+            
+            embed = discord.Embed(
+                title="🔄 Forcing UEX Price Refresh",
+                description=f"Bypassing cache to fetch fresh {category} data from UEX Corp API",
+                color=discord.Color.orange(),
+                timestamp=datetime.now()
+            )
+            
+            embed.add_field(
+                name="📊 Cache Status (Before)",
+                value=f"• Age: {old_age_minutes:.1f} minutes\n"
+                      f"• Valid: {'✅' if old_valid else '❌'}\n"
+                      f"• Normal refresh interval: 24 hours",
+                inline=True
+            )
+            
+            # Force refresh the data
+            print(f"🔄 Force refreshing {category} prices via admin command")
+            fresh_prices = await cache.get_ore_prices(category, force_refresh=True)
+            
+            if fresh_prices:
+                # Show success stats
+                new_cache_stats = cache.get_cache_stats()
+                new_stats = new_cache_stats["entries"][cache_key]
+                
+                embed.add_field(
+                    name="✅ Refresh Complete",
+                    value=f"• Fresh data retrieved from UEX API\n"
+                          f"• Items updated: {new_stats['item_count']}\n"
+                          f"• Cache age: 0 minutes (just refreshed)\n"
+                          f"• Next auto-refresh: 24 hours",
+                    inline=True
+                )
+                
+                # Show sample of updated prices
+                sample_prices = []
+                for ore_code, price_data in list(fresh_prices.items())[:3]:
+                    if isinstance(price_data, dict):
+                        name = price_data.get('name', ore_code)
+                        price = price_data.get('price_sell', 0)
+                        sample_prices.append(f"• **{name}**: {price:,.0f} aUEC/SCU")
+                
+                if sample_prices:
+                    embed.add_field(
+                        name="💰 Sample Updated Prices",
+                        value="\n".join(sample_prices),
+                        inline=False
+                    )
+                
+                embed.color = discord.Color.green()
+                
+            else:
+                embed.add_field(
+                    name="❌ Refresh Failed",
+                    value="Could not fetch fresh data from UEX API\n"
+                          "Check server logs for detailed error information",
+                    inline=False
+                )
+                embed.color = discord.Color.red()
+            
+            embed.set_footer(text="Use /redpricecheck to see all current prices")
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error forcing price refresh: {str(e)}",
+                ephemeral=True
+            )
+    
     @app_commands.command(name="redsundayminingtest", description="Run diagnostics for Sunday Mining voice channel issues (Admin only)")
     @app_commands.describe(
         test_type="Type of diagnostic test to run"
