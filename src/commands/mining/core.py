@@ -649,8 +649,8 @@ class SundayMiningCommands(commands.Cog):
             print(f"🔍 DEBUG: Retrieved mining channels: {mining_channels}")
             
             for channel_name, channel_id in mining_channels.items():
-                # Only join the dispatch channel (check if channel name starts with 'dispatch')
-                should_join = channel_name.lower().startswith('dispatch')
+                # Only join the dispatch channel (check if channel name contains 'dispatch' - case insensitive)
+                should_join = 'dispatch' in channel_name.lower()
                 print(f"🔍 DEBUG: Channel '{channel_name}' -> lowercase: '{channel_name.lower()}' -> contains 'dispatch': {should_join}")
                 print(f"Adding channel {channel_name} ({channel_id}) to tracking, join={should_join}")
                 await add_tracked_channel(int(channel_id), should_join=should_join)
