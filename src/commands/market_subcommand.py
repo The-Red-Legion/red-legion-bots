@@ -17,7 +17,7 @@ class RedMarketGroup(app_commands.Group):
     """Red Legion Market command group"""
     
     def __init__(self):
-        super().__init__(name='red-market', description='Organization marketplace and trading system')
+        super().__init__(name='redmarket', description='Organization marketplace and trading system')
     
     @app_commands.command(name='list', description='Browse marketplace listings')
     @app_commands.describe(
@@ -69,7 +69,7 @@ class RedMarketGroup(app_commands.Group):
                     description="No listings found matching your criteria.",
                     color=discord.Color.blue()
                 )
-                embed.add_field(name="Add a Listing", value="Use `/red-market add` to create a new listing", inline=False)
+                embed.add_field(name="Add a Listing", value="Use `/redmarket add` to create a new listing", inline=False)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
             
@@ -688,6 +688,27 @@ class RedMarketGroup(app_commands.Group):
         except Exception as e:
             logger.error(f"Error posting to market channel: {e}")
 
+class MarketManagement(commands.Cog):
+    """Market Management Cog using Discord subcommand groups."""
+    
+    def __init__(self, bot):
+        self.bot = bot
+    
+    # Properly register the command group
+    redmarket = RedMarketGroup()
+
+
 async def setup(bot):
-    """Setup function for the cog"""
-    bot.tree.add_command(RedMarketGroup())
+    """Setup function for discord.py extension loading."""
+    print("🔧 Setting up Market Management with subcommand groups...")
+    try:
+        cog = MarketManagement(bot)
+        await bot.add_cog(cog)
+        print("✅ Market Management cog loaded with subcommand groups")
+        print("✅ Available commands:")
+        print("   • /redmarket list [category] [sort]")
+        print("   • /redmarket add <item> <price> [details]")
+    except Exception as e:
+        print(f"❌ Error in setup function: {e}")
+        import traceback
+        traceback.print_exc()

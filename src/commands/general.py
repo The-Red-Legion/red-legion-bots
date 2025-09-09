@@ -20,7 +20,7 @@ class General(commands.Cog):
         self.bot = bot
         print("✅ General Cog initialized")
 
-    @app_commands.command(name="red-ping", description="Test Red Legion bot responsiveness")
+    @app_commands.command(name="redping", description="Test Red Legion bot responsiveness")
     async def ping_cmd(self, interaction: discord.Interaction):
         """Simple ping command to test bot responsiveness"""
         latency_ms = round(self.bot.latency * 1000, 2)

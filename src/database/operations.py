@@ -842,7 +842,7 @@ __all__ = [
     'close_mining_event',
     'mark_pdf_generated',
     'get_mining_session_participants',
-    'create_mining_event',
+    'create_adhoc_mining_event',
     'get_open_mining_events',
     'save_event',
     'update_event_end_time',

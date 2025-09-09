@@ -4,11 +4,11 @@ A comprehensive Discord bot for managing Sunday mining operations, voice trackin
 
 ## 📚 Documentation
 
-All documentation has been organized into the **[documentation/](documentation/)** folder with logical categories:
+All documentation has been organized into the **[docs/](docs/)** folder with logical categories:
 
-- **[📖 Complete Documentation Index](documentation/INDEX.md)** - Organized access to all guides and references
-- **[🚀 Quick Command Reference](documentation/guides/QUICK_COMMAND_REFERENCE.md)** - All bot commands and usage
-- **[🔧 Troubleshooting Guide](documentation/troubleshooting/TROUBLESHOOTING_FIXES.md)** - Common issues and solutions
+- **[📖 Complete Documentation Index](docs/INDEX.md)** - Organized access to all guides and references
+- **[🚀 Quick Command Reference](docs/guides/QUICK_COMMAND_REFERENCE.md)** - All bot commands and usage
+- **[🔧 Troubleshooting Guide](docs/troubleshooting/TROUBLESHOOTING_FIXES.md)** - Common issues and solutions
 
 ## ✨ Key Features
 

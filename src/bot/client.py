@@ -40,15 +40,18 @@ class RedLegionBot(commands.Bot):
             # Load new Cog-based slash command modules
             print("🔄 Loading Red Legion slash command extensions...")
             
-            # Core command extensions with proper "red-" prefix commands
+            # Core command extensions (all commands now use valid names without hyphens)
             extensions = [
-                'commands.diagnostics',      # red-health, red-test, red-dbtest, red-config
-                'commands.general',          # red-ping
-                'commands.market',           # red-market-list, red-market-add
-                'commands.admin',            # red-config-refresh, red-restart, etc.
-                'commands.loans',            # red-loan-request, red-loan-status
-                'commands.events_subcommand', # /red-events create|delete|view|list (unified subcommand group)
-                'commands.mining.core',      # red-sunday-mining-*, red-payroll
+                'commands.diagnostics',        # /redhealth, /redtest, /reddbtest, /redconfig
+                'commands.general',            # /redping
+                'commands.market',             # /redmarketlist, /redmarketadd
+                'commands.admin',              # /redconfigrefresh, /redrestart, etc.
+                'commands.loans',              # /redloanrequest, /redloanstatus
+                'commands.events_subcommand',  # /redevents create|delete|view|list (subcommand group)
+                'commands.market_subcommand',  # /redmarket list|add (subcommand group)
+                'commands.loans_subcommand',   # /redloans request|status (subcommand group)
+                'commands.join_subcommand',    # /redjoin apply|status|withdraw (subcommand group)
+                'commands.mining.core',        # /redsundayminingstart, /redpayroll, etc.
             ]
             
             for extension in extensions:

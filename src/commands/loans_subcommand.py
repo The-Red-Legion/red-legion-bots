@@ -124,7 +124,7 @@ class RedLoansGroup(app_commands.Group):
     """Red Legion Loans command group"""
     
     def __init__(self):
-        super().__init__(name='red-loans', description='Organization loan management system')
+        super().__init__(name='redloans', description='Organization loan management system')
     
     @app_commands.command(name='request', description='Request a loan from the organization')
     @app_commands.describe(
@@ -242,7 +242,7 @@ class RedLoansGroup(app_commands.Group):
                     description="You don't have any loans on record.",
                     color=discord.Color.blue()
                 )
-                embed.add_field(name="Request a Loan", value="Use `/red-loans request` to apply for a loan", inline=False)
+                embed.add_field(name="Request a Loan", value="Use `/redloans request` to apply for a loan", inline=False)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
             
@@ -614,6 +614,28 @@ class RedLoansGroup(app_commands.Group):
         except Exception as e:
             logger.error(f"Error notifying borrower: {e}")
 
+class LoanManagement(commands.Cog):
+    """Loan Management Cog using Discord subcommand groups."""
+    
+    def __init__(self, bot):
+        self.bot = bot
+    
+    # Properly register the command group
+    redloans = RedLoansGroup()
+
+
 async def setup(bot):
-    """Setup function for the cog"""
-    bot.tree.add_command(RedLoansGroup())
+    """Setup function for discord.py extension loading."""
+    print("🔧 Setting up Loan Management with subcommand groups...")
+    try:
+        cog = LoanManagement(bot)
+        await bot.add_cog(cog)
+        print("✅ Loan Management cog loaded with subcommand groups")
+        print("✅ Available commands:")
+        print("   • /redloans request <amount> [reason]")
+        print("   • /redloans status")
+        print("   • /redloans list")
+    except Exception as e:
+        print(f"❌ Error in setup function: {e}")
+        import traceback
+        traceback.print_exc()

@@ -24,7 +24,7 @@ class MiningEvents(commands.Cog):
         self.bot = bot
         logger.info("MiningEvents cog initialized")
 
-    @app_commands.command(name="red-mining-create", description="Create a new mining event")
+    @app_commands.command(name="redminingcreate", description="Create a new mining event")
     @app_commands.describe(
         name="Name of the mining event",
         description="Description of the mining event",
@@ -72,7 +72,7 @@ class MiningEvents(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="red-mining-delete", description="Delete a mining event")
+    @app_commands.command(name="redminingdelete", description="Delete a mining event")
     @app_commands.describe(event_id="ID of the mining event to delete")
     async def delete_mining_event(self, interaction: discord.Interaction, event_id: int):
         """Delete a mining event"""
@@ -110,7 +110,7 @@ class MiningEvents(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="red-mining-view", description="View all mining events")
+    @app_commands.command(name="redminingview", description="View all mining events")
     async def view_mining_events(self, interaction: discord.Interaction):
         """View all mining events"""
         try:

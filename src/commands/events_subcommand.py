@@ -5,10 +5,10 @@ This module implements a professional event management system using Discord's
 recommended subcommand group architecture for optimal organization and UX.
 
 Structure:
-- /red-events create <category> <name> [description]
-- /red-events delete <event_id>
-- /red-events view [category] [status] [event_id]
-- /red-events list [category] [status]
+- /redevents create <category> <name> [description]
+- /redevents delete <event_id>
+- /redevents view [category] [status] [event_id]
+- /redevents list [category] [status]
 """
 
 import discord
@@ -30,7 +30,7 @@ class RedEventsGroup(app_commands.Group):
     
     def __init__(self):
         super().__init__(
-            name="red-events",
+            name="redevents",
             description="Red Legion event management system"
         )
 
@@ -202,9 +202,9 @@ class RedEventsGroup(app_commands.Group):
                 
                 embed.add_field(
                     name="🎮 Next Steps",
-                    value="• Use `/red-events list` to view all events\n"
-                          "• Use `/red-events view` to view detailed information\n"
-                          f"• Use `/red-events view event_id:{event_id}` for details",
+                    value="• Use `/redevents list` to view all events\n"
+                          "• Use `/redevents view` to view detailed information\n"
+                          f"• Use `/redevents view event_id:{event_id}` for details",
                     inline=False
                 )
                 
@@ -343,8 +343,8 @@ class RedEventsGroup(app_commands.Group):
             
             embed.add_field(
                 name="🎮 Actions",
-                value="• Use `/red-events list` to view all events\n"
-                      "• Administrators can use `/red-events delete` to remove this event",
+                value="• Use `/redevents list` to view all events\n"
+                      "• Administrators can use `/redevents delete` to remove this event",
                 inline=False
             )
             
@@ -439,7 +439,7 @@ class RedEventsGroup(app_commands.Group):
             
             embed.add_field(
                 name="🔍 View Details",
-                value="Use `/red-events view event_id:<id>` to view detailed information about a specific event.",
+                value="Use `/redevents view event_id:<id>` to view detailed information about a specific event.",
                 inline=False
             )
             
@@ -527,10 +527,9 @@ class EventManagement(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        
-        # Add the command group to the cog
-        self.red_events = RedEventsGroup()
-        self.add_app_command(self.red_events)
+    
+    # Properly register the command group
+    redevents = RedEventsGroup()
 
 
 async def setup(bot):
@@ -541,10 +540,10 @@ async def setup(bot):
         await bot.add_cog(cog)
         print("✅ Event Management cog loaded with subcommand groups")
         print("✅ Available commands:")
-        print("   • /red-events create <category> <name> [description]")
-        print("   • /red-events delete <event_id>")
-        print("   • /red-events view <event_id>")
-        print("   • /red-events list [category] [status]")
+        print("   • /redevents create <category> <name> [description]")
+        print("   • /redevents delete <event_id>")
+        print("   • /redevents view <event_id>")
+        print("   • /redevents list [category] [status]")
     except Exception as e:
         print(f"❌ Error in setup function: {e}")
         import traceback

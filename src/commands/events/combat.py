@@ -24,7 +24,7 @@ class CombatEvents(commands.Cog):
         self.bot = bot
         logger.info("CombatEvents cog initialized")
 
-    @app_commands.command(name="red-combat-create", description="Create a new combat event")
+    @app_commands.command(name="redcombatcreate", description="Create a new combat event")
     @app_commands.describe(
         name="Name of the combat event",
         description="Description of the combat event", 
@@ -83,7 +83,7 @@ class CombatEvents(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="red-combat-delete", description="Delete a combat event")
+    @app_commands.command(name="redcombatdelete", description="Delete a combat event")
     @app_commands.describe(event_id="ID of the combat event to delete")
     async def delete_combat_event(self, interaction: discord.Interaction, event_id: int):
         """Delete a combat event"""
@@ -121,7 +121,7 @@ class CombatEvents(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="red-combat-view", description="View all combat events")
+    @app_commands.command(name="redcombatview", description="View all combat events")
     async def view_combat_events(self, interaction: discord.Interaction):
         """View all combat events"""
         try:

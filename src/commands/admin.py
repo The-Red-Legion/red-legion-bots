@@ -23,7 +23,7 @@ class Admin(commands.Cog):
         self.bot = bot
         print("✅ Admin Cog initialized")
 
-    @app_commands.command(name="red-config-refresh", description="Refresh Red Legion bot configuration (Admin only)")
+    @app_commands.command(name="redconfigrefresh", description="Refresh Red Legion bot configuration (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def refresh_config(self, interaction: discord.Interaction):
         """Refresh bot configuration from Secret Manager"""
@@ -78,7 +78,7 @@ class Admin(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Failed to refresh configuration: {str(e)}")
 
-    @app_commands.command(name="red-restart", description="Restart the Red Legion bot (Admin only)")
+    @app_commands.command(name="redrestart", description="Restart the Red Legion bot (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def restart_bot(self, interaction: discord.Interaction):
         """Restart the bot process (admin only)"""
@@ -113,7 +113,7 @@ class Admin(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Failed to restart bot: {str(e)}")
 
-    @app_commands.command(name="red-add-mining-channel", description="Add a mining channel to the Red Legion system (Admin only)")
+    @app_commands.command(name="redaddminingchannel", description="Add a mining channel to the Red Legion system (Admin only)")
     @app_commands.describe(channel="Voice channel to add for mining tracking")
     @app_commands.default_permissions(administrator=True)
     async def add_mining_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
@@ -145,7 +145,7 @@ class Admin(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to add mining channel: {str(e)}")
 
-    @app_commands.command(name="red-remove-mining-channel", description="Remove a mining channel from the Red Legion system (Admin only)")
+    @app_commands.command(name="redremoveminingchannel", description="Remove a mining channel from the Red Legion system (Admin only)")
     @app_commands.describe(channel="Voice channel to remove from mining tracking")
     @app_commands.default_permissions(administrator=True)
     async def remove_mining_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
@@ -175,7 +175,7 @@ class Admin(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to remove mining channel: {str(e)}")
 
-    @app_commands.command(name="red-list-mining-channels", description="List all Red Legion mining channels (Admin only)")
+    @app_commands.command(name="redlistminingchannels", description="List all Red Legion mining channels (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def list_mining_channels(self, interaction: discord.Interaction):
         """List all voice channels in the mining system"""

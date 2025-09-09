@@ -180,7 +180,7 @@ class RedJoinGroup(app_commands.Group):
     """Red Legion Join/Application command group"""
     
     def __init__(self):
-        super().__init__(name='red-join', description='Organization recruitment and application system')
+        super().__init__(name='redjoin', description='Organization recruitment and application system')
     
     @app_commands.command(name='apply', description='Apply to join Red Legion organization')
     @app_commands.describe(position='The position you are applying for')
@@ -209,7 +209,7 @@ class RedJoinGroup(app_commands.Group):
                     color=discord.Color.red()
                 )
                 embed.add_field(name="Status", value=existing['status'].title(), inline=True)
-                embed.add_field(name="Use", value="`/red-join status` to check progress", inline=True)
+                embed.add_field(name="Use", value="`/redjoin status` to check progress", inline=True)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
             
@@ -239,7 +239,7 @@ class RedJoinGroup(app_commands.Group):
                     description="You don't have any applications on file.",
                     color=discord.Color.red()
                 )
-                embed.add_field(name="Apply Now", value="Use `/red-join apply` to submit an application", inline=False)
+                embed.add_field(name="Apply Now", value="Use `/redjoin apply` to submit an application", inline=False)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
             
@@ -451,6 +451,29 @@ class RedJoinGroup(app_commands.Group):
                 ephemeral=True
             )
 
+class JoinManagement(commands.Cog):
+    """Join Management Cog using Discord subcommand groups."""
+    
+    def __init__(self, bot):
+        self.bot = bot
+    
+    # Properly register the command group
+    redjoin = RedJoinGroup()
+
+
 async def setup(bot):
-    """Setup function for the cog"""
-    bot.tree.add_command(RedJoinGroup())
+    """Setup function for discord.py extension loading."""
+    print("🔧 Setting up Join Management with subcommand groups...")
+    try:
+        cog = JoinManagement(bot)
+        await bot.add_cog(cog)
+        print("✅ Join Management cog loaded with subcommand groups")
+        print("✅ Available commands:")
+        print("   • /redjoin apply <position>")
+        print("   • /redjoin status")
+        print("   • /redjoin withdraw")
+        print("   • /redjoin list [status] [position]")
+    except Exception as e:
+        print(f"❌ Error in setup function: {e}")
+        import traceback
+        traceback.print_exc()

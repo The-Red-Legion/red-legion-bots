@@ -32,7 +32,7 @@ class TrainingEvents(commands.Cog):
         self.bot = bot
         logger.info("TrainingEvents cog initialized")
 
-    @app_commands.command(name="red-training-create", description="Create a new training event")
+    @app_commands.command(name="redtrainingcreate", description="Create a new training event")
     @app_commands.describe(
         name="Name of the training event",
         description="Description of the training event", 
@@ -92,7 +92,7 @@ class TrainingEvents(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="red-training-delete", description="Delete a training event")
+    @app_commands.command(name="redtrainingdelete", description="Delete a training event")
     @app_commands.describe(event_id="ID of the training event to delete")
     async def delete_training_event(self, interaction: discord.Interaction, event_id: int):
         """Delete a training event"""
@@ -130,7 +130,7 @@ class TrainingEvents(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="red-training-view", description="View all training events")
+    @app_commands.command(name="redtrainingview", description="View all training events")
     async def view_training_events(self, interaction: discord.Interaction):
         """View all training events"""
         try:
