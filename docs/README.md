@@ -6,6 +6,7 @@ Welcome to the Red Legion Discord Bot documentation! This bot is designed specif
 
 ### 🚀 [Getting Started](./guides/)
 - [Quick Command Reference](./guides/QUICK_COMMAND_REFERENCE.md)
+- [Sunday Mining Operations Guide](./guides/SUNDAY_MINING_OPERATIONS.md)
 - Setup and installation guides
 
 ### 🔧 [Development](./development/)

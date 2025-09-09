@@ -28,6 +28,7 @@ Welcome to the comprehensive documentation for the Red Legion Discord Bot. This 
 ### 📖 Guides
 
 - **[QUICK_COMMAND_REFERENCE.md](guides/QUICK_COMMAND_REFERENCE.md)** - Complete command reference with current `/red*` command names
+- **[SUNDAY_MINING_OPERATIONS.md](guides/SUNDAY_MINING_OPERATIONS.md)** - Complete guide to Sunday Mining operations and payroll system
 
 ### 🔧 Troubleshooting
 
