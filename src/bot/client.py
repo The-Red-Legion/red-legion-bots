@@ -53,6 +53,7 @@ class RedLegionBot(commands.Bot):
                 'commands.join_subcommand',    # /redjoin apply|status|withdraw (subcommand group)
                 'commands.mining.core',        # /redsundayminingstart, /redpayroll, etc.
                 'commands.test_mining',        # /redtestmining create|delete|status (test commands)
+                'commands.cache_diagnostics',  # /redcachestatus, /redcacherefresh, /redcacheclear
             ]
             
             for extension in extensions:
@@ -88,6 +89,15 @@ class RedLegionBot(commands.Bot):
         print(f'🤖 {self.user} is now online and ready!')
         print(f'📡 Connected to {len(self.guilds)} guild(s)')
         
+        # Initialize UEX cache service
+        try:
+            print("🗄️ Starting UEX API cache service...")
+            from services.uex_cache import initialize_uex_cache
+            await initialize_uex_cache()
+            print("✅ UEX cache service started")
+        except Exception as e:
+            print(f"❌ Failed to start UEX cache service: {e}")
+        
         # Sync slash commands with Discord
         try:
             print("🔄 Syncing slash commands...")
@@ -119,6 +129,18 @@ class RedLegionBot(commands.Bot):
         except Exception as e:
             print(f"❌ Failed to sync commands for {guild.name}: {e}")
     
+    async def close(self):
+        """Cleanup when bot is closing."""
+        try:
+            print("🛑 Shutting down UEX cache service...")
+            from services.uex_cache import shutdown_uex_cache
+            await shutdown_uex_cache()
+            print("✅ UEX cache service stopped")
+        except Exception as e:
+            print(f"⚠️ Error stopping UEX cache: {e}")
+        
+        await super().close()
+
     def run_bot(self):
         """Run the bot with proper error handling."""
         try:

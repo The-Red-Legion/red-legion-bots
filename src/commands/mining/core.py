@@ -96,63 +96,39 @@ class EventSelectionView(discord.ui.View):
             )
     
     async def _fetch_uex_prices(self):
-        """Fetch current UEX ore prices - uses highest sell price per SCU."""
+        """Fetch current UEX ore prices using cached data."""
         try:
-            headers = {
-                'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
-                'Accept': 'application/json'
-            }
+            from services.uex_cache import get_uex_cache
             
-            import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            cache = get_uex_cache()
+            cached_prices = await cache.get_ore_prices(category="ores")
             
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(
-                    UEX_API_CONFIG['base_url'], 
-                    headers=headers,
-                    timeout=UEX_API_CONFIG.get('timeout', 30)
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        ore_prices = {}
+            if not cached_prices:
+                print("❌ No UEX price data available from cache")
+                return {}
+            
+            # Convert cache format to expected format
+            ore_prices = {}
+            for code, data in cached_prices.items():
+                ore_name = data.get('name', code).upper()
+                
+                # Only process ores we care about
+                if ore_name in ORE_TYPES and data.get('price_sell', 0) > 0:
+                    ore_prices[ore_name] = {
+                        'max_price': float(data['price_sell']),
+                        'display_name': ORE_TYPES[ore_name],
+                        'code': data.get('code', code),
+                        'kind': 'commodity'
+                    }
+            
+            print(f"✅ Retrieved {len(ore_prices)} ore prices from cache")
+            return ore_prices
                         
-                        # Track highest prices per ore (multiple entries per ore across locations)
-                        for commodity in data.get('data', []):
-                            commodity_name = commodity.get('name', '').upper()
-                            
-                            # Only process mineral ores we care about
-                            if (commodity.get('is_mineral') == 1 and 
-                                commodity.get('is_extractable') == 1 and
-                                commodity_name in ORE_TYPES):
-                                
-                                # Use sell price (what miners get when selling)
-                                price = float(commodity.get('price_sell', 0))
-                                
-                                if price > 0:
-                                    # Keep highest price for each ore across all locations
-                                    if commodity_name not in ore_prices or price > ore_prices[commodity_name]['max_price']:
-                                        ore_prices[commodity_name] = {
-                                            'max_price': price,
-                                            'display_name': ORE_TYPES[commodity_name],
-                                            'code': commodity.get('code', ''),
-                                            'kind': commodity.get('kind', '')
-                                        }
-                        
-                        print(f"✅ Fetched {len(ore_prices)} ore prices from UEX API")
-                        return ore_prices
-                    else:
-                        print(f"❌ UEX API error: HTTP {response.status}")
-                        return {}
-                    
         except Exception as e:
-            print(f"❌ Error fetching UEX prices: {e}")
+            print(f"❌ Error fetching cached UEX prices: {e}")
             import traceback
             traceback.print_exc()
-        
-        return {}
+            return {}
 
 
 class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll Calculation'):
@@ -1062,85 +1038,43 @@ class SundayMiningCommands(commands.Cog):
             return None
     
     async def _fetch_detailed_uex_prices(self, category: str = "ores"):
-        """Fetch detailed UEX prices with location information."""
+        """Fetch detailed UEX prices using cached data."""
         try:
-            headers = {
-                'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
-                'Accept': 'application/json'
-            }
+            from services.uex_cache import get_uex_cache
             
-            import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            cache = get_uex_cache()
+            cached_prices = await cache.get_ore_prices(category=category)
             
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(
-                    UEX_API_CONFIG['base_url'], 
-                    headers=headers,
-                    timeout=UEX_API_CONFIG.get('timeout', 30)
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        commodities = {}
-                        
-                        for commodity in data.get('data', []):
-                            commodity_name = commodity.get('name', '').upper()
-                            price_sell_raw = commodity.get('price_sell')
-                            price_buy_raw = commodity.get('price_buy')
-                            
-                            # Handle None values
-                            price_sell = float(price_sell_raw) if price_sell_raw is not None else 0.0
-                            price_buy = float(price_buy_raw) if price_buy_raw is not None else 0.0
-                            
-                            # Filter by category
-                            include_commodity = False
-                            
-                            if category == "ores":
-                                # Only mineable ores
-                                include_commodity = (
-                                    commodity.get('is_mineral') == 1 and 
-                                    commodity.get('is_extractable') == 1 and
-                                    price_sell > 0
-                                )
-                            elif category == "high_value":
-                                # High value items (>5000 aUEC/SCU)
-                                include_commodity = price_sell > 5000
-                            else:  # category == "all"
-                                # All tradeable commodities
-                                include_commodity = (
-                                    price_sell > 0 and 
-                                    commodity.get('is_sellable') == 1
-                                )
-                            
-                            if include_commodity:
-                                # Track highest price location per commodity
-                                if commodity_name not in commodities or price_sell > commodities[commodity_name]['price_sell']:
-                                    commodities[commodity_name] = {
-                                        'name': commodity.get('name', 'Unknown'),
-                                        'code': commodity.get('code', ''),
-                                        'kind': commodity.get('kind', ''),
-                                        'price_sell': price_sell,
-                                        'price_buy': price_buy,
-                                        'is_mineral': commodity.get('is_mineral', 0) == 1,
-                                        'is_extractable': commodity.get('is_extractable', 0) == 1,
-                                        'is_illegal': commodity.get('is_illegal', 0) == 1,
-                                        'weight_scu': commodity.get('weight_scu', 0),
-                                        'commodity_id': commodity.get('id'),
-                                        # Note: UEX API doesn't provide location data in commodities endpoint
-                                        # We'd need to call /locations endpoint for location details
-                                        'location': 'Best Available Price'
-                                    }
-                        
-                        print(f"✅ Fetched {len(commodities)} {category} from UEX API")
-                        return commodities
-                    else:
-                        print(f"❌ UEX API error: HTTP {response.status}")
-                        return None
+            if not cached_prices:
+                print(f"❌ No UEX {category} price data available from cache")
+                return None
+            
+            # Convert cache format to expected detailed format
+            commodities = {}
+            for code, data in cached_prices.items():
+                commodity_name = data.get('name', code).upper()
+                
+                commodities[commodity_name] = {
+                    'name': data.get('name', 'Unknown'),
+                    'code': data.get('code', code),
+                    'kind': 'commodity',
+                    'price_sell': float(data.get('price_sell', 0)),
+                    'price_buy': float(data.get('price_buy', 0)),
+                    'is_mineral': True,  # Assume true for cached ore data
+                    'is_extractable': True,  # Assume true for cached ore data
+                    'is_illegal': False,  # Assume false for ores
+                    'weight_scu': 1,  # Default weight
+                    'commodity_id': code,
+                    'locations': data.get('locations', []),
+                    'location': 'Best Available Price',
+                    'updated': data.get('updated', 'Unknown')
+                }
+            
+            print(f"✅ Retrieved {len(commodities)} {category} from cache")
+            return commodities
         
         except Exception as e:
-            print(f"❌ Error fetching detailed UEX prices: {e}")
+            print(f"❌ Error fetching detailed cached UEX prices: {e}")
             import traceback
             traceback.print_exc()
             return None
