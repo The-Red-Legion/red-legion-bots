@@ -51,50 +51,93 @@ def get_cloud_sql_ip(instance_name: str, project_id: str = None) -> Optional[str
 
 def resolve_database_url(database_url: str) -> str:
     """
-    Resolve database URL by replacing hostname with actual Cloud SQL IP if needed.
+    Resolve database URL by replacing hostname with Cloud SQL internal IP and correct credentials.
     
     Args:
         database_url: Original database URL
         
     Returns:
-        Resolved database URL with correct IP
+        Resolved database URL with correct IP and credentials
     """
     try:
         parsed = urlparse(database_url)
         
-        # If hostname looks like a Cloud SQL instance name, try to resolve it
-        if parsed.hostname and not parsed.hostname.replace('.', '').replace('-', '').isdigit():
-            # Extract potential instance name from hostname
-            # Common patterns: instance-name, project:region:instance-name
-            instance_name = parsed.hostname.split(':')[-1] if ':' in parsed.hostname else parsed.hostname
-            
-            # Try to get the IP using gcloud
-            resolved_ip = get_cloud_sql_ip(instance_name)
-            
-            if resolved_ip:
-                # Replace hostname with resolved IP
-                netloc = f"{parsed.username}:{parsed.password}@{resolved_ip}"
-                if parsed.port:
-                    netloc += f":{parsed.port}"
-                    
-                resolved_url = urlunparse((
-                    parsed.scheme,
-                    netloc,
-                    parsed.path,
-                    parsed.params,
-                    parsed.query,
-                    parsed.fragment
-                ))
-                
-                logger.info(f"Resolved database URL using Cloud SQL IP")
-                return resolved_url
+        # Known Cloud SQL configuration
+        CLOUD_SQL_INTERNAL_IP = "10.92.0.3"
+        CLOUD_SQL_USERNAME = "arccorp_sys_admin"
         
-        # Return original URL if no resolution needed or failed
+        # If hostname looks like a Cloud SQL instance name or non-IP, use the known internal IP
+        if parsed.hostname and not _is_ip_address(parsed.hostname):
+            logger.info(f"Resolving hostname {parsed.hostname} to Cloud SQL internal IP {CLOUD_SQL_INTERNAL_IP}")
+            
+            # Get password from Google Secrets Manager
+            try:
+                password = _get_db_password_from_secrets()
+            except Exception as e:
+                logger.warning(f"Could not get password from secrets, using original: {e}")
+                password = parsed.password
+            
+            # Replace hostname and credentials with known values
+            netloc = f"{CLOUD_SQL_USERNAME}:{password}@{CLOUD_SQL_INTERNAL_IP}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+                
+            resolved_url = urlunparse((
+                parsed.scheme,
+                netloc,
+                parsed.path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+            
+            logger.info("Resolved database URL using Cloud SQL internal IP and credentials")
+            return resolved_url
+        
+        # If hostname is already an IP or localhost, return as-is
         return database_url
         
     except Exception as e:
         logger.warning(f"Error resolving database URL: {e}")
         return database_url
+
+def _get_db_password_from_secrets() -> str:
+    """Get database password from Google Secrets Manager."""
+    try:
+        from google.cloud import secretmanager
+        
+        # Initialize the client
+        client = secretmanager.SecretManagerServiceClient()
+        
+        # Get project ID from environment or use default
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
+        
+        # Try different possible secret names for the database password
+        secret_names = ["database-password", "DATABASE_PASSWORD", "db-password"]
+        
+        for secret_name in secret_names:
+            try:
+                name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+                response = client.access_secret_version(request={"name": name})
+                return response.payload.data.decode("UTF-8")
+            except Exception:
+                continue
+        
+        raise Exception("No database password secret found")
+        
+    except Exception as e:
+        logger.error(f"Error getting database password from secrets: {e}")
+        raise
+
+def _is_ip_address(hostname: str) -> bool:
+    """Check if hostname is already an IP address."""
+    try:
+        parts = hostname.split('.')
+        if len(parts) == 4:
+            return all(0 <= int(part) <= 255 for part in parts)
+    except (ValueError, AttributeError):
+        pass
+    return hostname in ['localhost', '127.0.0.1']
 
 class DatabaseManager:
     """
