@@ -1,154 +1,145 @@
 # 🤖 Red Legion Discord Bot
 
-**The ultimate companion for Star Citizen organizations - streamlining operations, tracking participation, and building stronger communities.**
+## What is this Bot?
 
-## 🌟 What is the Red Legion Bot?
+The Red Legion Discord Bot is an **automated operations manager** for Star Citizen organizations. It eliminates manual administrative work by automatically tracking member participation, calculating fair payouts, and managing events.
 
-The Red Legion Bot is a sophisticated Discord assistant designed specifically for Star Citizen organizations. Think of it as your organization's digital operations officer - it automatically tracks member participation, calculates fair payouts, manages events, and provides real-time game data to help your org operate more efficiently and fairly.
+**In Simple Terms**: 
+- Members join voice channels during operations (mining, combat, etc.)
+- The bot tracks who participated and for how long
+- It automatically calculates fair earnings based on participation time
+- Leaders get detailed reports and can distribute payouts instantly
 
-Whether you're running Sunday mining operations, organizing military missions, or planning social events, the Red Legion Bot handles the tedious administrative work so your members can focus on having fun and achieving your organization's goals.
+**Core Purpose**: Replace spreadsheets, manual timekeeping, and disputed payouts with transparent, automated systems that build trust and fairness in your organization.
 
-## 🎯 What Does the Bot Do?
+## 🚀 Core Features
 
-### 📊 **Sunday Mining Operations**
-The bot's flagship feature is comprehensive Sunday Mining management:
+### 📊 **Automated Sunday Mining Operations**
+The bot's flagship feature - complete automation for mining sessions:
 
-- **🎤 Voice Channel Tracking**: Automatically tracks who participates and for how long
+- **🎤 Voice Channel Tracking**: Automatically tracks who participates and for how long in 7 dedicated mining channels
 - **💰 Smart Payroll System**: Calculates fair earnings distribution based on participation time
-- **🎁 Donation System**: Members can voluntarily donate their earnings to help others
-- **💎 Live Price Data**: Pulls real-time ore prices from UEX Corp for accurate calculations
-- **📋 Event Management**: Creates and tracks mining events with unique IDs (e.g., `sm-a7k2m9`)
-- **👥 Member Listing**: Shows who's currently in each mining channel when sessions start
-- **🤖 Visual Indicators**: Bot joins the dispatch channel to show when tracking is active
+- **🎁 Voluntary Donation System**: Members can choose to donate earnings to help fellow miners
+- **💎 Live UEX Corp Price Data**: Real-time ore prices with best selling locations
+- **📋 Prefixed Event IDs**: Unique tracking IDs like `sm-a7k2m9` for each mining session
+- **👥 Live Member Display**: Shows who's currently in each mining channel when sessions start
+- **🤖 Visual Session Status**: Bot joins dispatch channel to indicate active tracking
 
-### 🎮 **Game Data Integration** 
-- **🔍 Ore Price Checking**: Real-time Star Citizen commodity prices from UEX Corp
-- **📈 Market Analysis**: Compare prices across different locations and ores
-- **⚡ Smart Caching**: Efficient data retrieval that updates every 24 hours
+**How it Works**: Start session → Members join voice channels → Bot tracks participation → Calculate payroll with real prices → Distribute earnings fairly
 
-### 🏛️ **Organization Management**
-- **👑 Role-Based Access**: Admin and OrgLeader permissions for sensitive operations
-- **🗃️ Member Database**: Tracks member participation history and statistics
-- **📅 Event System**: Support for multiple event types with organized tracking
+### 🎮 **Star Citizen Game Integration** 
+- **🔍 Commodity Price Checking**: Live pricing for all 19 mineable ores from UEX Corp API
+- **📈 Market Intelligence**: Compare prices across different star systems and locations  
+- **⚡ Smart Caching**: 24-hour refresh cycles aligned with game data updates
+- **🔄 Force Refresh**: Override cache when needed for immediate price updates
 
-### 🧪 **Testing & Diagnostics**
-- **🔧 Built-in Diagnostics**: Troubleshoot issues with comprehensive system checks
-- **🧪 Test Data Creation**: Generate realistic test scenarios for training and validation
-- **📊 Performance Monitoring**: Track bot health and database connectivity
+### 🏛️ **Organization Management Tools**
+- **👑 Role-Based Permissions**: Admin and OrgLeader access controls for sensitive operations
+- **🗃️ Member Database**: Complete participation history and statistics tracking
+- **📅 Multi-Event Support**: Mining, combat, training, social events with category-specific IDs
+- **📊 Analytics Dashboard**: Performance insights and participation metrics
 
-## 🚀 Key Features & Capabilities
+### 🧪 **Testing & Diagnostics Suite**
+- **🔧 Built-in Health Checks**: Comprehensive system diagnostics for troubleshooting
+- **🧪 Test Data Generation**: Create realistic scenarios for training and validation
+- **📊 Performance Monitoring**: Track bot health, database connectivity, and API status
+- **🛠️ Admin Tools**: Database validation, schema checks, and migration status
+
+## 👥 Benefits by Role
 
 ### **For Organization Leaders:**
-- **Automated Payroll**: No more manual calculations or disputes over fair distribution
-- **Participation Tracking**: See exactly who contributes and how much
-- **Event Organization**: Plan and track multiple concurrent operations
-- **Real-time Oversight**: Monitor active operations as they happen
+- **Zero Administrative Overhead**: No more manual calculations or disputes over fair distribution
+- **Complete Transparency**: See exactly who contributes and how much with detailed analytics
+- **Multi-Operation Management**: Track mining, combat, training events simultaneously
+- **Real-time Operations Dashboard**: Monitor active sessions as they happen
 
 ### **For Members:**
-- **Fair Compensation**: Earnings automatically calculated based on actual participation
-- **Transparency**: See exactly how payroll is calculated and distributed  
-- **Easy Participation**: Just join voice channels - the bot handles the rest
-- **Donation Options**: Voluntarily share earnings with fellow org members
+- **Guaranteed Fair Pay**: Earnings automatically calculated based on actual participation time
+- **Full Transparency**: See exactly how payroll is calculated and distributed  
+- **Effortless Participation**: Just join voice channels - the bot handles everything else
+- **Community Support**: Voluntarily donate earnings to help fellow organization members
 
 ### **For Payroll Officers:**
-- **One-Click Calculations**: Generate complete payroll reports instantly
-- **Editable Pricing**: Adjust ore prices if needed before final distribution
-- **Enhanced Reports**: Clear breakdown of base pay plus donation bonuses
-- **Multi-Step Workflow**: Guided process from event selection to final payout
+- **Instant Report Generation**: Complete payroll calculations with one command
+- **Price Flexibility**: Edit ore prices if needed before final distribution
+- **Enhanced Reporting**: Clear breakdown showing base pay plus donation bonuses
+- **Guided Workflow**: Step-by-step process from event selection to final payout
 
-## 📱 How to Use the Bot
+## 📱 Quick Start Guide
 
-### **Starting a Sunday Mining Session:**
-1. Run `/redsundayminingstart` 
-2. Bot shows who's currently in each channel
-3. Look for the bot in the dispatch channel (confirms tracking is active)
-4. Members join voice channels and participate normally
-5. Bot automatically tracks participation time
+### **🎯 Sunday Mining Session (5 Simple Steps)**
+1. **Start**: `/redsundayminingstart` - Bot shows current channel members and creates event ID like `sm-a7k2m9`
+2. **Mine**: Members join voice channels and participate normally - bot tracks automatically
+3. **Calculate**: `/redpayroll calculate` - Select your event, set donations, review prices
+4. **Distribute**: Bot generates fair payroll based on participation time and current ore values
+5. **Done**: Members get transparent breakdown of earnings and any donation bonuses
 
-### **Calculating Payroll:**
-1. Payroll officer runs `/redpayroll calculate`
-2. Select which mining event to process
-3. Choose members who want to donate earnings (optional)
-4. Review/edit ore prices if needed
-5. Enter total ore amounts collected
-6. Bot calculates and displays final distribution
+### **🔍 Essential Commands**
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `/redpricecheck ores` | Current ore prices with best locations | All 19 mineable ores |
+| `/redpricerefresh` | Force update price cache | Override 24-hour cache |
+| `/redeventdiagnostics` | System health check | Database, API, channels |
+| `/redtestmining create` | Generate test data | Training and validation |
 
-### **Getting Current Prices:**
-- `/redpricecheck ores` - See all ore prices
-- `/redpricecheck high_value` - High-value ores only
-- `/redpricecheck all` - Complete commodity list
+### **💡 Pro Tips**
+- Bot joins dispatch channel when tracking is active (visual confirmation)
+- Events get unique prefixed IDs: `sm-` (mining), `op-` (operations), `tr-` (training)
+- Donation system is completely voluntary - no pressure on members
+- All calculations are transparent with detailed breakdowns
 
-### **Testing & Diagnostics:**
-- `/redeventdiagnostics` - Check event creation and database
-- `/redtestmining create` - Generate test data for training
-- `/reddiagnostics` - Comprehensive system health check
+## ✅ What's Ready Now
 
-## 🏗️ Current Capabilities
+**Core Systems (Production Ready)**:
+- 🎤 **Voice Channel Tracking** - Automatic participation monitoring across 7 mining channels
+- 💰 **Smart Payroll System** - Fair distribution based on participation time with donation support
+- 💎 **Live UEX Corp Integration** - Real-time ore prices with 19+ commodities and location data
+- 📋 **Event Management** - Prefixed IDs (`sm-a7k2m9`), creation, tracking, and analytics
+- 🔒 **Security & Permissions** - Role-based access with Admin/OrgLeader controls
+- 🧪 **Testing & Diagnostics** - Comprehensive health checks and test data generation
 
-### ✅ **Fully Operational:**
-- ✅ Sunday Mining session management with voice tracking
-- ✅ Automated payroll calculation with donation support
-- ✅ Real-time UEX Corp price integration
-- ✅ Event creation and management (with prefixed IDs)
-- ✅ Member participation database
-- ✅ Comprehensive diagnostics and testing tools
-- ✅ Role-based permission system
-- ✅ Enhanced UI with interactive Discord components
+**Advanced Features (Enhanced v2.0)**:
+- 🎁 **Voluntary Donation System** - Members can share earnings with automatic redistribution
+- ✏️ **Editable Pricing** - Adjust ore values during payroll calculation as needed
+- 📊 **Interactive UI** - Discord buttons, modals, and multi-step workflows
+- 🏷️ **Smart Event IDs** - Category prefixes for mining, operations, training, social events
+- 📈 **Real-time Analytics** - Live participation tracking with detailed member statistics
 
-### 🔧 **Advanced Features:**
-- ✅ Multi-step payroll workflow with donation redistribution
-- ✅ Editable ore pricing during payroll calculation  
-- ✅ Smart event ID system (`sm-` for mining, `op-` for operations, etc.)
-- ✅ Real-time channel member display
-- ✅ Automatic database event creation and tracking
-- ✅ Flexible database schema support
+## 🚀 Future Expansions
 
-## 🌈 Future Possibilities
+**On the Roadmap:**
+- ⚔️ **Military Operations Tracking** - Combat missions with after-action reports  
+- 🎓 **Training Program Management** - Structured learning paths and certifications
+- 🏆 **Achievement System** - Recognition for top contributors and milestones
+- 📊 **Advanced Analytics** - Deep insights into member performance and trends
+- 🎮 **Direct Game Integration** - When Star Citizen APIs become available
 
-### 🎯 **Planned Enhancements:**
-- **📊 Advanced Analytics**: Detailed member performance reports and trends
-- **🏆 Achievement System**: Recognize top contributors and milestones
-- **📱 Mobile Integration**: Discord bot optimizations for mobile users
-- **🔔 Smart Notifications**: Automated reminders for events and activities
-- **💼 Multi-Event Support**: Simultaneous tracking of different operation types
+*The foundation is built - the possibilities are endless.*
 
-### 🚀 **Potential Expansions:**
-- **⚔️ Military Operations**: Combat mission tracking and after-action reports
-- **🎓 Training Programs**: Structured learning paths and certification tracking
-- **🏟️ Tournament Management**: Competition brackets and scoring systems
-- **🗺️ Exploration Tracking**: Discovery logging and territory mapping
-- **💰 Treasury Management**: Organization fund tracking and budget allocation
-- **📈 Market Intelligence**: Predictive pricing and trade route optimization
+---
 
-### 🔮 **Advanced Integrations:**
-- **🎮 Star Citizen API**: Direct game integration when available
-- **📊 Business Intelligence**: Advanced reporting and data visualization
-- **🤖 AI Assistant**: Natural language queries for data and operations
-- **🌐 Web Dashboard**: Browser-based control panel for detailed management
-- **📱 Custom Apps**: Dedicated mobile applications for org management
+## 🎯 Why Choose Red Legion Bot?
 
-## 🛡️ Built for Organizations
+**Built for Star Citizen Organizations That Value:**
 
-The Red Legion Bot is specifically designed for Star Citizen organizations that value:
+✅ **Fairness** - Transparent, automated systems eliminate favoritism and disputes  
+✅ **Community** - Tools that bring members together and encourage participation  
+✅ **Efficiency** - Automation reduces administrative overhead dramatically  
+✅ **Growth** - Data and insights help organizations improve and expand  
+✅ **Reliability** - Robust systems that work consistently when you need them
 
-- **⚖️ Fairness**: Transparent, automated systems that eliminate favoritism
-- **🤝 Community**: Tools that bring members together and encourage participation  
-- **⚡ Efficiency**: Automation that reduces administrative overhead
-- **📊 Growth**: Data and insights that help organizations improve and expand
-- **🔒 Reliability**: Robust systems that work consistently when you need them
+## 🎉 Ready to Transform Your Organization?
 
-Whether you're a small mining collective or a large multi-division organization, the Red Legion Bot scales to meet your needs while maintaining the personal touch that makes Star Citizen communities special.
+**Getting started is simple:**
 
-## 🎉 Getting Started
+1. **🎤 Members join voice channels** during operations (just like normal)
+2. **🤖 Bot handles everything automatically** - tracking, calculations, reporting
+3. **💰 Everyone gets fair compensation** based on transparent participation metrics
+4. **📈 Your organization grows stronger** with better tools and happier members
 
-Ready to revolutionize your organization's operations? The Red Legion Bot is designed to be intuitive for all users:
+**The Red Legion Bot eliminates the spreadsheets, disputes, and administrative headaches** - so you can focus on what matters: building an amazing Star Citizen community.
 
-1. **🎤 Join Voice Channels**: Participate in operations normally
-2. **📊 Let the Bot Work**: Automatic tracking happens in the background  
-3. **💰 Enjoy Fair Payouts**: Transparent, automated compensation
-4. **📈 Watch Your Org Grow**: Better tools lead to stronger communities
-
-*The Red Legion Bot - Where technology meets community in the Star Citizen universe.* ⭐
+*Where technology meets community in the Star Citizen universe.* ⭐
 
 ---
 
