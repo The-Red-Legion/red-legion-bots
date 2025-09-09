@@ -303,12 +303,34 @@ def init_database(database_url=None):
             -- Foreign key constraints will be added separately after schema creation
             """
             
-            # Drop and recreate mining_participation table if it exists in corrupted state
-            try:
-                cursor.execute("DROP TABLE IF EXISTS mining_participation CASCADE;")
-                print("✅ Dropped existing mining_participation table")
-            except Exception as e:
-                print(f"Info: mining_participation table cleanup: {e}")
+            # Drop ALL existing tables to ensure clean slate (order matters due to dependencies)
+            print("🧹 Dropping all existing tables for clean recreation...")
+            drop_tables = [
+                "DROP TABLE IF EXISTS mining_yields CASCADE;",
+                "DROP TABLE IF EXISTS mining_participation CASCADE;",
+                "DROP TABLE IF EXISTS admin_actions CASCADE;", 
+                "DROP TABLE IF EXISTS command_usage CASCADE;",
+                "DROP TABLE IF EXISTS bot_config CASCADE;",
+                "DROP TABLE IF EXISTS market_items CASCADE;",
+                "DROP TABLE IF EXISTS loans CASCADE;",
+                "DROP TABLE IF EXISTS materials CASCADE;",
+                "DROP TABLE IF EXISTS events CASCADE;",
+                "DROP TABLE IF EXISTS mining_events CASCADE;",
+                "DROP TABLE IF EXISTS mining_channels CASCADE;",
+                "DROP TABLE IF EXISTS guild_memberships CASCADE;",
+                "DROP TABLE IF EXISTS guilds CASCADE;",
+                "DROP TABLE IF EXISTS users CASCADE;"
+            ]
+            
+            for drop_sql in drop_tables:
+                try:
+                    cursor.execute(drop_sql)
+                    table_name = drop_sql.split("DROP TABLE IF EXISTS ")[1].split(" CASCADE")[0]
+                    print(f"✅ Dropped table: {table_name}")
+                except Exception as e:
+                    print(f"Info: Drop table failed (may not exist): {e}")
+            
+            print("🧹 All tables dropped, creating fresh schema...")
             
             # Execute schema creation with better error handling
             print("🔧 Creating database schema...")
