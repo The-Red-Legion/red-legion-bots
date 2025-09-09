@@ -65,8 +65,8 @@ def init_database(database_url=None):
             -- Guild memberships table
             CREATE TABLE IF NOT EXISTS guild_memberships (
                 membership_id SERIAL PRIMARY KEY,
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
-                user_id VARCHAR(20) REFERENCES users(user_id),
+                guild_id VARCHAR(20),
+                user_id VARCHAR(20),
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 left_at TIMESTAMP,
                 is_active BOOLEAN DEFAULT TRUE,
@@ -78,7 +78,7 @@ def init_database(database_url=None):
             -- Mining channels table
             CREATE TABLE IF NOT EXISTS mining_channels (
                 channel_id VARCHAR(20) PRIMARY KEY,
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                guild_id VARCHAR(20),
                 name VARCHAR(100) NOT NULL,
                 description TEXT,
                 is_active BOOLEAN DEFAULT TRUE,
@@ -89,7 +89,7 @@ def init_database(database_url=None):
             -- Mining events table (enhanced for comprehensive event management)
             CREATE TABLE IF NOT EXISTS mining_events (
                 event_id SERIAL PRIMARY KEY,
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                guild_id VARCHAR(20),
                 name VARCHAR(200) NOT NULL,
                 event_date DATE NOT NULL,
                 location VARCHAR(200),
@@ -158,8 +158,8 @@ def init_database(database_url=None):
             -- Mining yields table
             CREATE TABLE IF NOT EXISTS mining_yields (
                 yield_id SERIAL PRIMARY KEY,
-                participation_id INTEGER REFERENCES mining_participation(participation_id),
-                material_id INTEGER REFERENCES materials(material_id),
+                participation_id INTEGER,
+                material_id INTEGER,
                 quantity DECIMAL(10,3) NOT NULL,
                 quality_grade VARCHAR(10),
                 extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -168,8 +168,8 @@ def init_database(database_url=None):
             -- Loans table
             CREATE TABLE IF NOT EXISTS loans (
                 loan_id SERIAL PRIMARY KEY,
-                user_id VARCHAR(20) REFERENCES users(user_id),
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                user_id VARCHAR(20),
+                guild_id VARCHAR(20),
                 amount DECIMAL(15,2) NOT NULL,
                 interest_rate DECIMAL(5,4) DEFAULT 0.0000,
                 issued_date DATE NOT NULL,
@@ -236,7 +236,7 @@ def init_database(database_url=None):
             -- Market items table for red-market commands
             CREATE TABLE IF NOT EXISTS market_items (
                 item_id SERIAL PRIMARY KEY,
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                guild_id VARCHAR(20),
                 name VARCHAR(100) NOT NULL,
                 description TEXT,
                 price DECIMAL(15,2) NOT NULL CHECK (price > 0),
@@ -252,7 +252,7 @@ def init_database(database_url=None):
             -- Bot configuration table for red-config commands
             CREATE TABLE IF NOT EXISTS bot_config (
                 config_id SERIAL PRIMARY KEY,
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
+                guild_id VARCHAR(20),
                 config_key VARCHAR(100) NOT NULL,
                 config_value TEXT,
                 config_type VARCHAR(20) DEFAULT 'string',
@@ -266,8 +266,8 @@ def init_database(database_url=None):
             -- Command usage tracking for analytics
             CREATE TABLE IF NOT EXISTS command_usage (
                 usage_id SERIAL PRIMARY KEY,
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
-                user_id VARCHAR(20) REFERENCES users(user_id),
+                guild_id VARCHAR(20),
+                user_id VARCHAR(20),
                 command_name VARCHAR(100) NOT NULL,
                 command_type VARCHAR(20) DEFAULT 'slash',
                 success BOOLEAN DEFAULT TRUE,
@@ -280,8 +280,8 @@ def init_database(database_url=None):
             -- Admin actions log for red-admin commands
             CREATE TABLE IF NOT EXISTS admin_actions (
                 action_id SERIAL PRIMARY KEY,
-                guild_id VARCHAR(20) REFERENCES guilds(guild_id),
-                admin_id VARCHAR(20) REFERENCES users(user_id),
+                guild_id VARCHAR(20),
+                admin_id VARCHAR(20),
                 admin_name VARCHAR(100),
                 action_type VARCHAR(50) NOT NULL,
                 target_resource VARCHAR(100),
@@ -324,9 +324,42 @@ def init_database(database_url=None):
             
             # Add foreign key constraints with error handling
             fk_constraints = [
+                # Guild memberships foreign keys
+                ("fk_guild_memberships_guild", "ALTER TABLE guild_memberships ADD CONSTRAINT fk_guild_memberships_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                ("fk_guild_memberships_user", "ALTER TABLE guild_memberships ADD CONSTRAINT fk_guild_memberships_user FOREIGN KEY (user_id) REFERENCES users(user_id)"),
+                
+                # Mining channels foreign keys
+                ("fk_mining_channels_guild", "ALTER TABLE mining_channels ADD CONSTRAINT fk_mining_channels_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                
+                # Mining events foreign keys
+                ("fk_mining_events_guild", "ALTER TABLE mining_events ADD CONSTRAINT fk_mining_events_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                
+                # Mining participation foreign keys (keeping existing ones)
                 ("fk_mining_participation_event", "ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_event FOREIGN KEY (event_id) REFERENCES mining_events(event_id)"),
                 ("fk_mining_participation_user", "ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_user FOREIGN KEY (user_id) REFERENCES users(user_id)"),
-                ("fk_mining_participation_channel", "ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_channel FOREIGN KEY (channel_id) REFERENCES mining_channels(channel_id)")
+                ("fk_mining_participation_channel", "ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_channel FOREIGN KEY (channel_id) REFERENCES mining_channels(channel_id)"),
+                
+                # Mining yields foreign keys
+                ("fk_mining_yields_participation", "ALTER TABLE mining_yields ADD CONSTRAINT fk_mining_yields_participation FOREIGN KEY (participation_id) REFERENCES mining_participation(participation_id)"),
+                ("fk_mining_yields_material", "ALTER TABLE mining_yields ADD CONSTRAINT fk_mining_yields_material FOREIGN KEY (material_id) REFERENCES materials(material_id)"),
+                
+                # Loans foreign keys
+                ("fk_loans_user", "ALTER TABLE loans ADD CONSTRAINT fk_loans_user FOREIGN KEY (user_id) REFERENCES users(user_id)"),
+                ("fk_loans_guild", "ALTER TABLE loans ADD CONSTRAINT fk_loans_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                
+                # Market items foreign keys
+                ("fk_market_items_guild", "ALTER TABLE market_items ADD CONSTRAINT fk_market_items_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                
+                # Bot configuration foreign keys
+                ("fk_bot_config_guild", "ALTER TABLE bot_config ADD CONSTRAINT fk_bot_config_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                
+                # Command usage foreign keys
+                ("fk_command_usage_guild", "ALTER TABLE command_usage ADD CONSTRAINT fk_command_usage_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                ("fk_command_usage_user", "ALTER TABLE command_usage ADD CONSTRAINT fk_command_usage_user FOREIGN KEY (user_id) REFERENCES users(user_id)"),
+                
+                # Admin actions foreign keys
+                ("fk_admin_actions_guild", "ALTER TABLE admin_actions ADD CONSTRAINT fk_admin_actions_guild FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)"),
+                ("fk_admin_actions_admin", "ALTER TABLE admin_actions ADD CONSTRAINT fk_admin_actions_admin FOREIGN KEY (admin_id) REFERENCES users(user_id)")
             ]
             
             for constraint_name, constraint_sql in fk_constraints:
