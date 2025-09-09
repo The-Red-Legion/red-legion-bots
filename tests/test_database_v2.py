@@ -199,23 +199,36 @@ def test_legacy_compatibility():
             result = init_db("postgresql://test:test@localhost:5432/testdb")
             print("  ✅ Legacy init_db function works")
         
-        # Test legacy function stubs with proper mocking
-        with patch('psycopg2.connect') as mock_connect:
+        # Test that functions can be called (mock all database operations)
+        with patch('database.operations.get_legacy_connection') as mock_get_conn, \
+             patch('psycopg2.connect') as mock_connect:
+            
+            # Setup mock database connection
             mock_conn = Mock()
             mock_cursor = Mock()
             mock_conn.cursor.return_value = mock_cursor
+            mock_cursor.__enter__ = Mock(return_value=mock_cursor)
+            mock_cursor.__exit__ = Mock(return_value=None)
+            mock_conn.close = Mock()
+            
+            mock_get_conn.return_value = mock_conn
             mock_connect.return_value = mock_conn
             
-            # Mock return values for database operations
+            # Mock database results
             mock_cursor.fetchall.return_value = []
-            mock_cursor.fetchone.return_value = [1]  # Return a mock item_id
+            mock_cursor.fetchone.return_value = [1]
             mock_cursor.rowcount = 1
             
+            # Test function calls
             get_market_items("postgresql://test:test@localhost:5432/testdb")
             add_market_item("postgresql://test:test@localhost:5432/testdb", "test", 100, 10)
             get_mining_channels_dict("postgresql://test:test@localhost:5432/testdb", "123")
-            issue_loan("postgresql://test:test@localhost:5432/testdb", "user123", 1000, datetime.now(), datetime.now())
-            save_mining_participation("postgresql://test:test@localhost:5432/testdb")
+            issue_loan("postgresql://test:test@localhost:5432/testdb", "user123", "guild123", 1000, datetime.now(), datetime.now())
+            save_mining_participation(
+                "postgresql://test:test@localhost:5432/testdb",
+                1, "user123", "TestUser", "channel123", "Test Channel", 
+                datetime.now(), datetime.now(), 60, True
+            )
         
         print("  ✅ All legacy compatibility functions available")
         
