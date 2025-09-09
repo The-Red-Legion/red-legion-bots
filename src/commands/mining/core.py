@@ -1387,12 +1387,35 @@ class SundayMiningCommands(commands.Cog):
             mining_channels = get_sunday_mining_channels(interaction.guild.id)
             print(f"🔍 DEBUG: Retrieved mining channels: {mining_channels}")
             
+            dispatch_join_success = False
+            dispatch_error = None
+            
             for channel_name, channel_id in mining_channels.items():
                 # Only join the dispatch channel (check if channel name contains 'dispatch' - case insensitive)
                 should_join = 'dispatch' in channel_name.lower()
                 print(f"🔍 DEBUG: Channel '{channel_name}' -> lowercase: '{channel_name.lower()}' -> contains 'dispatch': {should_join}")
                 print(f"Adding channel {channel_name} ({channel_id}) to tracking, join={should_join}")
-                await add_tracked_channel(int(channel_id), should_join=should_join)
+                
+                try:
+                    success = await add_tracked_channel(int(channel_id), should_join=should_join)
+                    if should_join:  # This is the dispatch channel
+                        dispatch_join_success = success
+                        if not success:
+                            dispatch_error = "Bot failed to join dispatch channel - check permissions"
+                except Exception as e:
+                    if should_join:  # This is the dispatch channel
+                        dispatch_join_success = False
+                        dispatch_error = f"Error joining dispatch: {str(e)}"
+                    print(f"❌ Error adding channel {channel_name} ({channel_id}): {e}")
+            
+            # Log dispatch channel join result for debugging
+            if 'dispatch' in mining_channels:
+                if dispatch_join_success:
+                    print("✅ Bot successfully joined dispatch channel")
+                else:
+                    print(f"❌ Bot failed to join dispatch channel: {dispatch_error}")
+            else:
+                print("⚠️ No dispatch channel configured in mining channels")
             
             start_voice_tracking()
             
@@ -1410,26 +1433,64 @@ class SundayMiningCommands(commands.Cog):
                 inline=False
             )
             
-            # List tracked channels
+            # List tracked channels with current members
             mining_channels = get_sunday_mining_channels(interaction.guild.id)
             channel_list_items = []
+            dispatch_join_status = None
+            
             for name, channel_id in mining_channels.items():
                 try:
-                    # Get the actual channel object to display proper name
+                    # Get the actual channel object to display proper name and members
                     channel = interaction.guild.get_channel(int(channel_id))
-                    if channel:
-                        channel_list_items.append(f"• {name.title()}: {channel.name}")
+                    if channel and hasattr(channel, 'members'):
+                        # Count current members (excluding bots)
+                        human_members = [member for member in channel.members if not member.bot]
+                        member_count = len(human_members)
+                        
+                        if member_count == 0:
+                            member_status = "Empty"
+                        else:
+                            # Show first 3 member names, then count if more
+                            member_names = [member.display_name for member in human_members[:3]]
+                            if member_count > 3:
+                                member_status = f"{', '.join(member_names)} +{member_count-3} more"
+                            else:
+                                member_status = ', '.join(member_names)
+                        
+                        # Check if this is dispatch channel for bot join status
+                        if 'dispatch' in name.lower():
+                            bot_in_channel = any(member.id == interaction.client.user.id for member in channel.members)
+                            dispatch_join_status = f"{'✅' if bot_in_channel else '❌'} Bot {'joined' if bot_in_channel else 'not in'} dispatch"
+                        
+                        channel_list_items.append(f"• **{name.title()}**: {channel.name} - *{member_status}*")
+                    elif channel:
+                        channel_list_items.append(f"• **{name.title()}**: {channel.name} - *Text Channel*")
                     else:
-                        channel_list_items.append(f"• {name.title()}: Channel ID {channel_id}")
-                except (ValueError, TypeError):
-                    channel_list_items.append(f"• {name.title()}: Invalid ID {channel_id}")
+                        channel_list_items.append(f"• **{name.title()}**: Channel ID {channel_id} - *Not Found*")
+                except (ValueError, TypeError) as e:
+                    channel_list_items.append(f"• **{name.title()}**: Invalid ID {channel_id}")
+                    print(f"⚠️ Error processing channel {name} ({channel_id}): {e}")
             
             channel_list = "\n".join(channel_list_items)
+            
+            # Add dispatch status if we found it
+            dispatch_status_text = ""
+            if dispatch_join_status:
+                dispatch_status_text = f"\n\n{dispatch_join_status}"
+            
             embed.add_field(
-                name="🎤 Tracked Voice Channels",
-                value=channel_list + "\n\n🤖 **Bot will join Dispatch channel** to indicate active tracking!",
+                name="🎤 Mining Channel Status",
+                value=channel_list + dispatch_status_text,
                 inline=False
             )
+            
+            # Add dispatch troubleshooting if there was an issue
+            if dispatch_error:
+                embed.add_field(
+                    name="⚠️ Dispatch Channel Issue",
+                    value=f"{dispatch_error}\n\n**Troubleshooting:**\n• Check bot has 'Connect' permission in dispatch channel\n• Verify channel ID `{mining_channels.get('dispatch', 'N/A')}` is correct\n• Ensure bot can see the voice channel",
+                    inline=False
+                )
             
             embed.add_field(
                 name="📝 Next Steps",
