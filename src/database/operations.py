@@ -700,10 +700,9 @@ async def create_event(name: str, description: str, category: str, date: str, ti
         datetime_str = f"{date} {time}:00"
         start_time = datetime.fromisoformat(datetime_str)
         
-        # Default guild_id if not provided
+        # Default guild_id if not provided - this should not happen now
         if guild_id is None:
-            from config.settings import GUILD_ID
-            guild_id = str(GUILD_ID)
+            raise ValueError("guild_id is required for event creation")
         
         import psycopg2
         conn = psycopg2.connect(database_url)
@@ -733,7 +732,7 @@ async def get_all_events(category: str = None, guild_id: str = None) -> List[Dic
     
     Args:
         category: Optional category filter
-        guild_id: Guild ID (optional)
+        guild_id: Guild ID (required)
         
     Returns:
         List of event dictionaries
@@ -742,10 +741,9 @@ async def get_all_events(category: str = None, guild_id: str = None) -> List[Dic
         from config.settings import get_database_url
         database_url = get_database_url()
         
-        # Default guild_id if not provided
+        # Guild ID is required now
         if guild_id is None:
-            from config.settings import GUILD_ID
-            guild_id = str(GUILD_ID)
+            raise ValueError("guild_id is required for event operations")
         
         import psycopg2
         conn = psycopg2.connect(database_url)
@@ -797,7 +795,7 @@ async def delete_event(event_id: int, guild_id: str = None) -> bool:
     
     Args:
         event_id: Event ID to delete
-        guild_id: Guild ID (optional)
+        guild_id: Guild ID (required)
         
     Returns:
         bool: True if successful
@@ -806,10 +804,9 @@ async def delete_event(event_id: int, guild_id: str = None) -> bool:
         from config.settings import get_database_url
         database_url = get_database_url()
         
-        # Default guild_id if not provided
+        # Guild ID is required now
         if guild_id is None:
-            from config.settings import GUILD_ID
-            guild_id = str(GUILD_ID)
+            raise ValueError("guild_id is required for event operations")
         
         import psycopg2
         conn = psycopg2.connect(database_url)

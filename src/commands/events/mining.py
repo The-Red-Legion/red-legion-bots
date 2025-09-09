@@ -9,7 +9,6 @@ from discord import app_commands
 from typing import Optional
 import logging
 
-from config.settings import GUILD_ID
 from database.operations import get_all_events, create_event, delete_event
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,8 @@ class MiningEvents(commands.Cog):
                 category="mining",
                 date=date,
                 time=time,
-                created_by=interaction.user.id
+                created_by=interaction.user.id,
+                guild_id=str(interaction.guild.id)
             )
             
             embed = discord.Embed(
@@ -74,7 +74,7 @@ class MiningEvents(commands.Cog):
         """Delete a mining event"""
         try:
             # Verify event exists and is mining category
-            events = await get_all_events()
+            events = await get_all_events(category="mining", guild_id=str(interaction.guild.id))
             mining_event = None
             for event in events:
                 if event['id'] == event_id and event['category'] == 'mining':
@@ -88,7 +88,7 @@ class MiningEvents(commands.Cog):
                 )
                 return
             
-            await delete_event(event_id)
+            await delete_event(event_id, guild_id=str(interaction.guild.id))
             
             embed = discord.Embed(
                 title="🗑️ Mining Event Deleted",
@@ -110,7 +110,7 @@ class MiningEvents(commands.Cog):
     async def view_mining_events(self, interaction: discord.Interaction):
         """View all mining events"""
         try:
-            events = await get_all_events()
+            events = await get_all_events(category="mining", guild_id=str(interaction.guild.id))
             mining_events = [event for event in events if event['category'] == 'mining']
             
             if not mining_events:
@@ -148,5 +148,5 @@ class MiningEvents(commands.Cog):
 async def setup(bot):
     """Setup function to add the cog to the bot"""
     logger.info("Setting up MiningEvents cog...")
-    await bot.add_cog(MiningEvents(bot), guild=discord.Object(id=GUILD_ID))
+    await bot.add_cog(MiningEvents(bot))
     logger.info("MiningEvents cog added successfully")

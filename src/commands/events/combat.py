@@ -9,7 +9,6 @@ from discord import app_commands
 from typing import Optional
 import logging
 
-from config.settings import GUILD_ID
 from database.operations import get_all_events, create_event, delete_event
 
 logger = logging.getLogger(__name__)
@@ -55,7 +54,8 @@ class CombatEvents(commands.Cog):
                 subcategory=combat_type.value,
                 date=date,
                 time=time,
-                created_by=interaction.user.id
+                created_by=interaction.user.id,
+                guild_id=str(interaction.guild.id)
             )
             
             embed = discord.Embed(
@@ -85,7 +85,7 @@ class CombatEvents(commands.Cog):
         """Delete a combat event"""
         try:
             # Verify event exists and is combat category
-            events = await get_all_events()
+            events = await get_all_events(category="combat", guild_id=str(interaction.guild.id))
             combat_event = None
             for event in events:
                 if event['id'] == event_id and event['category'] == 'combat':
@@ -99,7 +99,7 @@ class CombatEvents(commands.Cog):
                 )
                 return
             
-            await delete_event(event_id)
+            await delete_event(event_id, guild_id=str(interaction.guild.id))
             
             embed = discord.Embed(
                 title="🗑️ Combat Event Deleted",
@@ -121,7 +121,7 @@ class CombatEvents(commands.Cog):
     async def view_combat_events(self, interaction: discord.Interaction):
         """View all combat events"""
         try:
-            events = await get_all_events()
+            events = await get_all_events(category="combat", guild_id=str(interaction.guild.id))
             combat_events = [event for event in events if event['category'] == 'combat']
             
             if not combat_events:
@@ -160,5 +160,5 @@ class CombatEvents(commands.Cog):
 async def setup(bot):
     """Setup function to add the cog to the bot"""
     logger.info("Setting up CombatEvents cog...")
-    await bot.add_cog(CombatEvents(bot), guild=discord.Object(id=GUILD_ID))
+    await bot.add_cog(CombatEvents(bot))
     logger.info("CombatEvents cog added successfully")
