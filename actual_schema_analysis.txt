@@ -1,0 +1,110 @@
+DATABASE SCHEMA ANALYSIS
+======================
+
+TABLE: events
+-------------
+  id                             integer                   NOT NULL   DEFAULT nextval('events_id_seq'::regclass)
+  guild_id                       bigint                    NOT NULL  
+  event_date                     date                      NOT NULL  
+  event_time                     timestamp without time zone NOT NULL  
+  event_name                     text                      NULL       DEFAULT 'Sunday Mining'::text
+  total_participants             integer                   NULL       DEFAULT 0
+  total_payout                   real                      NULL      
+  is_open                        boolean                   NULL       DEFAULT true
+  payroll_calculated             boolean                   NULL       DEFAULT false
+  pdf_generated                  boolean                   NULL       DEFAULT false
+  event_id                       integer                   NULL      
+  channel_id                     text                      NULL      
+  channel_name                   text                      NULL      
+  start_time                     text                      NULL      
+  end_time                       text                      NULL      
+  total_value                    real                      NULL      
+  created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+  updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+TABLE: guild_memberships
+------------------------
+  guild_id                       bigint                    NOT NULL  
+  user_id                        bigint                    NOT NULL  
+  is_org_member                  boolean                   NULL       DEFAULT false
+  join_date                      timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+TABLE: guilds
+-------------
+  id                             bigint                    NOT NULL  
+  name                           text                      NOT NULL  
+  settings                       jsonb                     NULL       DEFAULT '{}'::jsonb
+  created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+  updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+TABLE: loans
+------------
+  id                             integer                   NOT NULL   DEFAULT nextval('loans_id_seq'::regclass)
+  guild_id                       bigint                    NULL      
+  borrower_id                    bigint                    NULL      
+  amount_auec                    numeric(15,2)             NOT NULL  
+  interest_rate                  numeric(5,4)              NULL       DEFAULT 0.0000
+  status                         character varying(20)     NULL       DEFAULT 'active'::character varying
+  issued_date                    timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+  due_date                       timestamp without time zone NULL      
+  paid_date                      timestamp without time zone NULL      
+
+TABLE: materials
+----------------
+  id                             integer                   NOT NULL   DEFAULT nextval('materials_id_seq'::regclass)
+  name                           text                      NOT NULL  
+  category                       character varying(50)     NULL      
+  base_value_auec                numeric(10,2)             NULL      
+  current_market_value           numeric(10,2)             NULL      
+  updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+TABLE: mining_channels
+----------------------
+  id                             integer                   NOT NULL   DEFAULT nextval('mining_channels_id_seq'::regclass)
+  guild_id                       bigint                    NULL      
+  channel_id                     bigint                    NOT NULL  
+  channel_name                   text                      NOT NULL  
+  is_active                      boolean                   NULL       DEFAULT true
+  created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+TABLE: mining_events
+--------------------
+  id                             integer                   NOT NULL   DEFAULT nextval('mining_events_id_seq'::regclass)
+  guild_id                       bigint                    NULL      
+  event_date                     date                      NOT NULL  
+  event_time                     timestamp without time zone NOT NULL  
+  event_name                     text                      NULL       DEFAULT 'Sunday Mining'::text
+  status                         character varying(20)     NULL       DEFAULT 'planned'::character varying
+  total_participants             integer                   NULL       DEFAULT 0
+  total_value_auec               numeric(15,2)             NULL       DEFAULT 0
+  payroll_processed              boolean                   NULL       DEFAULT false
+  pdf_generated                  boolean                   NULL       DEFAULT false
+  created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+  updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+TABLE: mining_participation
+---------------------------
+  id                             integer                   NOT NULL   DEFAULT nextval('mining_participation_id_seq'::regclass)
+  event_id                       integer                   NULL      
+  user_id                        bigint                    NULL      
+  channel_id                     bigint                    NULL      
+  session_start                  timestamp without time zone NULL      
+  session_end                    timestamp without time zone NULL      
+  duration_seconds               integer                   NULL      
+  is_org_member                  boolean                   NULL       DEFAULT false
+  created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+  member_id                      text                      NULL      
+  username                       text                      NULL      
+  start_time                     timestamp without time zone NULL      
+  end_time                       timestamp without time zone NULL      
+  total_time_minutes             integer                   NULL      
+
+TABLE: mining_yields
+--------------------
+  id                             integer                   NOT NULL   DEFAULT nextval('mining_yields_id_seq'::regclass)
+  participation_id               integer                   NULL      
+  material_id                    integer                   NULL      
+  quantity_scu                   numeric(10,2)             NOT NULL  
+  estimated_value                numeric(15,2)             NULL      
+  recorded_at                    timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
