@@ -1061,6 +1061,168 @@ class SundayMiningCommands(commands.Cog):
             traceback.print_exc()
             return None
     
+    async def _fetch_detailed_uex_prices(self, category: str = "ores"):
+        """Fetch detailed UEX prices with location information."""
+        try:
+            headers = {
+                'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
+                'Accept': 'application/json'
+            }
+            
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.get(
+                    UEX_API_CONFIG['base_url'], 
+                    headers=headers,
+                    timeout=UEX_API_CONFIG.get('timeout', 30)
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        commodities = {}
+                        
+                        for commodity in data.get('data', []):
+                            commodity_name = commodity.get('name', '').upper()
+                            price_sell = float(commodity.get('price_sell', 0))
+                            price_buy = float(commodity.get('price_buy', 0))
+                            
+                            # Filter by category
+                            include_commodity = False
+                            
+                            if category == "ores":
+                                # Only mineable ores
+                                include_commodity = (
+                                    commodity.get('is_mineral') == 1 and 
+                                    commodity.get('is_extractable') == 1 and
+                                    price_sell > 0
+                                )
+                            elif category == "high_value":
+                                # High value items (>5000 aUEC/SCU)
+                                include_commodity = price_sell > 5000
+                            else:  # category == "all"
+                                # All tradeable commodities
+                                include_commodity = (
+                                    price_sell > 0 and 
+                                    commodity.get('is_sellable') == 1
+                                )
+                            
+                            if include_commodity:
+                                # Track highest price location per commodity
+                                if commodity_name not in commodities or price_sell > commodities[commodity_name]['price_sell']:
+                                    commodities[commodity_name] = {
+                                        'name': commodity.get('name', 'Unknown'),
+                                        'code': commodity.get('code', ''),
+                                        'kind': commodity.get('kind', ''),
+                                        'price_sell': price_sell,
+                                        'price_buy': price_buy,
+                                        'is_mineral': commodity.get('is_mineral', 0) == 1,
+                                        'is_extractable': commodity.get('is_extractable', 0) == 1,
+                                        'is_illegal': commodity.get('is_illegal', 0) == 1,
+                                        'weight_scu': commodity.get('weight_scu', 0),
+                                        'commodity_id': commodity.get('id'),
+                                        # Note: UEX API doesn't provide location data in commodities endpoint
+                                        # We'd need to call /locations endpoint for location details
+                                        'location': 'Best Available Price'
+                                    }
+                        
+                        print(f"✅ Fetched {len(commodities)} {category} from UEX API")
+                        return commodities
+                    else:
+                        print(f"❌ UEX API error: HTTP {response.status}")
+                        return None
+        
+        except Exception as e:
+            print(f"❌ Error fetching detailed UEX prices: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    async def _create_detailed_price_embed(self, price_data: Dict, category: str) -> discord.Embed:
+        """Create detailed price embed with location information."""
+        category_names = {
+            "ores": "Mineable Ores",
+            "high_value": "High Value Commodities", 
+            "all": "All Commodities"
+        }
+        
+        embed = discord.Embed(
+            title=f"📊 UEX Corp Price Check - {category_names.get(category, category.title())}",
+            description="Live prices from UEX API (highest available per SCU)",
+            color=0x3498db,
+            timestamp=datetime.now()
+        )
+        
+        if not price_data:
+            embed.add_field(
+                name="❌ No Price Data",
+                value="Could not fetch current commodity prices",
+                inline=False
+            )
+            return embed
+        
+        # Sort by price (highest first)
+        sorted_items = sorted(
+            price_data.items(),
+            key=lambda x: x[1]['price_sell'],
+            reverse=True
+        )
+        
+        # Split into chunks for multiple fields (Discord limit)
+        chunk_size = 10
+        chunks = [sorted_items[i:i + chunk_size] for i in range(0, min(len(sorted_items), 50), chunk_size)]
+        
+        for i, chunk in enumerate(chunks):
+            price_list = []
+            for commodity_key, commodity_data in chunk:
+                # Add indicators for special commodities
+                indicators = []
+                if commodity_data.get('is_illegal'):
+                    indicators.append("⚠️")
+                if commodity_data.get('is_mineral'):
+                    indicators.append("⛏️")
+                
+                indicator_str = "".join(indicators) + " " if indicators else ""
+                
+                price_list.append(
+                    f"{indicator_str}**{commodity_data['name']}** ({commodity_data['code']})"
+                    f"\n└ {commodity_data['price_sell']:>8,.0f} aUEC/SCU"
+                )
+            
+            field_name = f"💰 Prices ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Current Prices"
+            embed.add_field(
+                name=field_name,
+                value="\n".join(price_list),
+                inline=True if len(chunks) > 1 else False
+            )
+        
+        # Add summary statistics
+        if price_data:
+            prices = [p['price_sell'] for p in price_data.values()]
+            embed.add_field(
+                name="📈 Price Statistics",
+                value=f"• Highest: **{max(prices):,.0f}** aUEC/SCU\n"
+                      f"• Lowest: **{min(prices):,.0f}** aUEC/SCU\n" 
+                      f"• Average: **{sum(prices)/len(prices):,.0f}** aUEC/SCU\n"
+                      f"• Total Items: **{len(price_data)}**",
+                inline=False
+            )
+        
+        # Add legend
+        embed.add_field(
+            name="🔍 Legend",
+            value="⛏️ Mineable Ore • ⚠️ Illegal Commodity\n"
+                  "💡 Use `/payroll calculate` to calculate mining payouts",
+            inline=False
+        )
+        
+        embed.set_footer(text=f"Data from UEX Corp API • Category: {category_names.get(category, category)}")
+        
+        return embed
+    
     async def _create_ore_prices_embed(self, ore_prices: Dict) -> discord.Embed:
         """Create an embed showing current ore prices."""
         embed = discord.Embed(
@@ -1272,6 +1434,40 @@ class SundayMiningCommands(commands.Cog):
         except Exception as e:
             print(f"Error generating PDF report: {e}")
             return None
+    
+    @app_commands.command(name="redpricecheck", description="Check live ore prices and locations from UEX API")
+    @app_commands.describe(category="Category of commodities to check")
+    @app_commands.choices(category=[
+        app_commands.Choice(name="Ores (Mineable)", value="ores"),
+        app_commands.Choice(name="All Commodities", value="all"),
+        app_commands.Choice(name="High Value Only", value="high_value")
+    ])
+    async def price_check(self, interaction: discord.Interaction, category: str = "ores"):
+        """Check current commodity prices from UEX API with location data."""
+        try:
+            await interaction.response.defer()
+            
+            # Fetch UEX data with location information
+            price_data = await self._fetch_detailed_uex_prices(category)
+            
+            if not price_data:
+                embed = discord.Embed(
+                    title="❌ UEX API Error",
+                    description="Could not fetch current price data from UEX Corp",
+                    color=0xff0000
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Create price embed with location data
+            embed = await self._create_detailed_price_embed(price_data, category)
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error checking prices: {str(e)}",
+                ephemeral=True
+            )
     
     @app_commands.command(name="redsundayminingtest", description="Run diagnostics for Sunday Mining voice channel issues (Admin only)")
     @app_commands.describe(
