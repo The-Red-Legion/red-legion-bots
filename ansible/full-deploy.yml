@@ -160,17 +160,11 @@
         group: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Create temporary directory for full codebase copy
-      tempfile:
-        state: directory
-        suffix: _full_deploy
-      register: temp_dir
-      delegate_to: localhost
-
-    - name: Copy entire codebase to temporary directory (excluding unwanted files)
+    - name: Copy complete codebase (full deploy method)
       synchronize:
         src: "{{ playbook_dir }}/../"
-        dest: "{{ temp_dir.path }}/"
+        dest: "{{ app_dir }}"
+        delete: yes
         recursive: yes
         rsync_opts:
           - "--exclude=.git"
@@ -185,147 +179,34 @@
           - "--exclude=*.pyc"
           - "--exclude=*.pyo"
           - "--exclude={{ backup_dir }}"
-      delegate_to: localhost
-
-    - name: Create tarball of complete codebase
-      command: tar -czf "{{ temp_dir.path }}.tar.gz" -C "{{ temp_dir.path }}" .
-      delegate_to: localhost
-
-    - name: Copy tarball to remote server
-      copy:
-        src: "{{ temp_dir.path }}.tar.gz"
-        dest: "/tmp/full_codebase.tar.gz"
-        mode: '0644'
-
-    - name: Debug tarball before extraction
-      block:
-        - name: Check if tarball exists
-          stat:
-            path: "/tmp/full_codebase.tar.gz"
-          register: tarball_check
-          
-        - name: Show tarball info
-          debug:
-            msg: |
-              Tarball debug info:
-              - Exists: {{ tarball_check.stat.exists }}
-              - Size: {{ tarball_check.stat.size | default('N/A') }} bytes
-              
-        - name: Test tarball contents
-          command: tar -tzf /tmp/full_codebase.tar.gz | head -10
-          register: tarball_contents
-          
-        - name: Show tarball contents sample
-          debug:
-            msg: |
-              Tarball contents (first 10 files):
-              {{ tarball_contents.stdout }}
-              
-        - name: Check app directory before extraction
-          stat:
-            path: "{{ app_dir }}"
-          register: app_dir_before
-          
-        - name: Show app directory status
-          debug:
-            msg: |
-              App directory before extraction:
-              - Path: {{ app_dir }}
-              - Exists: {{ app_dir_before.stat.exists }}
-              - Is directory: {{ app_dir_before.stat.isdir | default(false) }}
-              - Mode: {{ app_dir_before.stat.mode | default('N/A') }}
-              - Owner: {{ app_dir_before.stat.pw_name | default('N/A') }}
-
-    - name: Extract complete codebase to application directory
-      unarchive:
-        src: "/tmp/full_codebase.tar.gz"
-        dest: "{{ app_dir }}"
-        remote_src: yes
-        extra_opts:
-          - "--strip-components=1"
-      register: extract_result
-      
-    - name: Show extraction result
-      debug:
-        msg: |
-          Extraction result:
-          - Changed: {{ extract_result.changed }}
-          - Files extracted: {{ extract_result.files | default([]) | length }}
-    
-    - name: Fix ownership of deployed files
-      file:
-        path: "{{ app_dir }}"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        recurse: yes
-        state: directory
-      when: extract_result.changed
-
-    - name: Clean up temporary files
-      block:
-        - name: Remove temporary tarball from remote
-          file:
-            path: "/tmp/full_codebase.tar.gz"
-            state: absent
-        
-        - name: Remove temporary directory on localhost
-          file:
-            path: "{{ temp_dir.path }}"
-            state: absent
-          delegate_to: localhost
-        
-        - name: Remove temporary tarball on localhost
-          file:
-            path: "{{ temp_dir.path }}.tar.gz"
-            state: absent
-          delegate_to: localhost
+          - "--perms"
+          - "--times"
 
     - name: Verify complete codebase deployment
+      stat:
+        path: "{{ app_dir }}/src/main.py"
+      register: main_file_check
+      failed_when: not main_file_check.stat.exists
+
+    - name: Display full deployment timestamp and file count
       block:
-        - name: Check if src directory exists
-          stat:
-            path: "{{ app_dir }}/src"
-          register: src_dir_check
-          
-        - name: Check if main.py exists
-          stat:
-            path: "{{ app_dir }}/src/main.py"
-          register: main_file_check
-          
-        - name: List deployed files for debugging
+        - name: Count deployed files
           find:
             paths: "{{ app_dir }}"
             recurse: yes
             file_type: file
-          register: deployed_files
-          
-        - name: Show deployment structure
+          register: file_count
+        
+        - name: Display deployment stats
           debug:
             msg: |
-              Deployment verification:
-              - App directory exists: {{ src_dir_check.stat.exists | default(false) }}
-              - Main.py exists: {{ main_file_check.stat.exists | default(false) }}
-              - Total files deployed: {{ deployed_files.matched }}
-              
-        - name: Fail if main.py not found
-          fail:
-            msg: |
-              Deployment verification failed:
-              - src/ directory: {{ 'EXISTS' if src_dir_check.stat.exists else 'MISSING' }}
-              - src/main.py: {{ 'EXISTS' if main_file_check.stat.exists else 'MISSING' }}
-              - Files deployed: {{ deployed_files.matched }}
-          when: not main_file_check.stat.exists
-
-    - name: Display full deployment stats
-      debug:
-        msg: |
-          ===== FULL DEPLOYMENT COMPLETED =====
-          Method: Complete file copy (not rsync)
-          Files deployed: {{ deployed_files.matched }}
-          Deployment time: {{ ansible_date_time.iso8601 }}
-          Target: {{ app_dir }}
-          Backup: {{ backup_dir }} (if existed)
-          =====================================
+              ===== FULL DEPLOYMENT COMPLETED =====
+              Method: Complete file copy using synchronize
+              Files deployed: {{ file_count.matched }}
+              Deployment time: {{ ansible_date_time.iso8601 }}
+              Target: {{ app_dir }}
+              Backup: {{ backup_dir }} (if existed)
+              =====================================
 
     - name: Install Python dependencies (fresh installation)
       block:
