@@ -83,6 +83,19 @@ class RedLegionBot(commands.Bot):
         except Exception as e:
             print(f"❌ Error loading extensions: {e}")
     
+    async def on_ready(self):
+        """Called when the bot is ready."""
+        print(f'🤖 {self.user} is now online and ready!')
+        print(f'📡 Connected to {len(self.guilds)} guild(s)')
+        
+        # Sync slash commands with Discord
+        try:
+            print("🔄 Syncing slash commands...")
+            synced = await self.tree.sync()
+            print(f"✅ Synced {len(synced)} slash command(s) to Discord")
+        except Exception as e:
+            print(f"❌ Failed to sync commands: {e}")
+
     async def on_guild_join(self, guild):
         """Called when the bot joins a new guild."""
         print(f'🎉 Joined new guild: {guild.name} (ID: {guild.id})')
@@ -97,6 +110,14 @@ class RedLegionBot(commands.Bot):
                 print(f"❌ Database initialization failed for guild {guild.name}")
         except Exception as e:
             print(f"❌ Error initializing database for guild {guild.name}: {e}")
+        
+        # Sync commands for the new guild
+        try:
+            print(f"🔄 Syncing commands for guild {guild.name}...")
+            synced = await self.tree.sync(guild=guild)
+            print(f"✅ Synced {len(synced)} command(s) for {guild.name}")
+        except Exception as e:
+            print(f"❌ Failed to sync commands for {guild.name}: {e}")
     
     def run_bot(self):
         """Run the bot with proper error handling."""
