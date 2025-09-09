@@ -2622,12 +2622,12 @@ class SundayMiningCommands(commands.Cog):
                     inline=False
                 )
                 
-                # Check mining_events table schema with detailed info
+                # Check events table schema with detailed info
                 cursor.execute("""
                     SELECT column_name, data_type, character_maximum_length, is_nullable,
                            column_default
                     FROM information_schema.columns 
-                    WHERE table_name = 'mining_events' 
+                    WHERE table_name = 'events' 
                     ORDER BY ordinal_position
                 """)
                 
@@ -2670,13 +2670,14 @@ class SundayMiningCommands(commands.Cog):
                 
                 # Check recent events in this guild
                 cursor.execute("""
-                    SELECT event_id, guild_id, name, 
-                           status, event_date, created_at 
-                    FROM mining_events 
+                    SELECT id, guild_id, name, 
+                           CASE WHEN is_open THEN 'open' ELSE 'closed' END as status, 
+                           event_date, created_at 
+                    FROM events 
                     WHERE guild_id = %s AND created_at >= NOW() - INTERVAL '7 days'
                     ORDER BY created_at DESC 
                     LIMIT 5
-                """, (str(guild_id),))
+                """, (int(guild_id),))
                 
                 recent_events = cursor.fetchall()
                 

@@ -948,24 +948,26 @@ def get_open_mining_events(database_url, guild_id=None):
         if guild_id:
             # Get open events for specific guild
             cursor.execute("""
-                SELECT event_id, guild_id, event_date, start_time, name, status,
-                       0 as total_participants, total_value_auec, 
-                       false as payroll_processed, false as pdf_generated,
+                SELECT id, guild_id, event_date, event_time as start_time, name, 
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value, 
+                       payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
-                WHERE guild_id = %s AND status IN ('planned', 'active') AND is_active = true
-                ORDER BY start_time DESC
-            """, (str(guild_id),))
+                FROM events 
+                WHERE guild_id = %s AND is_open = true AND is_active = true
+                ORDER BY event_time DESC
+            """, (int(guild_id),))
         else:
             # Get all open events
             cursor.execute("""
-                SELECT event_id, guild_id, event_date, start_time, name, status,
-                       0 as total_participants, total_value_auec,
-                       false as payroll_processed, false as pdf_generated,
+                SELECT id, guild_id, event_date, event_time as start_time, name,
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value,
+                       payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
-                WHERE status IN ('planned', 'active') AND is_active = true
-                ORDER BY start_time DESC
+                FROM events 
+                WHERE is_open = true AND is_active = true
+                ORDER BY event_time DESC
             """)
         
         events = cursor.fetchall()
@@ -1029,23 +1031,25 @@ def get_mining_events(database_url, guild_id, event_date=None):
         if event_date:
             # Get events for specific date
             cursor.execute("""
-                SELECT id, guild_id, event_date, event_time, event_name, status,
-                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                SELECT id, guild_id, event_date, event_time, event_name, 
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value, payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
+                FROM events 
                 WHERE guild_id = %s AND event_date = %s
                 ORDER BY event_time DESC
-            """, (guild_id, event_date))
+            """, (int(guild_id), event_date))
         else:
             # Get recent events (last 30 days)
             cursor.execute("""
-                SELECT id, guild_id, event_date, event_time, event_name, status,
-                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                SELECT id, guild_id, event_date, event_time, event_name,
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value, payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
+                FROM events 
                 WHERE guild_id = %s AND event_date >= CURRENT_DATE - INTERVAL '30 days'
                 ORDER BY event_time DESC
-            """, (guild_id,))
+            """, (int(guild_id),))
         
         events = cursor.fetchall()
         conn.close()
