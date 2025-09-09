@@ -8,11 +8,12 @@ Includes both new architecture classes and legacy compatibility functions.
 import sys
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+from datetime import datetime, date
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.connection import DatabaseManager
+from database.connection import DatabaseManager, resolve_database_url
 from database.models import User, Guild, MiningEvent, MiningParticipation
 
 class BaseOperations:
@@ -73,11 +74,18 @@ class GuildOperations(BaseOperations):
                 return Guild(**row)
             return None
 
+# Utility function for legacy database connections
+def get_legacy_connection(database_url):
+    """Get a database connection with URL resolution for legacy functions."""
+    import psycopg2
+    resolved_url = resolve_database_url(database_url)
+    return psycopg2.connect(resolved_url)
+
 # Legacy functions - these will be properly implemented later
 def init_db(database_url):
     """Legacy function - initialize database"""
-    from database import init_database
-    return init_database()
+    from .schemas import init_database
+    return init_database(database_url)
 
 def get_market_items(database_url):
     """Get all active market items from the database"""
@@ -85,16 +93,8 @@ def get_market_items(database_url):
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect using utility function with URL resolution
+        conn = get_legacy_connection(database_url)
             
         cursor = conn.cursor()
         cursor.execute("""
@@ -118,16 +118,8 @@ def add_market_item(database_url, name, price, stock, guild_id=None, seller_name
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect using utility function with URL resolution
+        conn = get_legacy_connection(database_url)
             
         cursor = conn.cursor()
         cursor.execute("""
@@ -151,16 +143,8 @@ def issue_loan(database_url, user_id, username, amount, issued_date_iso, due_dat
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect using utility function with URL resolution
+        conn = get_legacy_connection(database_url)
             
         cursor = conn.cursor()
         cursor.execute("""
@@ -178,38 +162,60 @@ def issue_loan(database_url, user_id, username, amount, issued_date_iso, due_dat
         print(f"Error issuing loan: {e}")
         raise
 
-def get_user_loans(database_url, user_id):
-    """Get all loans for a specific user"""
+def get_user_loans(database_url, user_id, guild_id=None):
+    """
+    Get all loans for a specific user.
+    
+    Args:
+        database_url: Database connection string
+        user_id: Discord user ID
+        guild_id: Optional guild ID to filter by
+    
+    Returns:
+        List of tuples: (loan_id, amount, issued_date, due_date, status, paid_amount, interest_rate)
+    """
     try:
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
         parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
+        
+        with conn.cursor() as cursor:
+            if guild_id:
+                cursor.execute("""
+                    SELECT loan_id, amount, issued_date, due_date, status, paid_amount, interest_rate
+                    FROM loans 
+                    WHERE user_id = %s AND guild_id = %s AND status IN ('active', 'overdue', 'pending')
+                    ORDER BY issued_date DESC
+                """, (str(user_id), str(guild_id)))
+            else:
+                cursor.execute("""
+                    SELECT loan_id, amount, issued_date, due_date, status, paid_amount, interest_rate
+                    FROM loans 
+                    WHERE user_id = %s AND status IN ('active', 'overdue', 'pending')
+                    ORDER BY issued_date DESC
+                """, (str(user_id),))
             
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT loan_id, amount, issued_date_iso, due_date_iso, status
-            FROM loans 
-            WHERE user_id = %s AND status IN ('active', 'overdue')
-            ORDER BY issued_date_iso DESC
-        """, (user_id,))
-        
-        loans = cursor.fetchall()
-        conn.close()
-        return loans
-        
+            loans = cursor.fetchall()
+            print(f"✅ Found {len(loans)} loans for user {user_id}")
+            return loans
+            
     except Exception as e:
-        print(f"Error getting user loans: {e}")
+        print(f"❌ Error getting user loans: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return []
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def get_mining_channels_dict(database_url, guild_id):
     """Get mining channels as a dictionary for a specific guild."""
@@ -217,18 +223,8 @@ def get_mining_channels_dict(database_url, guild_id):
         import psycopg2
         from urllib.parse import urlparse
         
-        # Convert database_url to use proxy if running locally
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            # Try proxy first on port 5433
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                # If proxy fails, try original URL
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect directly to database (no proxy needed with shared VPC)
+        conn = psycopg2.connect(database_url)
             
         c = conn.cursor()
         
@@ -254,21 +250,230 @@ def get_mining_channels_dict(database_url, guild_id):
         # If database fails, return empty dict to fall back to hardcoded values
         return {}
 
-def issue_loan(database_url, user_id, amount, issued_date, due_date):
-    """Legacy function - issue loan"""
-    pass
+def issue_loan(database_url, user_id, guild_id, amount, issued_date, due_date, interest_rate=0.0):
+    """
+    Issue a loan to a user.
+    
+    Args:
+        database_url: Database connection string
+        user_id: Discord user ID
+        guild_id: Discord guild ID
+        amount: Loan amount
+        issued_date: Date when loan is issued
+        due_date: Date when loan is due
+        interest_rate: Interest rate (default 0.0)
+    
+    Returns:
+        int: Loan ID if successful, None if failed
+    """
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        parsed = urlparse(database_url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
+        
+        with conn.cursor() as cursor:
+            # Insert new loan
+            cursor.execute("""
+                INSERT INTO loans (user_id, guild_id, amount, interest_rate, issued_date, due_date, status)
+                VALUES (%s, %s, %s, %s, %s, %s, 'active')
+                RETURNING loan_id
+            """, (str(user_id), str(guild_id), amount, interest_rate, issued_date, due_date))
+            
+            loan_id = cursor.fetchone()[0]
+            conn.commit()
+            
+            print(f"✅ Issued loan {loan_id} for {amount} aUEC to user {user_id}")
+            return loan_id
+            
+    except Exception as e:
+        print(f"❌ Error issuing loan: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return None
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
-def save_mining_participation(database_url, *args, **kwargs):
-    """Legacy function - save mining participation"""
-    pass
+def save_mining_participation(database_url, event_id, user_id, username, channel_id, channel_name, join_time, leave_time, duration_minutes, is_org_member):
+    """
+    Save mining participation data to the database.
+    
+    Args:
+        database_url: Database connection string
+        event_id: Mining event ID
+        user_id: Discord user ID
+        username: Discord username
+        channel_id: Discord channel ID
+        channel_name: Discord channel name
+        join_time: Timestamp when user joined
+        leave_time: Timestamp when user left
+        duration_minutes: Duration in minutes
+        is_org_member: Whether user is an org member
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        parsed = urlparse(database_url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
+        
+        with conn.cursor() as cursor:
+            # First ensure the user exists in users table
+            cursor.execute("""
+                INSERT INTO users (user_id, username, display_name, last_seen)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id) 
+                DO UPDATE SET 
+                    username = EXCLUDED.username,
+                    display_name = EXCLUDED.display_name,
+                    last_seen = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (str(user_id), username, username))
+            
+            # Save mining participation
+            cursor.execute("""
+                INSERT INTO mining_participation (
+                    event_id, user_id, channel_id, join_time, leave_time, 
+                    duration_minutes, is_valid, created_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP
+                )
+            """, (
+                event_id,
+                str(user_id),
+                str(channel_id),
+                join_time,
+                leave_time,
+                duration_minutes
+            ))
+            
+            conn.commit()
+            print(f"✅ Saved mining participation: User {user_id} for {duration_minutes} minutes in event {event_id}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error saving mining participation: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return False
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def add_mining_channel(database_url, guild_id, channel_id, channel_name, description=None):
-    """Legacy function - add mining channel"""
-    pass
+    """Add a mining channel to the database."""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        parsed = urlparse(database_url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
+        
+        with conn.cursor() as cursor:
+            # Check if channel already exists
+            cursor.execute("""
+                SELECT channel_id FROM mining_channels 
+                WHERE guild_id = %s AND channel_id = %s
+            """, (str(guild_id), str(channel_id)))
+            
+            if cursor.fetchone():
+                print(f"⚠️ Mining channel {channel_id} already exists for guild {guild_id}")
+                return False
+            
+            # Insert new mining channel
+            cursor.execute("""
+                INSERT INTO mining_channels (guild_id, channel_id, channel_name, description, is_active)
+                VALUES (%s, %s, %s, %s, true)
+            """, (str(guild_id), str(channel_id), channel_name, description))
+            
+            conn.commit()
+            print(f"✅ Added mining channel {channel_name} ({channel_id}) for guild {guild_id}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error adding mining channel: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return False
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def remove_mining_channel(database_url, guild_id, channel_id):
-    """Legacy function - remove mining channel"""
-    return True
+    """Remove a mining channel from the database."""
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        parsed = urlparse(database_url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
+        
+        with conn.cursor() as cursor:
+            # Check if channel exists
+            cursor.execute("""
+                SELECT channel_name FROM mining_channels 
+                WHERE guild_id = %s AND channel_id = %s AND is_active = true
+            """, (str(guild_id), str(channel_id)))
+            
+            result = cursor.fetchone()
+            if not result:
+                print(f"⚠️ Mining channel {channel_id} not found or already inactive for guild {guild_id}")
+                return False
+            
+            channel_name = result[0]
+            
+            # Set channel as inactive instead of deleting (preserve historical data)
+            cursor.execute("""
+                UPDATE mining_channels 
+                SET is_active = false, updated_at = CURRENT_TIMESTAMP 
+                WHERE guild_id = %s AND channel_id = %s
+            """, (str(guild_id), str(channel_id)))
+            
+            conn.commit()
+            print(f"✅ Removed mining channel {channel_name} ({channel_id}) from guild {guild_id}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error removing mining channel: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return False
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def get_mining_channels(database_url, guild_id, active_only=True):
     """Get mining channels as a list for a specific guild."""
@@ -457,9 +662,182 @@ def mark_pdf_generated(database_url, event_id):
     """Legacy function - mark PDF generated"""
     pass
 
-def get_mining_session_participants(database_url, *args, **kwargs):
-    """Legacy function - get mining session participants"""
-    return []
+def get_mining_session_participants(database_url, hours_back=None, event_id=None):
+    """
+    Get mining session participants.
+    
+    Args:
+        database_url: Database connection string
+        hours_back: Get participants from sessions in the last N hours
+        event_id: Get participants from a specific event
+    
+    Returns:
+        List of tuples: (member_id, username, total_time_seconds, primary_channel_id, last_activity, is_org_member)
+    """
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        
+        parsed = urlparse(database_url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
+        
+        with conn.cursor() as cursor:
+            if event_id:
+                # Get participants for a specific event
+                query = """
+                SELECT 
+                    u.user_id,
+                    u.username,
+                    COALESCE(SUM(mp.duration_minutes * 60), 0) as total_time_seconds,
+                    MIN(mp.channel_id) as primary_channel_id,
+                    MAX(mp.leave_time) as last_activity,
+                    COALESCE(gm.is_org_member, false) as is_org_member
+                FROM mining_participation mp
+                JOIN users u ON mp.user_id = u.user_id
+                LEFT JOIN guild_memberships gm ON mp.user_id = gm.user_id
+                WHERE mp.event_id = %s 
+                  AND mp.is_valid = true
+                  AND mp.duration_minutes > 0
+                GROUP BY u.user_id, u.username, gm.is_org_member
+                ORDER BY total_time_seconds DESC
+                """
+                cursor.execute(query, (event_id,))
+                
+            elif hours_back:
+                # Get participants from recent sessions
+                query = """
+                SELECT 
+                    u.user_id,
+                    u.username,
+                    COALESCE(SUM(mp.duration_minutes * 60), 0) as total_time_seconds,
+                    MIN(mp.channel_id) as primary_channel_id,
+                    MAX(mp.leave_time) as last_activity,
+                    COALESCE(gm.is_org_member, false) as is_org_member
+                FROM mining_participation mp
+                JOIN users u ON mp.user_id = u.user_id
+                LEFT JOIN guild_memberships gm ON mp.user_id = gm.user_id
+                WHERE mp.join_time >= NOW() - INTERVAL '%s hours'
+                  AND mp.is_valid = true
+                  AND mp.duration_minutes > 0
+                GROUP BY u.user_id, u.username, gm.is_org_member
+                ORDER BY total_time_seconds DESC
+                """
+                cursor.execute(query, (hours_back,))
+            else:
+                # Default: get all recent participants (last 24 hours)
+                query = """
+                SELECT 
+                    u.user_id,
+                    u.username,
+                    COALESCE(SUM(mp.duration_minutes * 60), 0) as total_time_seconds,
+                    MIN(mp.channel_id) as primary_channel_id,
+                    MAX(mp.leave_time) as last_activity,
+                    COALESCE(gm.is_org_member, false) as is_org_member
+                FROM mining_participation mp
+                JOIN users u ON mp.user_id = u.user_id
+                LEFT JOIN guild_memberships gm ON mp.user_id = gm.user_id
+                WHERE mp.join_time >= NOW() - INTERVAL '24 hours'
+                  AND mp.is_valid = true
+                  AND mp.duration_minutes > 0
+                GROUP BY u.user_id, u.username, gm.is_org_member
+                ORDER BY total_time_seconds DESC
+                """
+                cursor.execute(query)
+            
+            results = cursor.fetchall()
+            print(f"✅ Found {len(results)} mining session participants")
+            return results
+            
+    except Exception as e:
+        print(f"❌ Error getting mining session participants: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return []
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+def create_mining_event(database_url, guild_id, event_date=None, event_name="Sunday Mining"):
+    """
+    Create a standard mining event.
+    
+    Args:
+        database_url: Database connection string
+        guild_id: Discord guild ID
+        event_date: Event date (defaults to today)
+        event_name: Name of the event
+    
+    Returns:
+        int: Event ID if successful, None if failed
+    """
+    try:
+        import psycopg2
+        from urllib.parse import urlparse
+        from datetime import date, datetime
+        
+        if event_date is None:
+            event_date = date.today()
+        
+        parsed = urlparse(database_url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            database=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            port=parsed.port or 5432
+        )
+        
+        with conn.cursor() as cursor:
+            # Check if event already exists for this date and guild
+            cursor.execute("""
+                SELECT event_id FROM mining_events 
+                WHERE guild_id = %s AND event_date = %s AND is_active = true
+                LIMIT 1
+            """, (str(guild_id), event_date))
+            
+            existing_event = cursor.fetchone()
+            if existing_event:
+                print(f"✅ Found existing mining event {existing_event[0]} for {event_date}")
+                return existing_event[0]
+            
+            # Create new event
+            cursor.execute("""
+                INSERT INTO mining_events (
+                    guild_id, name, event_date, event_type, status, 
+                    start_time, is_active, created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s, 'mining', 'active', 
+                    %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                ) RETURNING event_id
+            """, (
+                str(guild_id), 
+                event_name, 
+                event_date,
+                datetime.now()
+            ))
+            
+            event_id = cursor.fetchone()[0]
+            conn.commit()
+            
+            print(f"✅ Created mining event {event_id} for guild {guild_id} on {event_date}")
+            return event_id
+            
+    except Exception as e:
+        print(f"❌ Error creating mining event: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return None
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def create_adhoc_mining_event(database_url, guild_id, organizer_id, organizer_name, event_name, description=None, start_time=None):
     """Create an adhoc mining event."""
@@ -533,22 +911,24 @@ def get_open_mining_events(database_url, guild_id=None):
         if guild_id:
             # Get open events for specific guild
             cursor.execute("""
-                SELECT id, guild_id, event_date, event_time, event_name, status,
-                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                SELECT event_id, guild_id, event_date, start_time, name, status,
+                       0 as total_participants, total_value_auec, 
+                       false as payroll_processed, false as pdf_generated,
                        created_at, updated_at
                 FROM mining_events 
-                WHERE guild_id = %s AND status IN ('planned', 'active')
-                ORDER BY event_time DESC
-            """, (guild_id,))
+                WHERE guild_id = %s AND status IN ('planned', 'active') AND is_active = true
+                ORDER BY start_time DESC
+            """, (str(guild_id),))
         else:
             # Get all open events
             cursor.execute("""
-                SELECT id, guild_id, event_date, event_time, event_name, status,
-                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                SELECT event_id, guild_id, event_date, start_time, name, status,
+                       0 as total_participants, total_value_auec,
+                       false as payroll_processed, false as pdf_generated,
                        created_at, updated_at
                 FROM mining_events 
-                WHERE status IN ('planned', 'active')
-                ORDER BY event_time DESC
+                WHERE status IN ('planned', 'active') AND is_active = true
+                ORDER BY start_time DESC
             """)
         
         events = cursor.fetchall()
@@ -668,6 +1048,164 @@ def get_entries(database_url, month_year):
     """Legacy function - get entries"""
     return []
 
+# ================================
+# Event Management Functions
+# ================================
+
+async def create_event(name: str, description: str, category: str, date: str, time: str, 
+                      created_by: int, subcategory: str = None, guild_id: str = None) -> int:
+    """
+    Create a new event in the mining_events table.
+    
+    Args:
+        name: Event name
+        description: Event description  
+        category: Event category (mining, combat, training, etc.)
+        date: Event date (YYYY-MM-DD format)
+        time: Event time (HH:MM format)
+        created_by: Discord user ID who created the event
+        subcategory: Optional subcategory for more specific event types
+        guild_id: Guild ID (optional, can be derived from context)
+        
+    Returns:
+        int: The created event ID
+    """
+    try:
+        # Use global db manager
+        from config.settings import get_database_url
+        database_url = get_database_url()
+        
+        # Combine date and time into a datetime
+        datetime_str = f"{date} {time}:00"
+        start_time = datetime.fromisoformat(datetime_str)
+        
+        # Default guild_id if not provided - this should not happen now
+        if guild_id is None:
+            raise ValueError("guild_id is required for event creation")
+        
+        import psycopg2
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Insert into mining_events table (works for all event types)
+        cursor.execute("""
+            INSERT INTO mining_events 
+            (guild_id, name, description, event_type, start_time, organizer_id, status, event_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING event_id
+        """, (guild_id, name, description, category, start_time, str(created_by), 'planned', start_time.date()))
+        
+        event_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        
+        return event_id
+        
+    except Exception as e:
+        print(f"Error creating event: {e}")
+        raise
+
+async def get_all_events(category: str = None, guild_id: str = None) -> List[Dict]:
+    """
+    Get all events, optionally filtered by category.
+    
+    Args:
+        category: Optional category filter
+        guild_id: Guild ID (required)
+        
+    Returns:
+        List of event dictionaries
+    """
+    try:
+        from config.settings import get_database_url
+        database_url = get_database_url()
+        
+        # Guild ID is required now
+        if guild_id is None:
+            raise ValueError("guild_id is required for event operations")
+        
+        import psycopg2
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        if category:
+            cursor.execute("""
+                SELECT event_id, name, description, event_type, start_time, event_date, 
+                       status, organizer_id, organizer_name
+                FROM mining_events 
+                WHERE guild_id = %s AND event_type = %s AND is_active = true
+                ORDER BY start_time ASC
+            """, (guild_id, category))
+        else:
+            cursor.execute("""
+                SELECT event_id, name, description, event_type, start_time, event_date,
+                       status, organizer_id, organizer_name
+                FROM mining_events 
+                WHERE guild_id = %s AND is_active = true
+                ORDER BY start_time ASC
+            """, (guild_id,))
+        
+        events = []
+        for row in cursor.fetchall():
+            event_dict = {
+                'id': row[0],
+                'name': row[1],
+                'description': row[2],
+                'category': row[3],
+                'start_time': row[4],
+                'date': row[5].strftime('%Y-%m-%d') if row[5] else None,
+                'time': row[4].strftime('%H:%M') if row[4] else None,
+                'status': row[6],
+                'organizer_id': row[7],
+                'organizer_name': row[8]
+            }
+            events.append(event_dict)
+        
+        conn.close()
+        return events
+        
+    except Exception as e:
+        print(f"Error getting events: {e}")
+        return []
+
+async def delete_event(event_id: int, guild_id: str = None) -> bool:
+    """
+    Delete an event by setting is_active to false.
+    
+    Args:
+        event_id: Event ID to delete
+        guild_id: Guild ID (required)
+        
+    Returns:
+        bool: True if successful
+    """
+    try:
+        from config.settings import get_database_url
+        database_url = get_database_url()
+        
+        # Guild ID is required now
+        if guild_id is None:
+            raise ValueError("guild_id is required for event operations")
+        
+        import psycopg2
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE mining_events 
+            SET is_active = false, updated_at = CURRENT_TIMESTAMP
+            WHERE event_id = %s AND guild_id = %s
+        """, (event_id, guild_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error deleting event: {e}")
+        return False
+
 __all__ = [
     'init_db',
     'get_market_items',
@@ -684,10 +1222,15 @@ __all__ = [
     'mark_pdf_generated',
     'get_mining_session_participants',
     'create_mining_event',
+    'create_adhoc_mining_event',
     'get_open_mining_events',
     'save_event',
     'update_event_end_time',
     'get_mining_events',
     'update_entries',
     'get_entries',
+    # Event management functions
+    'create_event',
+    'get_all_events',
+    'delete_event',
 ]

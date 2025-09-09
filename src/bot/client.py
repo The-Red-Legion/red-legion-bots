@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -39,13 +40,19 @@ class RedLegionBot(commands.Bot):
             # Load new Cog-based slash command modules
             print("🔄 Loading Red Legion slash command extensions...")
             
-            # Core command extensions
+            # Core command extensions (all commands now use valid names without hyphens)
             extensions = [
-                'commands.mining',          # red-mining command group
-                'commands.diagnostics',     # red-health, red-test, red-dbtest, red-config
-                'commands.admin',           # red-config-refresh, red-restart, etc.
-                'commands.loans',           # red-loan-request, red-loan-status
-                'commands.events'           # red-events command group
+                'commands.diagnostics',        # /redhealth, /redtest, /reddbtest, /redconfig
+                'commands.general',            # /redping
+                'commands.market',             # /redmarketlist, /redmarketadd
+                'commands.admin',              # /redconfigrefresh, /redrestart, etc.
+                'commands.loans',              # /redloanrequest, /redloanstatus
+                'commands.events_subcommand',  # /redevents create|delete|view|list (subcommand group)
+                'commands.market_subcommand',  # /redmarket list|add (subcommand group)
+                'commands.loans_subcommand',   # /redloans request|status (subcommand group)
+                'commands.join_subcommand',    # /redjoin apply|status|withdraw (subcommand group)
+                'commands.mining.core',        # /redsundayminingstart, /redpayroll, etc.
+                'commands.test_mining',        # /redtestmining create|delete|status (test commands)
             ]
             
             for extension in extensions:
@@ -75,21 +82,6 @@ class RedLegionBot(commands.Bot):
             
         except Exception as e:
             print(f"❌ Error loading extensions: {e}")
-    
-    async def on_ready(self):
-        """Called when the bot is ready."""
-        print(f'\n🤖 {self.user} is now online!')
-        print(f'🔗 Connected to {len(self.guilds)} guild(s)')
-        
-        for guild in self.guilds:
-            print(f'  - {guild.name} (ID: {guild.id})')
-        
-        # Sync slash commands
-        try:
-            synced = await self.tree.sync()
-            print(f'✅ Synced {len(synced)} slash commands')
-        except Exception as e:
-            print(f'❌ Failed to sync slash commands: {e}')
     
     async def on_guild_join(self, guild):
         """Called when the bot joins a new guild."""

@@ -1,0 +1,207 @@
+
+=== TABLE: api_key ===
+id                             integer              NOT NULL   DEFAULT nextval('api_key_id_seq1'::regclass) [PK]
+org_id                         bigint               NOT NULL  
+name                           character varying(190) NOT NULL  
+key                            character varying(190) NOT NULL  
+role                           character varying(255) NOT NULL  
+created                        timestamp without time zone NOT NULL  
+updated                        timestamp without time zone NOT NULL  
+expires                        bigint               NULL      
+service_account_id             bigint               NULL      
+last_used_at                   timestamp without time zone NULL      
+is_revoked                     boolean              NULL       DEFAULT false
+
+=== TABLE: builtin_role ===
+id                             integer              NOT NULL   DEFAULT nextval('builtin_role_id_seq'::regclass) [PK]
+role                           character varying(190) NOT NULL  
+role_id                        bigint               NOT NULL  
+created                        timestamp without time zone NOT NULL  
+updated                        timestamp without time zone NOT NULL  
+org_id                         bigint               NOT NULL   DEFAULT 0
+
+=== TABLE: cache_data ===
+cache_key                      character varying(168) NOT NULL   [PK]
+data                           bytea                NOT NULL  
+expires                        integer              NOT NULL  
+created_at                     integer              NOT NULL  
+
+=== TABLE: correlation ===
+uid                            character varying(40) NOT NULL   [PK]
+source_uid                     character varying(40) NOT NULL   [PK]
+target_uid                     character varying(40) NULL      
+label                          text                 NOT NULL  
+description                    text                 NOT NULL  
+config                         text                 NULL      
+
+=== TABLE: entity_event ===
+id                             integer              NOT NULL   DEFAULT nextval('entity_event_id_seq'::regclass) [PK]
+entity_id                      character varying(1024) NOT NULL  
+event_type                     character varying(8) NOT NULL  
+created                        bigint               NOT NULL  
+
+=== TABLE: events ===
+id                             integer              NOT NULL   DEFAULT nextval('events_id_seq'::regclass) [PK]
+guild_id                       bigint               NOT NULL  
+event_date                     date                 NOT NULL  
+event_time                     timestamp without time zone NOT NULL  
+event_name                     text                 NULL       DEFAULT 'Sunday Mining'::text
+total_participants             integer              NULL       DEFAULT 0
+total_payout                   real                 NULL      
+is_open                        boolean              NULL       DEFAULT true
+payroll_calculated             boolean              NULL       DEFAULT false
+pdf_generated                  boolean              NULL       DEFAULT false
+event_id                       integer              NULL      
+channel_id                     text                 NULL      
+channel_name                   text                 NULL      
+start_time                     text                 NULL      
+end_time                       text                 NULL      
+total_value                    real                 NULL      
+created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: file ===
+path                           character varying(1024) NOT NULL  
+path_hash                      character varying(64) NOT NULL  
+parent_folder_path_hash        character varying(64) NOT NULL  
+contents                       bytea                NOT NULL  
+etag                           character varying(32) NOT NULL  
+cache_control                  character varying(128) NOT NULL  
+content_disposition            character varying(128) NOT NULL  
+updated                        timestamp without time zone NOT NULL  
+created                        timestamp without time zone NOT NULL  
+size                           bigint               NOT NULL  
+mime_type                      character varying(255) NOT NULL  
+
+=== TABLE: file_meta ===
+path_hash                      character varying(64) NOT NULL  
+key                            character varying(191) NOT NULL  
+value                          character varying(1024) NOT NULL  
+
+=== TABLE: guild_memberships ===
+guild_id                       bigint               NOT NULL   [FK]
+guild_id                       bigint               NOT NULL   [PK]
+user_id                        bigint               NOT NULL   [FK]
+user_id                        bigint               NOT NULL   [PK]
+is_org_member                  boolean              NULL       DEFAULT false
+join_date                      timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: guilds ===
+id                             bigint               NOT NULL   [PK]
+name                           text                 NOT NULL  
+settings                       jsonb                NULL       DEFAULT '{}'::jsonb
+created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: loans ===
+id                             integer              NOT NULL   DEFAULT nextval('loans_id_seq'::regclass) [PK]
+guild_id                       bigint               NULL       [FK]
+borrower_id                    bigint               NULL       [FK]
+amount_auec                    numeric              NOT NULL  
+interest_rate                  numeric              NULL       DEFAULT 0.0000
+status                         character varying(20) NULL       DEFAULT 'active'::character varying
+issued_date                    timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+due_date                       timestamp without time zone NULL      
+paid_date                      timestamp without time zone NULL      
+
+=== TABLE: materials ===
+id                             integer              NOT NULL   DEFAULT nextval('materials_id_seq'::regclass) [PK]
+name                           text                 NOT NULL   [UQ]
+category                       character varying(50) NULL      
+base_value_auec                numeric              NULL      
+current_market_value           numeric              NULL      
+updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: mining_channels ===
+id                             integer              NOT NULL   DEFAULT nextval('mining_channels_id_seq'::regclass) [PK]
+guild_id                       bigint               NULL       [UQ]
+guild_id                       bigint               NULL       [FK]
+channel_id                     bigint               NOT NULL   [UQ]
+channel_name                   text                 NOT NULL  
+is_active                      boolean              NULL       DEFAULT true
+created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: mining_events ===
+id                             integer              NOT NULL   DEFAULT nextval('mining_events_id_seq'::regclass) [PK]
+guild_id                       bigint               NULL       [FK]
+event_date                     date                 NOT NULL  
+event_time                     timestamp without time zone NOT NULL  
+event_name                     text                 NULL       DEFAULT 'Sunday Mining'::text
+status                         character varying(20) NULL       DEFAULT 'planned'::character varying
+total_participants             integer              NULL       DEFAULT 0
+total_value_auec               numeric              NULL       DEFAULT 0
+payroll_processed              boolean              NULL       DEFAULT false
+pdf_generated                  boolean              NULL       DEFAULT false
+created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+updated_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: mining_participation ===
+id                             integer              NOT NULL   DEFAULT nextval('mining_participation_id_seq'::regclass) [PK]
+event_id                       integer              NULL      
+user_id                        bigint               NULL       [FK]
+channel_id                     bigint               NULL      
+session_start                  timestamp without time zone NULL      
+session_end                    timestamp without time zone NULL      
+duration_seconds               integer              NULL      
+is_org_member                  boolean              NULL       DEFAULT false
+created_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+member_id                      text                 NULL      
+username                       text                 NULL      
+start_time                     timestamp without time zone NULL      
+end_time                       timestamp without time zone NULL      
+total_time_minutes             integer              NULL      
+
+=== TABLE: mining_yields ===
+id                             integer              NOT NULL   DEFAULT nextval('mining_yields_id_seq'::regclass) [PK]
+participation_id               integer              NULL       [FK]
+material_id                    integer              NULL       [FK]
+quantity_scu                   numeric              NOT NULL  
+estimated_value                numeric              NULL      
+recorded_at                    timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: ngalert_configuration ===
+id                             integer              NOT NULL   DEFAULT nextval('ngalert_configuration_id_seq'::regclass) [PK]
+org_id                         bigint               NOT NULL  
+alertmanagers                  text                 NULL      
+created_at                     integer              NOT NULL  
+updated_at                     integer              NOT NULL  
+send_alerts_to                 smallint             NOT NULL   DEFAULT 0
+
+=== TABLE: permission ===
+id                             integer              NOT NULL   DEFAULT nextval('permission_id_seq'::regclass) [PK]
+role_id                        bigint               NOT NULL  
+action                         character varying(190) NOT NULL  
+scope                          character varying(190) NOT NULL  
+created                        timestamp without time zone NOT NULL  
+updated                        timestamp without time zone NOT NULL  
+
+=== TABLE: plugin_setting ===
+id                             integer              NOT NULL   DEFAULT nextval('plugin_setting_id_seq'::regclass) [PK]
+org_id                         bigint               NULL      
+plugin_id                      character varying(190) NOT NULL  
+enabled                        boolean              NOT NULL  
+pinned                         boolean              NOT NULL  
+json_data                      text                 NULL      
+secure_json_data               text                 NULL      
+created                        timestamp without time zone NOT NULL  
+updated                        timestamp without time zone NOT NULL  
+plugin_version                 character varying(50) NULL      
+
+=== TABLE: provenance_type ===
+id                             integer              NOT NULL   DEFAULT nextval('provenance_type_id_seq'::regclass) [PK]
+org_id                         bigint               NOT NULL  
+record_key                     character varying(190) NOT NULL  
+record_type                    character varying(190) NOT NULL  
+provenance                     character varying(190) NOT NULL  
+
+=== TABLE: schema_metadata ===
+version                        character varying(20) NOT NULL   [PK]
+description                    text                 NULL      
+applied_at                     timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+=== TABLE: seed_assignment ===
+builtin_role                   character varying(190) NOT NULL  
+role_name                      character varying(190) NULL      
+action                         character varying(190) NULL      
+scope                          character varying(190) NULL      
+id                             integer              NOT NULL   DEFAULT nextval('seed_assignment_id_seq'::regclass) [PK]

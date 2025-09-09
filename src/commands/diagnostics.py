@@ -24,7 +24,7 @@ class Diagnostics(commands.Cog):
         self.bot = bot
         print("✅ Diagnostics Cog initialized")
 
-    @app_commands.command(name="red-health", description="Simple health check for Red Legion bot monitoring")
+    @app_commands.command(name="redhealth", description="Simple health check for Red Legion bot monitoring")
     async def health_check(self, interaction: discord.Interaction):
         """Simple health check command for monitoring"""
         try:
@@ -57,7 +57,7 @@ class Diagnostics(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"⚠️ Health check error: {str(e)}")
 
-    @app_commands.command(name="red-test", description="Comprehensive Red Legion bot health and system status")
+    @app_commands.command(name="redtest", description="Comprehensive Red Legion bot health and system status")
     async def test_command(self, interaction: discord.Interaction):
         """🔧 Bot Test & Health Status - Comprehensive bot health and system status"""
         try:
@@ -212,7 +212,7 @@ class Diagnostics(commands.Cog):
             
             await interaction.response.send_message(embed=error_embed)
 
-    @app_commands.command(name="red-dbtest", description="Test Red Legion bot database connectivity (Admin only)")
+    @app_commands.command(name="reddbtest", description="Test Red Legion bot database connectivity (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def dbtest_command(self, interaction: discord.Interaction):
         """Test database connectivity and performance"""
@@ -316,7 +316,7 @@ class Diagnostics(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Database test error: {str(e)}")
 
-    @app_commands.command(name="red-config", description="Check Red Legion bot configuration status (Admin only)")
+    @app_commands.command(name="redconfig", description="Check Red Legion bot configuration status (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def config_check(self, interaction: discord.Interaction):
         """Check configuration status and settings"""

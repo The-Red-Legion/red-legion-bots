@@ -30,6 +30,77 @@ async def setup_core_handlers(bot):
         for guild in bot.guilds:
             print(f'Connected to guild: {guild.name} (ID: {guild.id})')
         
+        # Enhanced command logging - Check what commands we have locally before sync
+        all_commands = bot.tree.get_commands()
+        print(f'🔍 Total command objects loaded: {len(all_commands)}')
+        
+        # Separate individual commands from command groups
+        individual_commands = []
+        command_groups = []
+        
+        for cmd in all_commands:
+            if hasattr(cmd, 'name'):
+                if hasattr(cmd, 'commands') and cmd.commands:  # This is a command group
+                    command_groups.append(cmd)
+                    print(f'� Command Group: /{cmd.name} (with {len(cmd.commands)} subcommands)')
+                    for subcmd in cmd.commands:
+                        print(f'  └── /{cmd.name} {subcmd.name}')
+                else:  # This is an individual command
+                    individual_commands.append(cmd.name)
+        
+        print(f'🔍 Individual commands: {len(individual_commands)}')
+        print(f'🔍 Command groups: {len(command_groups)}')
+        
+        # Count red- prefix commands
+        red_commands = [cmd for cmd in individual_commands if cmd.startswith('red-')]
+        other_commands = [cmd for cmd in individual_commands if not cmd.startswith('red-')]
+        
+        print(f'✅ Individual commands with red- prefix: {len(red_commands)}')
+        if other_commands:
+            print(f'⚠️ Individual commands without red- prefix: {len(other_commands)}')
+            for cmd in other_commands:
+                print(f'  ❌ {cmd}')
+        
+        # Show all individual commands for verification
+        if red_commands:
+            print('📋 All red- individual commands:')
+            for cmd in sorted(red_commands):
+                print(f'  🟢 /{cmd}')
+        else:
+            print('⚠️ No red- prefix individual commands found!')
+        
+        # Sync slash commands with enhanced logging
+        try:
+            print('🔄 Syncing slash commands with Discord...')
+            start_time = datetime.now()
+            synced = await bot.tree.sync()
+            sync_time = (datetime.now() - start_time).total_seconds()
+            
+            print(f'✅ Synced {len(synced)} slash commands in {sync_time:.1f}s')
+            
+            # Verify sync results
+            synced_red = [cmd.name for cmd in synced if cmd.name.startswith('red-')]
+            synced_other = [cmd.name for cmd in synced if not cmd.name.startswith('red-')]
+            
+            print(f'📊 Sync Results:')
+            print(f'  🟢 Red-prefixed commands synced: {len(synced_red)}')
+            if synced_other:
+                print(f'  🔴 Non-red commands synced: {len(synced_other)}')
+                for cmd in synced_other:
+                    print(f'    - {cmd}')
+            
+            # Final status
+            if len(synced_red) > 0 and len(synced_other) == 0:
+                print('🎉 SUCCESS: All synced commands have red- prefix!')
+                print('💡 Commands should now appear in Discord. Type /red to test.')
+            else:
+                print('⚠️ WARNING: Sync completed but may have issues')
+                
+        except Exception as sync_error:
+            print(f'❌ Failed to sync slash commands: {sync_error}')
+            import traceback
+            traceback.print_exc()
+        
         try:
             print("Initializing database...")
             # Run database init in a thread to avoid blocking the event loop

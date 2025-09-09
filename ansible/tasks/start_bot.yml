@@ -27,8 +27,8 @@
     msg: "Import test result: {{ import_test.stdout if import_test.rc == 0 else import_test.stderr }}"
   when: not ansible_check_mode and import_test is defined
 
-- name: Initialize database schema
-  command: python3 -c "import sys; sys.path.insert(0, 'src'); from database_init import init_database_for_deployment; result = init_database_for_deployment(); print('Database initialization:', 'SUCCESS' if result else 'FAILED')"
+- name: Deploy complete database schema
+  command: python3 scripts/deploy_complete_schema.py
   args:
     chdir: "{{ app_dir }}"
   environment:
@@ -37,9 +37,9 @@
   when: not ansible_check_mode
   ignore_errors: true
 
-- name: Show database initialization result
+- name: Show complete schema deployment result
   debug:
-    msg: "Database initialization: {{ db_init.stdout if db_init.rc == 0 else db_init.stderr }}"
+    msg: "Complete schema deployment: {{ db_init.stdout if db_init.rc == 0 else db_init.stderr }}"
   when: not ansible_check_mode and db_init is defined
 
 - name: Create environment file from template

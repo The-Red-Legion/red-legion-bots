@@ -11,9 +11,140 @@ from contextlib import contextmanager
 from typing import Optional, Generator
 import logging
 import os
-from urllib.parse import urlparse
+import subprocess
+from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
+
+def get_cloud_sql_ip(instance_name: str, project_id: str = None) -> Optional[str]:
+    """
+    Get the private IP address of a Cloud SQL instance using gcloud commands.
+    
+    Args:
+        instance_name: Name of the Cloud SQL instance
+        project_id: GCP project ID (optional, uses default if not provided)
+    
+    Returns:
+        Private IP address of the instance or None if not found
+    """
+    try:
+        # Build gcloud command
+        cmd = ['gcloud', 'sql', 'instances', 'describe', instance_name]
+        if project_id:
+            cmd.extend(['--project', project_id])
+        cmd.extend(['--format', 'value(ipAddresses[0].ipAddress)'])
+        
+        # Execute command
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0 and result.stdout.strip():
+            ip = result.stdout.strip()
+            logger.info(f"Resolved Cloud SQL instance {instance_name} to IP: {ip}")
+            return ip
+        else:
+            logger.warning(f"Could not resolve Cloud SQL instance {instance_name}: {result.stderr}")
+            return None
+            
+    except Exception as e:
+        logger.warning(f"Error resolving Cloud SQL IP for {instance_name}: {e}")
+        return None
+
+def resolve_database_url(database_url: str) -> str:
+    """
+    Resolve database URL by replacing hostname with Cloud SQL internal IP and correct credentials.
+    
+    Args:
+        database_url: Original database URL
+        
+    Returns:
+        Resolved database URL with correct IP and credentials
+    """
+    try:
+        logger.info("Processing database URL for connection resolution...")
+        parsed = urlparse(database_url)
+        logger.info(f"Parsed hostname: {parsed.hostname or '[redacted]'}, port: {parsed.port or '[default]'}, username: {parsed.username or '[redacted]'}")
+        
+        # Known Cloud SQL configuration
+        CLOUD_SQL_INTERNAL_IP = "10.92.0.3"
+        CLOUD_SQL_USERNAME = "arccorp_sys_admin"
+        
+        # If hostname looks like a Cloud SQL instance name or non-IP, use the known internal IP
+        if parsed.hostname and not _is_ip_address(parsed.hostname):
+            logger.info(f"Resolving hostname {parsed.hostname} to Cloud SQL internal IP {CLOUD_SQL_INTERNAL_IP}")
+            
+            # Get password from Google Secrets Manager
+            try:
+                password = _get_db_password_from_secrets()
+                logger.info("Successfully retrieved password from Google Secrets Manager")
+            except Exception as e:
+                logger.warning(f"Could not get password from secrets, using original: {e}")
+                password = parsed.password if parsed.password else "fallback_password"
+            
+            # Use original port or default to 5432
+            port = parsed.port if parsed.port else 5432
+            
+            # URL-encode the password to handle special characters
+            from urllib.parse import quote
+            encoded_password = quote(password, safe='')
+            
+            # Get database name from the path, default to the production database
+            database_name = parsed.path.lstrip('/') if parsed.path else 'red_legion_arccorp_data_store'
+            resolved_url = f"postgresql://{CLOUD_SQL_USERNAME}:{encoded_password}@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}"
+            
+            logger.info(f"Resolved database URL: postgresql://{CLOUD_SQL_USERNAME}:***@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}")
+            return resolved_url
+        
+        # If hostname is already an IP or localhost, return as-is
+        logger.info("Database URL already has IP address, returning as-is")
+        return database_url
+        
+    except Exception as e:
+        logger.error(f"Error resolving database URL: {e}")
+        logger.error("Failed to resolve database URL - check connection parameters")
+        # Return a safe fallback URL
+        try:
+            password = _get_db_password_from_secrets()
+            from urllib.parse import quote
+            encoded_password = quote(password, safe='')
+            fallback_url = f"postgresql://arccorp_sys_admin:{encoded_password}@10.92.0.3:5432/red_legion_arccorp_data_store"
+            logger.info("Using fallback URL with secrets manager password")
+            return fallback_url
+        except:
+            logger.error("Could not create fallback URL, returning original")
+            return database_url
+
+def _get_db_password_from_secrets() -> str:
+    """Get database password from Google Secrets Manager."""
+    try:
+        from google.cloud import secretmanager
+        
+        # Initialize the client
+        client = secretmanager.SecretManagerServiceClient()
+        
+        # Get project ID from environment or use default
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
+        
+        # Use the correct secret name for database password
+        secret_name = "db-password"
+        name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+        
+        # Access the secret version
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+        
+    except Exception as e:
+        logger.error(f"Error getting database password from secrets: {e}")
+        raise
+
+def _is_ip_address(hostname: str) -> bool:
+    """Check if hostname is already an IP address."""
+    try:
+        parts = hostname.split('.')
+        if len(parts) == 4:
+            return all(0 <= int(part) <= 255 for part in parts)
+    except (ValueError, AttributeError):
+        pass
+    return hostname in ['localhost', '127.0.0.1']
 
 class DatabaseManager:
     """
@@ -35,7 +166,8 @@ class DatabaseManager:
             min_connections: Minimum connections in pool
             max_connections: Maximum connections in pool
         """
-        self.database_url = database_url
+        # Resolve the database URL to get the correct IP
+        self.database_url = resolve_database_url(database_url)
         self.min_connections = min_connections
         self.max_connections = max_connections
         self._pool: Optional[SimpleConnectionPool] = None
@@ -44,10 +176,19 @@ class DatabaseManager:
     def _initialize_pool(self):
         """Initialize the connection pool."""
         try:
-            # Parse URL to validate format
+            # Parse URL to validate format (log safely without credentials)
             parsed = urlparse(self.database_url)
+            logger.info("Initializing database connection pool...")
+            logger.info(f"Database - scheme: {parsed.scheme}, hostname: {parsed.hostname or '[redacted]'}, port: {parsed.port or '[default]'}")
+            
             if not parsed.scheme == 'postgresql':
                 raise ValueError("Database URL must be a PostgreSQL URL")
+            
+            # Test connection first to provide better error messages
+            logger.info("Testing database connection...")
+            test_conn = psycopg2.connect(self.database_url)
+            test_conn.close()
+            logger.info("Database connection test successful")
             
             self._pool = SimpleConnectionPool(
                 self.min_connections,

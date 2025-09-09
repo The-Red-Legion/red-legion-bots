@@ -141,12 +141,13 @@
     - name: Stop existing bot process
       include_tasks: tasks/stop_bot.yml
 
-    - name: Clean and prepare application directory
-      file:
-        path: "{{ app_dir }}"
-        state: absent
+    - name: Stop bot service before deployment
+      systemd:
+        name: red-legion-bot
+        state: stopped
+      ignore_errors: yes
 
-    - name: Create application directory
+    - name: Ensure application directory exists
       file:
         path: "{{ app_dir }}"
         state: directory
@@ -154,35 +155,37 @@
         group: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Copy application code (optimized with rsync)
+    - name: Sync codebase with rsync
       synchronize:
         src: "{{ playbook_dir }}/../"
         dest: "{{ app_dir }}"
         delete: yes
-        checksum: yes
         recursive: yes
-        times: yes
-        compress: yes
         rsync_opts:
           - "--exclude=.git"
-          - "--exclude=.github" 
+          - "--exclude=.github"
           - "--exclude=__pycache__"
-          - "--exclude=*.pyc"
           - "--exclude=.pytest_cache"
           - "--exclude=.DS_Store"
           - "--exclude=node_modules"
           - "--exclude=venv"
           - "--exclude=.env"
           - "--exclude=Logs"
-      delegate_to: localhost
-      
-    - name: Fix application code ownership
-      file:
-        path: "{{ app_dir }}"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0755'
-        recurse: yes
+          - "--exclude=*.pyc"
+          - "--exclude=*.pyo"
+          - "--perms"
+          - "--times"
+      notify: restart red-legion-bot
+
+    - name: Verify codebase deployment
+      stat:
+        path: "{{ app_dir }}/src/main.py"
+      register: main_file_check
+      failed_when: not main_file_check.stat.exists
+
+    - name: Display deployment timestamp
+      debug:
+        msg: "Codebase synced with rsync at {{ ansible_date_time.iso8601 }}"
 
     - name: Install Python dependencies
       block:
@@ -230,16 +233,13 @@
     - name: Verify bot is running
       include_tasks: tasks/verify_bot.yml
 
-    - name: Clean up temporary files
-      file:
-        path: "{{ item }}"
-        state: absent
-      with_items:
-        - "{{ app_dir }}/.git"
-        - "{{ app_dir }}/ansible"
-        - "{{ app_dir }}/tests"
-
   handlers:
     - name: reload systemd
       systemd:
         daemon_reload: yes
+
+    - name: restart red-legion-bot
+      systemd:
+        name: red-legion-bot
+        state: restarted
+        enabled: yes

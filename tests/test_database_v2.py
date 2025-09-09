@@ -27,8 +27,10 @@ def test_database_connection_manager():
     print("\n🧪 Testing DatabaseManager connection pooling...")
     
     try:
-        # Mock the connection pool at the module level where it's imported
-        with patch('database.connection.SimpleConnectionPool') as mock_pool_class:
+        # Mock both the connection pool and the test connection
+        with patch('database.connection.SimpleConnectionPool') as mock_pool_class, \
+             patch('database.connection.psycopg2.connect') as mock_connect:
+            
             mock_pool_instance = Mock()
             mock_pool_class.return_value = mock_pool_instance
             
@@ -44,6 +46,11 @@ def test_database_connection_manager():
             mock_conn.cursor.return_value = mock_cursor
             mock_pool_instance.getconn.return_value = mock_conn
             mock_pool_instance.putconn.return_value = None
+            
+            # Mock the test connection (added for debugging)
+            mock_test_conn = Mock()
+            mock_connect.return_value = mock_test_conn
+            mock_test_conn.close.return_value = None
             
             # Import after setting up mocks
             from database.connection import DatabaseManager
@@ -179,22 +186,49 @@ def test_legacy_compatibility():
         print("  ✅ Legacy functions imported successfully")
         
         # Test legacy init_db function
-        with patch('psycopg2.connect') as mock_connect:
-            mock_conn = Mock()
+        with patch('database.connection.initialize_database') as mock_init_db:
+            mock_db_manager = Mock()
+            mock_cursor_context = Mock()
             mock_cursor = Mock()
-            mock_conn.cursor.return_value = mock_cursor
-            mock_connect.return_value = mock_conn
+            mock_cursor_context.__enter__ = Mock(return_value=mock_cursor)
+            mock_cursor_context.__exit__ = Mock(return_value=None)
+            mock_db_manager.get_cursor.return_value = mock_cursor_context
+            mock_init_db.return_value = mock_db_manager
             
             # Should not raise exceptions
             result = init_db("postgresql://test:test@localhost:5432/testdb")
             print("  ✅ Legacy init_db function works")
         
-        # Test legacy function stubs (should not raise exceptions)
-        get_market_items("test_url")
-        add_market_item("test_url", "test", 100, 10)
-        get_mining_channels_dict("test_url", "123")
-        issue_loan("test_url", "user123", 1000, datetime.now(), datetime.now())
-        save_mining_participation("test_url")
+        # Test that functions can be called (mock all database operations)
+        with patch('database.operations.get_legacy_connection') as mock_get_conn, \
+             patch('psycopg2.connect') as mock_connect:
+            
+            # Setup mock database connection
+            mock_conn = Mock()
+            mock_cursor = Mock()
+            mock_conn.cursor.return_value = mock_cursor
+            mock_cursor.__enter__ = Mock(return_value=mock_cursor)
+            mock_cursor.__exit__ = Mock(return_value=None)
+            mock_conn.close = Mock()
+            
+            mock_get_conn.return_value = mock_conn
+            mock_connect.return_value = mock_conn
+            
+            # Mock database results
+            mock_cursor.fetchall.return_value = []
+            mock_cursor.fetchone.return_value = [1]
+            mock_cursor.rowcount = 1
+            
+            # Test function calls
+            get_market_items("postgresql://test:test@localhost:5432/testdb")
+            add_market_item("postgresql://test:test@localhost:5432/testdb", "test", 100, 10)
+            get_mining_channels_dict("postgresql://test:test@localhost:5432/testdb", "123")
+            issue_loan("postgresql://test:test@localhost:5432/testdb", "user123", "guild123", 1000, datetime.now(), datetime.now())
+            save_mining_participation(
+                "postgresql://test:test@localhost:5432/testdb",
+                1, "user123", "TestUser", "channel123", "Test Channel", 
+                datetime.now(), datetime.now(), 60, True
+            )
         
         print("  ✅ All legacy compatibility functions available")
         

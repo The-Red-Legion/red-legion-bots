@@ -34,21 +34,26 @@ def init_database_for_deployment(db_url=None):
         
         logger.info("Initializing database for deployment...")
         
-        # Initialize the global database manager first
-        db_manager = initialize_database(db_url)
-        logger.info("Global database manager initialized")
-        
-        # Initialize schema using the properly initialized manager
+        # Initialize schema FIRST using the URL directly (to avoid connection pool issues)
         if schema_init(db_url):
             logger.info("✅ Database schema initialized successfully")
-            return True
         else:
             logger.error("❌ Database schema initialization failed")
             return False
+        
+        # Now initialize the global database manager (schema should be ready)
+        db_manager = initialize_database(db_url)
+        logger.info("Global database manager initialized")
+        
+        return True
             
     except Exception as e:
         logger.error(f"❌ Database initialization error: {e}")
+        print(f"❌ Database initialization error: {e}")
         import traceback
+        traceback.print_exc()
+        # Also print to stdout for systemd logging
+        print("Full traceback:")
         traceback.print_exc()
         return False
 

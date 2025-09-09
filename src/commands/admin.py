@@ -23,7 +23,7 @@ class Admin(commands.Cog):
         self.bot = bot
         print("✅ Admin Cog initialized")
 
-    @app_commands.command(name="red-config-refresh", description="Refresh Red Legion bot configuration (Admin only)")
+    @app_commands.command(name="redconfigrefresh", description="Refresh Red Legion bot configuration (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def refresh_config(self, interaction: discord.Interaction):
         """Refresh bot configuration from Secret Manager"""
@@ -78,7 +78,7 @@ class Admin(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Failed to refresh configuration: {str(e)}")
 
-    @app_commands.command(name="red-restart", description="Restart the Red Legion bot (Admin only)")
+    @app_commands.command(name="redrestart", description="Restart the Red Legion bot (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def restart_bot(self, interaction: discord.Interaction):
         """Restart the bot process (admin only)"""
@@ -113,69 +113,9 @@ class Admin(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Failed to restart bot: {str(e)}")
 
-    @app_commands.command(name="red-add-mining-channel", description="Add a mining channel to the Red Legion system (Admin only)")
-    @app_commands.describe(channel="Voice channel to add for mining tracking")
-    @app_commands.default_permissions(administrator=True)
-    async def add_mining_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
-        """Add a voice channel to the mining system"""
-        try:
-            # This would integrate with the mining channel management system
-            embed = discord.Embed(
-                title="✅ Red Legion Mining Channel Added",
-                description=f"Successfully added {channel.mention} to the mining system",
-                color=discord.Color.green()
-            )
-            
-            embed.add_field(
-                name="Channel Info",
-                value=f"**Name:** {channel.name}\\n"
-                      f"**ID:** {channel.id}\\n"
-                      f"**Category:** {channel.category.name if channel.category else 'None'}",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="Added By",
-                value=f"{interaction.user.display_name}",
-                inline=True
-            )
-            
-            await interaction.response.send_message(embed=embed)
-            
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Failed to add mining channel: {str(e)}")
+# Mining channel commands removed as they are no longer needed
 
-    @app_commands.command(name="red-remove-mining-channel", description="Remove a mining channel from the Red Legion system (Admin only)")
-    @app_commands.describe(channel="Voice channel to remove from mining tracking")
-    @app_commands.default_permissions(administrator=True)
-    async def remove_mining_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
-        """Remove a voice channel from the mining system"""
-        try:
-            embed = discord.Embed(
-                title="🗑️ Red Legion Mining Channel Removed",
-                description=f"Successfully removed {channel.mention} from the mining system",
-                color=discord.Color.orange()
-            )
-            
-            embed.add_field(
-                name="Channel Info",
-                value=f"**Name:** {channel.name}\\n"
-                      f"**ID:** {channel.id}",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="Removed By",
-                value=f"{interaction.user.display_name}",
-                inline=True
-            )
-            
-            await interaction.response.send_message(embed=embed)
-            
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Failed to remove mining channel: {str(e)}")
-
-    @app_commands.command(name="red-list-mining-channels", description="List all Red Legion mining channels (Admin only)")
+    @app_commands.command(name="redlistminingchannels", description="List all Red Legion mining channels (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def list_mining_channels(self, interaction: discord.Interaction):
         """List all voice channels in the mining system"""
@@ -218,6 +158,108 @@ class Admin(commands.Cog):
             
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to list mining channels: {str(e)}")
+
+    @app_commands.command(name="redsyncommands", description="Force sync Discord slash commands (Admin only)")
+    @app_commands.describe(
+        guild_only="Sync commands only to this guild (faster) or globally (slower)"
+    )
+    @app_commands.default_permissions(administrator=True)
+    async def sync_commands(self, interaction: discord.Interaction, guild_only: bool = True):
+        """Force sync slash commands to Discord."""
+        try:
+            await interaction.response.defer(ephemeral=True)
+            
+            start_time = datetime.now()
+            
+            if guild_only:
+                # Guild-specific sync (much faster, appears immediately)
+                synced = await self.bot.tree.sync(guild=interaction.guild)
+                sync_type = f"guild '{interaction.guild.name}'"
+            else:
+                # Global sync (slower, takes 1-10 minutes)
+                synced = await self.bot.tree.sync()
+                sync_type = "globally"
+            
+            sync_duration = (datetime.now() - start_time).total_seconds()
+            
+            embed = discord.Embed(
+                title="🔄 Commands Synced",
+                description=f"Successfully synced {len(synced)} slash commands {sync_type}",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+            
+            embed.add_field(
+                name="⚡ Sync Duration",
+                value=f"{sync_duration:.1f} seconds",
+                inline=True
+            )
+            
+            if guild_only:
+                embed.add_field(
+                    name="📍 Availability",
+                    value="Commands available immediately in this server",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="🌍 Availability",
+                    value="Commands will appear globally in 1-10 minutes",
+                    inline=True
+                )
+            
+            # List synced commands
+            command_list = []
+            red_commands = []
+            other_commands = []
+            
+            for cmd in synced:
+                if hasattr(cmd, 'name'):
+                    if cmd.name.startswith('red'):
+                        red_commands.append(f"/{cmd.name}")
+                    else:
+                        other_commands.append(f"/{cmd.name}")
+                    command_list.append(f"/{cmd.name}")
+            
+            if red_commands:
+                if len(red_commands) <= 15:
+                    embed.add_field(
+                        name=f"✅ Red Legion Commands ({len(red_commands)})",
+                        value="\n".join(sorted(red_commands)),
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name=f"✅ Red Legion Commands ({len(red_commands)})",
+                        value="\n".join(sorted(red_commands)[:15]) + f"\n...and {len(red_commands) - 15} more",
+                        inline=False
+                    )
+            
+            if other_commands:
+                embed.add_field(
+                    name=f"⚠️ Other Commands ({len(other_commands)})",
+                    value="\n".join(sorted(other_commands)[:10]),
+                    inline=False
+                )
+            
+            embed.add_field(
+                name="🧪 Quick Test",
+                value="Try typing `/red` to see available commands",
+                inline=False
+            )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            error_embed = discord.Embed(
+                title="❌ Sync Failed",
+                description=f"Error syncing commands: {str(e)}",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            await interaction.followup.send(embed=error_embed, ephemeral=True)
+            import traceback
+            print(f"Command sync error: {traceback.format_exc()}")
 
 
 async def setup(bot):

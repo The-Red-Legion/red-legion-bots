@@ -1,24 +1,10 @@
 """
-Legacy configuration module (Compatibility)
-
-This file exists for backward compatibility. 
-All configuration is now in config/settings.py
+Legacy config module for backward compatibility.
+This file re-exports the new modular configuration.
 """
 
-import warnings
-import sys
-from pathlib import Path
+from .config.settings import *
+from .config.channels import *
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-# Show deprecation warning
-warnings.warn(
-    "config.py is deprecated. Use config.settings instead.", 
-    DeprecationWarning, 
-    stacklevel=2
-)
-
-# Import everything from the new config module for compatibility
-from config.settings import *
-from config.channels import *
+# Legacy exports for backward compatibility
+DISCORD_TOKEN = DISCORD_CONFIG['TOKEN']
