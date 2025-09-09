@@ -759,23 +759,50 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
                 print(f"✅ Found existing mining event {existing_event[0]} for {event_date}")
                 return existing_event[0]
             
-            # Create new event
-            cursor.execute("""
-                INSERT INTO mining_events (
-                    guild_id, name, event_date, event_type, status, 
-                    start_time, is_active, created_at, updated_at
-                ) VALUES (
-                    %s, %s, %s, 'mining', 'active', 
-                    %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                ) RETURNING event_id
-            """, (
-                str(guild_id), 
-                event_name, 
-                event_date,
-                datetime.now()
-            ))
+            # Create new event - using flexible column structure
+            print(f"🔍 Attempting to create event with guild_id={guild_id}, name='{event_name}', date={event_date}")
             
-            event_id = cursor.fetchone()[0]
+            try:
+                # Try the new schema format first (with event_id primary key)
+                cursor.execute("""
+                    INSERT INTO mining_events (
+                        guild_id, name, event_date, event_type, status, 
+                        start_time, is_active, created_at, updated_at
+                    ) VALUES (
+                        %s, %s, %s, 'mining', 'active', 
+                        %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    ) RETURNING event_id
+                """, (
+                    str(guild_id), 
+                    event_name, 
+                    event_date,
+                    datetime.now()
+                ))
+                event_id = cursor.fetchone()[0]
+                print(f"✅ Created event using new schema format, event_id: {event_id}")
+                
+            except Exception as schema_error:
+                print(f"⚠️ New schema failed: {schema_error}")
+                print(f"🔄 Trying legacy schema format...")
+                
+                # Try legacy schema format (with id primary key)
+                cursor.execute("""
+                    INSERT INTO mining_events (
+                        guild_id, event_name, event_date, event_type, status, 
+                        start_time, is_active, created_at, updated_at
+                    ) VALUES (
+                        %s, %s, %s, 'mining', 'active', 
+                        %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    ) RETURNING id
+                """, (
+                    str(guild_id), 
+                    event_name, 
+                    event_date,
+                    datetime.now()
+                ))
+                event_id = cursor.fetchone()[0]
+                print(f"✅ Created event using legacy schema format, id: {event_id}")
+            
             conn.commit()
             
             print(f"✅ Created mining event {event_id} for guild {guild_id} on {event_date}")
