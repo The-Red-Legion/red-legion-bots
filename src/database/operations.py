@@ -77,8 +77,8 @@ class GuildOperations(BaseOperations):
 # Legacy functions - these will be properly implemented later
 def init_db(database_url):
     """Legacy function - initialize database"""
-    from database import init_database
-    return init_database()
+    from .schemas import init_database
+    return init_database(database_url)
 
 def get_market_items(database_url):
     """Get all active market items from the database"""

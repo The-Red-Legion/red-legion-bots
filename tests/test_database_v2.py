@@ -179,22 +179,36 @@ def test_legacy_compatibility():
         print("  ✅ Legacy functions imported successfully")
         
         # Test legacy init_db function
+        with patch('database.connection.initialize_database') as mock_init_db:
+            mock_db_manager = Mock()
+            mock_cursor_context = Mock()
+            mock_cursor = Mock()
+            mock_cursor_context.__enter__ = Mock(return_value=mock_cursor)
+            mock_cursor_context.__exit__ = Mock(return_value=None)
+            mock_db_manager.get_cursor.return_value = mock_cursor_context
+            mock_init_db.return_value = mock_db_manager
+            
+            # Should not raise exceptions
+            result = init_db("postgresql://test:test@localhost:5432/testdb")
+            print("  ✅ Legacy init_db function works")
+        
+        # Test legacy function stubs with proper mocking
         with patch('psycopg2.connect') as mock_connect:
             mock_conn = Mock()
             mock_cursor = Mock()
             mock_conn.cursor.return_value = mock_cursor
             mock_connect.return_value = mock_conn
             
-            # Should not raise exceptions
-            result = init_db("postgresql://test:test@localhost:5432/testdb")
-            print("  ✅ Legacy init_db function works")
-        
-        # Test legacy function stubs (should not raise exceptions)
-        get_market_items("test_url")
-        add_market_item("test_url", "test", 100, 10)
-        get_mining_channels_dict("test_url", "123")
-        issue_loan("test_url", "user123", 1000, datetime.now(), datetime.now())
-        save_mining_participation("test_url")
+            # Mock return values for database operations
+            mock_cursor.fetchall.return_value = []
+            mock_cursor.fetchone.return_value = [1]  # Return a mock item_id
+            mock_cursor.rowcount = 1
+            
+            get_market_items("postgresql://test:test@localhost:5432/testdb")
+            add_market_item("postgresql://test:test@localhost:5432/testdb", "test", 100, 10)
+            get_mining_channels_dict("postgresql://test:test@localhost:5432/testdb", "123")
+            issue_loan("postgresql://test:test@localhost:5432/testdb", "user123", 1000, datetime.now(), datetime.now())
+            save_mining_participation("postgresql://test:test@localhost:5432/testdb")
         
         print("  ✅ All legacy compatibility functions available")
         
