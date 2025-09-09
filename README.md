@@ -19,6 +19,33 @@ All documentation has been organized into the **[docs/](docs/)** folder with log
 - **Administrative Commands**: Comprehensive server management tools
 - **Modular Architecture**: Clean, maintainable codebase
 
+## ⛏️ Sunday Mining System Workflow
+
+### Starting a Mining Session
+1. **`/redsundayminingstart`** - Creates database event and begins voice tracking
+   - Automatically creates a mining event in the database with unique session ID
+   - Activates voice participation tracking across all configured mining channels
+   - Sets event status to 'active' for later payroll processing
+
+### During Mining Operations
+- Players join mining voice channels → Participation automatically tracked
+- Bot monitors join/leave times and calculates duration
+- All participation data linked to the active mining event
+
+### Ending a Session
+2. **`/redsundayminingstop`** - Stops tracking and shows session summary
+   - Ends voice tracking across all channels
+   - Displays participation summary with total miners and duration
+   - Prompts payroll officer to use `/redpayroll calculate`
+
+### Processing Payroll
+3. **`/redpayroll calculate`** - Select event and calculate earnings distribution
+   - Shows dropdown of available open/active mining events
+   - Payroll officer selects the specific event to process
+   - Auto-fetches current UEX ore prices for accurate calculations
+   - Officer enters total ore amounts (SCU) → System auto-calculates total value
+   - Generates payroll distribution based on participation time and org membership
+
 ## 🚀 Quick Start
 
 1. **Installation**: See [Deployment Documentation](documentation/deployment/)
