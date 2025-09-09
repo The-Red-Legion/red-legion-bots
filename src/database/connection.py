@@ -11,9 +11,90 @@ from contextlib import contextmanager
 from typing import Optional, Generator
 import logging
 import os
-from urllib.parse import urlparse
+import subprocess
+from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
+
+def get_cloud_sql_ip(instance_name: str, project_id: str = None) -> Optional[str]:
+    """
+    Get the private IP address of a Cloud SQL instance using gcloud commands.
+    
+    Args:
+        instance_name: Name of the Cloud SQL instance
+        project_id: GCP project ID (optional, uses default if not provided)
+    
+    Returns:
+        Private IP address of the instance or None if not found
+    """
+    try:
+        # Build gcloud command
+        cmd = ['gcloud', 'sql', 'instances', 'describe', instance_name]
+        if project_id:
+            cmd.extend(['--project', project_id])
+        cmd.extend(['--format', 'value(ipAddresses[0].ipAddress)'])
+        
+        # Execute command
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0 and result.stdout.strip():
+            ip = result.stdout.strip()
+            logger.info(f"Resolved Cloud SQL instance {instance_name} to IP: {ip}")
+            return ip
+        else:
+            logger.warning(f"Could not resolve Cloud SQL instance {instance_name}: {result.stderr}")
+            return None
+            
+    except Exception as e:
+        logger.warning(f"Error resolving Cloud SQL IP for {instance_name}: {e}")
+        return None
+
+def resolve_database_url(database_url: str) -> str:
+    """
+    Resolve database URL by replacing hostname with actual Cloud SQL IP if needed.
+    
+    Args:
+        database_url: Original database URL
+        
+    Returns:
+        Resolved database URL with correct IP
+    """
+    try:
+        parsed = urlparse(database_url)
+        
+        # If hostname looks like a Cloud SQL instance name, try to resolve it
+        if parsed.hostname and not parsed.hostname.replace('.', '').replace('-', '').isdigit():
+            # Extract potential instance name from hostname
+            # Common patterns: instance-name, project:region:instance-name
+            instance_name = parsed.hostname.split(':')[-1] if ':' in parsed.hostname else parsed.hostname
+            
+            # Try to get the IP using gcloud
+            resolved_ip = get_cloud_sql_ip(instance_name)
+            
+            if resolved_ip:
+                # Replace hostname with resolved IP
+                netloc = f"{parsed.username}:{parsed.password}@{resolved_ip}"
+                if parsed.port:
+                    netloc += f":{parsed.port}"
+                    
+                resolved_url = urlunparse((
+                    parsed.scheme,
+                    netloc,
+                    parsed.path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment
+                ))
+                
+                logger.info(f"Resolved database URL using Cloud SQL IP")
+                return resolved_url
+        
+        # Return original URL if no resolution needed or failed
+        return database_url
+        
+    except Exception as e:
+        logger.warning(f"Error resolving database URL: {e}")
+        return database_url
 
 class DatabaseManager:
     """
@@ -35,7 +116,8 @@ class DatabaseManager:
             min_connections: Minimum connections in pool
             max_connections: Maximum connections in pool
         """
-        self.database_url = database_url
+        # Resolve the database URL to get the correct IP
+        self.database_url = resolve_database_url(database_url)
         self.min_connections = min_connections
         self.max_connections = max_connections
         self._pool: Optional[SimpleConnectionPool] = None

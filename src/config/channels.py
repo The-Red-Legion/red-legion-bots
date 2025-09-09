@@ -3,6 +3,7 @@ Channel configuration for Red Legion Discord Bot.
 """
 
 from .settings import get_database_url
+from database.connection import resolve_database_url
 
 # Sunday Mining Configuration
 # Note: Channel IDs are now managed in the database
@@ -33,16 +34,9 @@ def get_sunday_mining_channels(guild_id=None):
             if guild_id is None:
                 guild_id = 814699481912049704  # Default Red Legion server ID
                 
-            # Convert to proxy URL if needed
-            parsed = urlparse(db_url)
-            if parsed.hostname not in ['127.0.0.1', 'localhost']:
-                proxy_url = db_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-                try:
-                    conn = psycopg2.connect(proxy_url)
-                except psycopg2.OperationalError:
-                    conn = psycopg2.connect(db_url)
-            else:
-                conn = psycopg2.connect(db_url)
+            # Connect using URL resolution for Cloud SQL
+            resolved_url = resolve_database_url(db_url)
+            conn = psycopg2.connect(resolved_url)
                 
             c = conn.cursor()
             c.execute('''

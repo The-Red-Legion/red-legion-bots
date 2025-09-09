@@ -48,7 +48,11 @@ def init_database_for_deployment(db_url=None):
             
     except Exception as e:
         logger.error(f"❌ Database initialization error: {e}")
+        print(f"❌ Database initialization error: {e}")
         import traceback
+        traceback.print_exc()
+        # Also print to stdout for systemd logging
+        print("Full traceback:")
         traceback.print_exc()
         return False
 

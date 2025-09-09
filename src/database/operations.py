@@ -13,7 +13,7 @@ from datetime import datetime, date
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.connection import DatabaseManager
+from database.connection import DatabaseManager, resolve_database_url
 from database.models import User, Guild, MiningEvent, MiningParticipation
 
 class BaseOperations:
@@ -74,6 +74,13 @@ class GuildOperations(BaseOperations):
                 return Guild(**row)
             return None
 
+# Utility function for legacy database connections
+def get_legacy_connection(database_url):
+    """Get a database connection with URL resolution for legacy functions."""
+    import psycopg2
+    resolved_url = resolve_database_url(database_url)
+    return psycopg2.connect(resolved_url)
+
 # Legacy functions - these will be properly implemented later
 def init_db(database_url):
     """Legacy function - initialize database"""
@@ -86,16 +93,8 @@ def get_market_items(database_url):
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect using utility function with URL resolution
+        conn = get_legacy_connection(database_url)
             
         cursor = conn.cursor()
         cursor.execute("""
@@ -119,16 +118,8 @@ def add_market_item(database_url, name, price, stock, guild_id=None, seller_name
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect using utility function with URL resolution
+        conn = get_legacy_connection(database_url)
             
         cursor = conn.cursor()
         cursor.execute("""
@@ -152,16 +143,8 @@ def issue_loan(database_url, user_id, username, amount, issued_date_iso, due_dat
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect using utility function with URL resolution
+        conn = get_legacy_connection(database_url)
             
         cursor = conn.cursor()
         cursor.execute("""
@@ -185,16 +168,8 @@ def get_user_loans(database_url, user_id):
         import psycopg2
         from urllib.parse import urlparse
         
-        # Handle database connection with proxy fallback
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect using utility function with URL resolution
+        conn = get_legacy_connection(database_url)
             
         cursor = conn.cursor()
         cursor.execute("""
@@ -218,18 +193,8 @@ def get_mining_channels_dict(database_url, guild_id):
         import psycopg2
         from urllib.parse import urlparse
         
-        # Convert database_url to use proxy if running locally
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            # Try proxy first on port 5433
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                # If proxy fails, try original URL
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Connect directly to database (no proxy needed with shared VPC)
+        conn = psycopg2.connect(database_url)
             
         c = conn.cursor()
         
