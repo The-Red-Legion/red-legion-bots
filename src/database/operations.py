@@ -830,10 +830,10 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
         with conn.cursor() as cursor:
             # Check if event already exists for this date and guild
             cursor.execute("""
-                SELECT event_id FROM events 
+                SELECT id FROM events 
                 WHERE guild_id = %s AND event_date = %s AND is_open = true
                 LIMIT 1
-            """, (str(guild_id), event_date))
+            """, (int(guild_id), event_date))
             
             existing_event = cursor.fetchone()
             if existing_event:
@@ -850,18 +850,20 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
             # Create new event - using flexible column structure
             print(f"🔍 Attempting to create event with guild_id={guild_id}, event_id='{prefixed_event_id}', name='{event_name}', date={event_date}")
             
-            # Use the actual events table schema from diagnostics
-            print(f"🔄 Creating event using events table (integer event_id)")
+            # Use the actual events table schema with proper column names and data types
+            print(f"🔄 Creating event using events table (integer id, BIGINT guild_id)")
             cursor.execute("""
                 INSERT INTO events (
-                    guild_id, name, event_date, is_open
+                    guild_id, name, event_name, event_date, event_time, is_open, is_active
                 ) VALUES (
-                    %s, %s, %s, true
-                ) RETURNING event_id
+                    %s, %s, %s, %s, %s, true, true
+                ) RETURNING id
             """, (
-                str(guild_id), 
-                event_name, 
-                event_date
+                int(guild_id),  # Convert to BIGINT 
+                event_name,     # Use as name
+                event_name,     # Also set event_name for compatibility
+                event_date,
+                datetime.now()  # Add event_time
             ))
             integer_event_id = cursor.fetchone()[0]
             # Convert to prefixed format for display consistency
