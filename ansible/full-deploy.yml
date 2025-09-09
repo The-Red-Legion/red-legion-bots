@@ -188,18 +188,13 @@
       delegate_to: localhost
 
     - name: Create tarball of complete codebase
-      archive:
-        path: "{{ temp_dir.path }}"
-        dest: "{{ temp_dir.path }}.tar.gz"
-        format: gz
+      command: tar -czf "{{ temp_dir.path }}.tar.gz" -C "{{ temp_dir.path }}" .
       delegate_to: localhost
 
     - name: Copy tarball to remote server
       copy:
         src: "{{ temp_dir.path }}.tar.gz"
         dest: "/tmp/full_codebase.tar.gz"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
         mode: '0644'
 
     - name: Extract complete codebase to application directory
