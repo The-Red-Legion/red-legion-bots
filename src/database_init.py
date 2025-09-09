@@ -34,17 +34,18 @@ def init_database_for_deployment(db_url=None):
         
         logger.info("Initializing database for deployment...")
         
-        # Initialize the global database manager first
-        db_manager = initialize_database(db_url)
-        logger.info("Global database manager initialized")
-        
-        # Initialize schema using the existing manager (don't pass URL to avoid double initialization)
-        if schema_init():
+        # Initialize schema FIRST using the URL directly (to avoid connection pool issues)
+        if schema_init(db_url):
             logger.info("✅ Database schema initialized successfully")
-            return True
         else:
             logger.error("❌ Database schema initialization failed")
             return False
+        
+        # Now initialize the global database manager (schema should be ready)
+        db_manager = initialize_database(db_url)
+        logger.info("Global database manager initialized")
+        
+        return True
             
     except Exception as e:
         logger.error(f"❌ Database initialization error: {e}")
