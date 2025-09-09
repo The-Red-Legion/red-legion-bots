@@ -2135,18 +2135,15 @@ class SundayMiningCommands(commands.Cog):
                             # Find location with highest sell price
                             best_location = max(locations, 
                                               key=lambda x: x.get('sell_price', 0))
-                            location_name = best_location.get('name', 'Unknown Location')
+                            location_name = best_location.get('name', 'Best Available Price')
                             
-                            # Truncate long location names but keep important parts
-                            if len(location_name) > 25:
-                                # Try to keep the important part (usually the first part)
-                                location_name = location_name[:22] + "..."
-                            
-                            location_info = location_name
+                            # Since UEX API v2.0 doesn't provide specific location data,
+                            # just show a consistent message for all ores
+                            location_info = "UEX Highest Price"
                         else:
-                            location_info = "No trading locations"
+                            location_info = "UEX Highest Price"
                     else:
-                        location_info = "Data not cached"
+                        location_info = "UEX Highest Price"
                 
                 price_list.append(
                     f"• **{ore_name}**: {price:,.0f} aUEC/SCU\n"
