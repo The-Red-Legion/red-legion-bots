@@ -27,41 +27,15 @@ class EventManagement(commands.Cog):
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        print("✅ Event Management Cog initialized with 3 separate commands")
+        print("✅ Event Management Cog initialized successfully!")
 
-    @app_commands.command(name="red-events-create", description="Create a new Red Legion event")
-    @app_commands.describe(
-        category="Event category",
-        name="Event name",
-        description="Event description (optional)"
-    )
-    @app_commands.choices(category=[
-        app_commands.Choice(name="Mining", value="mining"),
-        app_commands.Choice(name="Training", value="training"),
-        app_commands.Choice(name="Combat Operations", value="combat_operations"),
-        app_commands.Choice(name="Salvage", value="salvage"),
-        app_commands.Choice(name="Miscellaneous", value="misc")
-    ])
-    async def create_event(
-        self, 
-        interaction: discord.Interaction,
-        category: app_commands.Choice[str],
-        name: str,
-        description: str = None
-    ):
-        """Create a new event in the specified category."""
-        await interaction.response.defer()
-        
-        try:
-            await self._create_event_by_category(interaction, category.value, name, description)
-        except Exception as e:
-            print(f"❌ Error in create event command: {e}")
-            embed = discord.Embed(
-                title="❌ Command Error",
-                description=f"An error occurred while creating the event: {str(e)}",
-                color=0xff0000
-            )
-            await interaction.followup.send(embed=embed)
+    @app_commands.command(name="red-test-event", description="Test command to verify event system works")
+    async def test_event(self, interaction: discord.Interaction):
+        """Simple test command."""
+        await interaction.response.send_message("✅ Event system is working!", ephemeral=True)
+
+
+async def setup(bot):
 
     @app_commands.command(name="red-events-delete", description="Delete a Red Legion event (Admin only)")
     @app_commands.describe(
@@ -908,12 +882,12 @@ class DeleteConfirmationView(discord.ui.View):
 
 async def setup(bot):
     """Setup function for discord.py extension loading."""
-    print("🔧 Starting EventManagement setup with 3 separate commands...")
+    print("🔧 Starting EventManagement setup with simple test command...")
     try:
         cog = EventManagement(bot)
         await bot.add_cog(cog)
-        print("✅ Event Management commands loaded")
-        print("✅ Added red-events-create, red-events-delete, and red-events-view commands")
+        print("✅ Event Management test command loaded")
+        print("✅ Added red-test-event command")
     except Exception as e:
         print(f"❌ Error in setup function: {e}")
         import traceback
