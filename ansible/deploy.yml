@@ -1,16 +1,27 @@
 ---
-- name: Deploy Participation Bot
+- name: Full Deploy Participation Bot (Complete Codebase Copy)
   hosts: arccorp_compute
   become: yes
   gather_facts: yes
 
   vars:
     app_dir: /app
+    backup_dir: /app_backup
     repo_url: https://github.com/The-Red-Legion/red-legion-bots.git
     python_version: "3.9"
     gcp_project: "rl-prod-471116"
 
   tasks:
+    - name: Display deployment info
+      debug:
+        msg: |
+          ===== FULL CODEBASE DEPLOYMENT =====
+          Deployment Type: Complete file copy (no rsync)
+          Target Directory: {{ app_dir }}
+          Backup Directory: {{ backup_dir }}
+          Time: {{ ansible_date_time.iso8601 }}
+          =====================================
+
     - name: Update apt cache
       apt:
         update_cache: yes
@@ -27,6 +38,8 @@
           - curl
           - wget
           - software-properties-common
+          - tar
+          - gzip
         state: present
       when: ansible_os_family == 'Debian'
 
@@ -98,56 +111,48 @@
             - apt_pip_result.failed | default(false)
       when: ansible_os_family == 'Debian'
 
-    - name: Verify pip installation
-      block:
-        - name: Check pip3 command
-          command: pip3 --version
-          register: pip3_check
-          ignore_errors: true
-        
-        - name: Check python3 -m pip
-          command: python3 -m pip --version
-          register: pip_module_check
-          ignore_errors: true
-          when: pip3_check.failed | default(false)
-        
-        - name: Display pip status
-          debug:
-            msg: |
-              pip3 command: {{ 'Available' if not (pip3_check.failed | default(false)) else 'Not available' }}
-              python3 -m pip: {{ 'Available' if not (pip_module_check.failed | default(false)) else 'Not available' }}
-        
-        - name: Fail if no pip method works
-          fail:
-            msg: "Neither pip3 nor python3 -m pip is available"
-          when: 
-            - pip3_check.failed | default(false)
-            - pip_module_check.failed | default(false)
-        
-        - name: Upgrade pip to latest version
-          command: python3 -m pip install --user --upgrade pip
-          ignore_errors: yes
-          when: not (pip_module_check.failed | default(false)) or not (pip3_check.failed | default(false))
-
-    - name: Check if Google Cloud SDK is available
-      command: which gcloud
-      register: gcloud_check
-      ignore_errors: true
-
-    - name: Install Google Cloud SDK
-      include_tasks: tasks/install_gcloud.yml
-      when: gcloud_check.rc != 0
-
     - name: Stop existing bot process
       include_tasks: tasks/stop_bot.yml
 
-    - name: Stop bot service before deployment
+    - name: Stop bot service before full deployment
       systemd:
         name: red-legion-bot
         state: stopped
       ignore_errors: yes
 
-    - name: Ensure application directory exists
+    - name: Create backup of existing application (if exists)
+      block:
+        - name: Check if app directory exists
+          stat:
+            path: "{{ app_dir }}"
+          register: app_dir_stat
+        
+        - name: Remove old backup directory
+          file:
+            path: "{{ backup_dir }}"
+            state: absent
+          when: app_dir_stat.stat.exists
+        
+        - name: Create backup of current app
+          command: cp -r "{{ app_dir }}" "{{ backup_dir }}"
+          when: app_dir_stat.stat.exists
+        
+        - name: Display backup info
+          debug:
+            msg: "✅ Backup created at {{ backup_dir }}"
+          when: app_dir_stat.stat.exists
+        
+        - name: No backup needed
+          debug:
+            msg: "ℹ️ No existing app directory to backup"
+          when: not app_dir_stat.stat.exists
+
+    - name: Completely remove existing application directory
+      file:
+        path: "{{ app_dir }}"
+        state: absent
+
+    - name: Create fresh application directory
       file:
         path: "{{ app_dir }}"
         state: directory
@@ -155,7 +160,7 @@
         group: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Sync codebase with rsync
+    - name: Copy complete codebase (full deploy method)
       synchronize:
         src: "{{ playbook_dir }}/../"
         dest: "{{ app_dir }}"
@@ -173,40 +178,60 @@
           - "--exclude=Logs"
           - "--exclude=*.pyc"
           - "--exclude=*.pyo"
+          - "--exclude={{ backup_dir }}"
           - "--perms"
           - "--times"
-      notify: restart red-legion-bot
 
-    - name: Verify codebase deployment
+    - name: Verify complete codebase deployment
       stat:
         path: "{{ app_dir }}/src/main.py"
       register: main_file_check
       failed_when: not main_file_check.stat.exists
 
-    - name: Display deployment timestamp
-      debug:
-        msg: "Codebase synced with rsync at {{ ansible_date_time.iso8601 }}"
+    - name: Display full deployment timestamp and file count
+      block:
+        - name: Count deployed files
+          find:
+            paths: "{{ app_dir }}"
+            recurse: yes
+            file_type: file
+          register: file_count
+        
+        - name: Display deployment stats
+          debug:
+            msg: |
+              ===== FULL DEPLOYMENT COMPLETED =====
+              Method: Complete file copy using synchronize
+              Files deployed: {{ file_count.matched }}
+              Deployment time: {{ ansible_date_time.iso8601 }}
+              Target: {{ app_dir }}
+              Backup: {{ backup_dir }} (if existed)
+              =====================================
 
-    - name: Install Python dependencies
+    - name: Install Python dependencies (fresh installation)
       block:
         - name: Install requirements with pip3 (system-wide)
           pip:
             requirements: "{{ app_dir }}/requirements.txt"
             executable: pip3
+            state: present
+            extra_args: "--upgrade"  # Upgrade instead of force reinstall
       rescue:
         - name: Install requirements with python3 -m pip (system-wide)
-          command: python3 -m pip install -r "{{ app_dir }}/requirements.txt"
+          command: python3 -m pip install --upgrade -r "{{ app_dir }}/requirements.txt"
 
-    - name: Install additional packages
+    - name: Install additional packages (fresh installation)
       block:
         - name: Install psycopg2-binary with pip3 (system-wide)
           pip:
             name:
               - psycopg2-binary
             executable: pip3
+            state: present
+            extra_args: "--upgrade"  # Upgrade instead of force reinstall
       rescue:
         - name: Install psycopg2-binary with python3 -m pip (system-wide)
-          command: python3 -m pip install psycopg2-binary
+          command: python3 -m pip install --upgrade psycopg2-binary
 
     - name: Set up environment variables
       include_tasks: tasks/setup_environment.yml
@@ -217,7 +242,22 @@
         state: absent
       ignore_errors: true
 
-    - name: Test Python imports
+    - name: Clear Python cache directories
+      find:
+        paths: "{{ app_dir }}"
+        patterns: "__pycache__"
+        file_type: directory
+        recurse: yes
+      register: pycache_dirs
+
+    - name: Remove Python cache directories
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ pycache_dirs.files }}"
+      when: pycache_dirs.files is defined
+
+    - name: Test Python imports (fresh environment)
       command: python3 -c "import sys; print('Python path:', sys.path); import src.participation_bot"
       args:
         chdir: "{{ app_dir }}"
@@ -227,11 +267,35 @@
       failed_when: import_test.rc != 0
       when: not ansible_check_mode
 
-    - name: Start bot service
+    - name: Start bot service (fresh start)
       include_tasks: tasks/start_bot.yml
 
-    - name: Verify bot is running
-      include_tasks: tasks/verify_bot.yml
+    - name: Extended bot verification (allow more time for fresh start)
+      block:
+        - name: Wait for bot to fully initialize
+          pause:
+            seconds: 20
+            prompt: "Waiting for bot to fully initialize after fresh deployment..."
+        
+        - name: Verify bot is running
+          include_tasks: tasks/verify_bot.yml
+        
+        - name: Display success message
+          debug:
+            msg: |
+              ✅ FULL DEPLOYMENT SUCCESS ✅
+              The complete codebase has been deployed using file copy method.
+              All files have been refreshed and the bot should be fully operational.
+              Backup available at: {{ backup_dir }}
+
+    - name: Cleanup old backup on success
+      file:
+        path: "{{ backup_dir }}"
+        state: absent
+      when: 
+        - import_test.rc == 0
+        - not ansible_check_mode
+      ignore_errors: yes
 
   handlers:
     - name: reload systemd

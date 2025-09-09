@@ -47,7 +47,7 @@ class LoanConfirmationView(discord.ui.View):
                 name="What's Next?",
                 value="• Finance officers will review your request\n"
                       "• You'll be notified of the decision\n"
-                      "• Use `/red-loans status` to check progress",
+                      "• Use `/redloans status` to check progress",
                 inline=False
             )
             
@@ -106,7 +106,7 @@ class LoanConfirmationView(discord.ui.View):
             
             embed.add_field(
                 name="Review Actions",
-                value="Use `/red-loans approve` or `/red-loans deny` to process this request",
+                value="Use `/redloans approve` or `/redloans deny` to process this request",
                 inline=False
             )
             
@@ -217,8 +217,8 @@ class RedLoansGroup(app_commands.Group):
                 
                 embed.add_field(
                     name="📋 Next Steps",
-                    value="• Use `/loans status` to check your loan details\n"
-                          "• Make payments using `/loans pay`\n"
+                    value="• Use `/redloans status` to check your loan details\n"
+                          "• Make payments using `/redloans pay`\n"
                           "• Contact finance officers for questions",
                     inline=False
                 )

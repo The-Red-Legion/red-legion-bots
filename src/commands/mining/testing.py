@@ -1,7 +1,7 @@
 """
 Sunday Mining Start Command Testing and Verification Framework
 
-This module provides comprehensive testing for the /sunday_mining_start command
+This module provides comprehensive testing for the /redsundayminingstart command
 including schema verification, voice channel testing, and debugging.
 """
 

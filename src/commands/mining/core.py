@@ -8,9 +8,9 @@ This module handles Sunday mining operations including:
 - Mining session management and reporting
 
 Commands:
-- /sunday_mining_start: Start a Sunday mining session
-- /sunday_mining_stop: Stop the current mining session 
-- /payroll: Calculate and display payroll for the last session
+- /redsundayminingstart: Start a Sunday mining session
+- /redsundayminingstop: Stop the current mining session 
+- /redpayroll: Calculate and display payroll for the last session
 """
 
 import discord
@@ -96,63 +96,39 @@ class EventSelectionView(discord.ui.View):
             )
     
     async def _fetch_uex_prices(self):
-        """Fetch current UEX ore prices - uses highest sell price per SCU."""
+        """Fetch current UEX ore prices using cached data."""
         try:
-            headers = {
-                'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
-                'Accept': 'application/json'
-            }
+            from services.uex_cache import get_uex_cache
             
-            import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            cache = get_uex_cache()
+            cached_prices = await cache.get_ore_prices(category="ores")
             
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(
-                    UEX_API_CONFIG['base_url'], 
-                    headers=headers,
-                    timeout=UEX_API_CONFIG.get('timeout', 30)
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        ore_prices = {}
+            if not cached_prices:
+                print("❌ No UEX price data available from cache")
+                return {}
+            
+            # Convert cache format to expected format
+            ore_prices = {}
+            for code, data in cached_prices.items():
+                ore_name = data.get('name', code).upper()
+                
+                # Only process ores we care about
+                if ore_name in ORE_TYPES and data.get('price_sell', 0) > 0:
+                    ore_prices[ore_name] = {
+                        'max_price': float(data['price_sell']),
+                        'display_name': ORE_TYPES[ore_name],
+                        'code': data.get('code', code),
+                        'kind': 'commodity'
+                    }
+            
+            print(f"✅ Retrieved {len(ore_prices)} ore prices from cache")
+            return ore_prices
                         
-                        # Track highest prices per ore (multiple entries per ore across locations)
-                        for commodity in data.get('data', []):
-                            commodity_name = commodity.get('name', '').upper()
-                            
-                            # Only process mineral ores we care about
-                            if (commodity.get('is_mineral') == 1 and 
-                                commodity.get('is_extractable') == 1 and
-                                commodity_name in ORE_TYPES):
-                                
-                                # Use sell price (what miners get when selling)
-                                price = float(commodity.get('price_sell', 0))
-                                
-                                if price > 0:
-                                    # Keep highest price for each ore across all locations
-                                    if commodity_name not in ore_prices or price > ore_prices[commodity_name]['max_price']:
-                                        ore_prices[commodity_name] = {
-                                            'max_price': price,
-                                            'display_name': ORE_TYPES[commodity_name],
-                                            'code': commodity.get('code', ''),
-                                            'kind': commodity.get('kind', '')
-                                        }
-                        
-                        print(f"✅ Fetched {len(ore_prices)} ore prices from UEX API")
-                        return ore_prices
-                    else:
-                        print(f"❌ UEX API error: HTTP {response.status}")
-                        return {}
-                    
         except Exception as e:
-            print(f"❌ Error fetching UEX prices: {e}")
+            print(f"❌ Error fetching cached UEX prices: {e}")
             import traceback
             traceback.print_exc()
-        
-        return {}
+            return {}
 
 
 class PayrollCalculationModal(discord.ui.Modal, title='Sunday Mining - Payroll Calculation'):
@@ -673,8 +649,8 @@ class SundayMiningCommands(commands.Cog):
             print(f"🔍 DEBUG: Retrieved mining channels: {mining_channels}")
             
             for channel_name, channel_id in mining_channels.items():
-                # Only join the dispatch channel (check if channel name starts with 'dispatch')
-                should_join = channel_name.lower().startswith('dispatch')
+                # Only join the dispatch channel (check if channel name contains 'dispatch' - case insensitive)
+                should_join = 'dispatch' in channel_name.lower()
                 print(f"🔍 DEBUG: Channel '{channel_name}' -> lowercase: '{channel_name.lower()}' -> contains 'dispatch': {should_join}")
                 print(f"Adding channel {channel_name} ({channel_id}) to tracking, join={should_join}")
                 await add_tracked_channel(int(channel_id), should_join=should_join)
@@ -718,7 +694,7 @@ class SundayMiningCommands(commands.Cog):
             
             embed.add_field(
                 name="📝 Next Steps",
-                value="1. **Look for the bot in Dispatch channel** - this confirms tracking is active\n2. Join any tracked voice channels to track participation\n3. Mine ore and deposit in central storage\n4. Use `/sunday_mining_stop` when done\n5. Payroll officer uses `/payroll` to calculate distribution",
+                value="1. **Look for the bot in Dispatch channel** - this confirms tracking is active\n2. Join any tracked voice channels to track participation\n3. Mine ore and deposit in central storage\n4. Use `/redsundayminingstop` when done\n5. Payroll officer uses `/redpayroll calculate` to calculate distribution",
                 inline=False
             )
             
@@ -737,7 +713,7 @@ class SundayMiningCommands(commands.Cog):
             if not current_session['active']:
                 embed = discord.Embed(
                     title="⚠️ No Active Mining Session",
-                    description="Use `/sunday_mining_start` to begin a session",
+                    description="Use `/redsundayminingstart` to begin a session",
                     color=0xffaa00
                 )
                 await interaction.response.send_message(embed=embed)
@@ -754,24 +730,84 @@ class SundayMiningCommands(commands.Cog):
             
             stop_voice_tracking()
             
+            # Get participants data
+            participants_text = "No participants tracked"
+            participant_count = 0
+            
+            try:
+                # Try to get participants from database first
+                if current_session.get('event_id'):
+                    from database.operations import get_mining_session_participants
+                    from config.settings import get_database_url
+                    
+                    db_url = get_database_url()
+                    if db_url:
+                        participants_data = get_mining_session_participants(db_url, event_id=current_session['event_id'])
+                        if participants_data:
+                            participant_count = len(participants_data)
+                            # Group participants by name and sum their time
+                            participant_summary = {}
+                            for p in participants_data:
+                                name = p[2]  # participant_name is 3rd element
+                                duration_mins = p[7] / 60 if len(p) > 7 else 0  # duration_seconds converted to minutes
+                                if name in participant_summary:
+                                    participant_summary[name] += duration_mins
+                                else:
+                                    participant_summary[name] = duration_mins
+                            
+                            # Create display text
+                            if participant_summary:
+                                participants_list = []
+                                for name, total_mins in sorted(participant_summary.items()):
+                                    participants_list.append(f"• {name}: {total_mins:.1f} mins")
+                                participants_text = "\n".join(participants_list[:15])  # Limit to 15 to avoid embed limits
+                                if len(participant_summary) > 15:
+                                    participants_text += f"\n• ... and {len(participant_summary) - 15} more"
+                
+                # Fallback to in-memory tracking
+                if participant_count == 0:
+                    from handlers.voice_tracking import get_all_mining_participants
+                    in_memory_participants = get_all_mining_participants(interaction.client)
+                    if in_memory_participants:
+                        participant_count = len(in_memory_participants)
+                        participants_list = []
+                        for member_id, data in in_memory_participants.items():
+                            username = data.get('username', f'User {member_id}')
+                            total_mins = data.get('total_time', 0) / 60
+                            participants_list.append(f"• {username}: {total_mins:.1f} mins")
+                        participants_text = "\n".join(participants_list[:15])
+                        if len(in_memory_participants) > 15:
+                            participants_text += f"\n• ... and {len(in_memory_participants) - 15} more"
+                            
+            except Exception as e:
+                print(f"❌ Error retrieving participants: {e}")
+                participants_text = "Error retrieving participant data"
+            
             # Create session summary
             embed = discord.Embed(
                 title="⏹️ Sunday Mining Session Ended",
-                description=f"Session ID: `{current_session['session_id']}`",
+                description=f"Session ID: `{current_session['session_id']}`\nEvent ID: `{current_session.get('event_id', 'N/A')}`",
                 color=0xff6b6b,
                 timestamp=datetime.now()
             )
             
             embed.add_field(
                 name="📊 Session Summary",
-                value=f"• Duration: {duration_hours:.1f} hours\n• Participants tracked via voice channels\n• 🤖 Bot has left all voice channels",
+                value=f"• Duration: {duration_hours:.1f} hours\n• Participants: {participant_count}\n• 🤖 Bot has left all voice channels",
                 inline=False
             )
+            
+            if participant_count > 0:
+                embed.add_field(
+                    name="👥 Participants",
+                    value=participants_text,
+                    inline=False
+                )
             
             # Calculate total ore collected - removed since payroll officer handles this
             embed.add_field(
                 name="💰 Next Steps",
-                value="Payroll officer should use `/payroll calculate` to determine earnings distribution",
+                value="Payroll officer should use `/redpayroll calculate` to determine earnings distribution",
                 inline=False
             )
             
@@ -831,7 +867,7 @@ class SundayMiningCommands(commands.Cog):
                     # No events found - provide helpful message
                     embed = discord.Embed(
                         title="❌ No Mining Events Found",
-                        description="No recent Sunday mining events found. Start a mining session first with `/sunday_mining_start`",
+                        description="No recent Sunday mining events found. Start a mining session first with `/redsundayminingstart`",
                         color=0xff0000
                     )
                     embed.add_field(
@@ -974,7 +1010,7 @@ class SundayMiningCommands(commands.Cog):
             
             embed.add_field(
                 name="💡 Next Steps",
-                value="Use `/payroll calculate` to enter total mining value and calculate distribution",
+                value="Use `/redpayroll calculate` to enter total mining value and calculate distribution",
                 inline=False
             )
             
@@ -1062,85 +1098,43 @@ class SundayMiningCommands(commands.Cog):
             return None
     
     async def _fetch_detailed_uex_prices(self, category: str = "ores"):
-        """Fetch detailed UEX prices with location information."""
+        """Fetch detailed UEX prices using cached data."""
         try:
-            headers = {
-                'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
-                'Accept': 'application/json'
-            }
+            from services.uex_cache import get_uex_cache
             
-            import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            cache = get_uex_cache()
+            cached_prices = await cache.get_ore_prices(category=category)
             
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(
-                    UEX_API_CONFIG['base_url'], 
-                    headers=headers,
-                    timeout=UEX_API_CONFIG.get('timeout', 30)
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        commodities = {}
-                        
-                        for commodity in data.get('data', []):
-                            commodity_name = commodity.get('name', '').upper()
-                            price_sell_raw = commodity.get('price_sell')
-                            price_buy_raw = commodity.get('price_buy')
-                            
-                            # Handle None values
-                            price_sell = float(price_sell_raw) if price_sell_raw is not None else 0.0
-                            price_buy = float(price_buy_raw) if price_buy_raw is not None else 0.0
-                            
-                            # Filter by category
-                            include_commodity = False
-                            
-                            if category == "ores":
-                                # Only mineable ores
-                                include_commodity = (
-                                    commodity.get('is_mineral') == 1 and 
-                                    commodity.get('is_extractable') == 1 and
-                                    price_sell > 0
-                                )
-                            elif category == "high_value":
-                                # High value items (>5000 aUEC/SCU)
-                                include_commodity = price_sell > 5000
-                            else:  # category == "all"
-                                # All tradeable commodities
-                                include_commodity = (
-                                    price_sell > 0 and 
-                                    commodity.get('is_sellable') == 1
-                                )
-                            
-                            if include_commodity:
-                                # Track highest price location per commodity
-                                if commodity_name not in commodities or price_sell > commodities[commodity_name]['price_sell']:
-                                    commodities[commodity_name] = {
-                                        'name': commodity.get('name', 'Unknown'),
-                                        'code': commodity.get('code', ''),
-                                        'kind': commodity.get('kind', ''),
-                                        'price_sell': price_sell,
-                                        'price_buy': price_buy,
-                                        'is_mineral': commodity.get('is_mineral', 0) == 1,
-                                        'is_extractable': commodity.get('is_extractable', 0) == 1,
-                                        'is_illegal': commodity.get('is_illegal', 0) == 1,
-                                        'weight_scu': commodity.get('weight_scu', 0),
-                                        'commodity_id': commodity.get('id'),
-                                        # Note: UEX API doesn't provide location data in commodities endpoint
-                                        # We'd need to call /locations endpoint for location details
-                                        'location': 'Best Available Price'
-                                    }
-                        
-                        print(f"✅ Fetched {len(commodities)} {category} from UEX API")
-                        return commodities
-                    else:
-                        print(f"❌ UEX API error: HTTP {response.status}")
-                        return None
+            if not cached_prices:
+                print(f"❌ No UEX {category} price data available from cache")
+                return None
+            
+            # Convert cache format to expected detailed format
+            commodities = {}
+            for code, data in cached_prices.items():
+                commodity_name = data.get('name', code).upper()
+                
+                commodities[commodity_name] = {
+                    'name': data.get('name', 'Unknown'),
+                    'code': data.get('code', code),
+                    'kind': 'commodity',
+                    'price_sell': float(data.get('price_sell', 0)),
+                    'price_buy': float(data.get('price_buy', 0)),
+                    'is_mineral': True,  # Assume true for cached ore data
+                    'is_extractable': True,  # Assume true for cached ore data
+                    'is_illegal': False,  # Assume false for ores
+                    'weight_scu': 1,  # Default weight
+                    'commodity_id': code,
+                    'locations': data.get('locations', []),
+                    'location': 'Best Available Price',
+                    'updated': data.get('updated', 'Unknown')
+                }
+            
+            print(f"✅ Retrieved {len(commodities)} {category} from cache")
+            return commodities
         
         except Exception as e:
-            print(f"❌ Error fetching detailed UEX prices: {e}")
+            print(f"❌ Error fetching detailed cached UEX prices: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -1155,7 +1149,7 @@ class SundayMiningCommands(commands.Cog):
         
         embed = discord.Embed(
             title=f"📊 UEX Corp Price Check - {category_names.get(category, category.title())}",
-            description="Live prices from UEX API (highest available per SCU)",
+            description="Live prices from UEX API with best selling locations",
             color=0x3498db,
             timestamp=datetime.now()
         )
@@ -1175,9 +1169,9 @@ class SundayMiningCommands(commands.Cog):
             reverse=True
         )
         
-        # Split into chunks for multiple fields (Discord limit)
-        chunk_size = 10
-        chunks = [sorted_items[i:i + chunk_size] for i in range(0, min(len(sorted_items), 50), chunk_size)]
+        # Split into chunks for better readability - use single wide columns
+        chunk_size = 8
+        chunks = [sorted_items[i:i + chunk_size] for i in range(0, min(len(sorted_items), 25), chunk_size)]
         
         for i, chunk in enumerate(chunks):
             price_list = []
@@ -1191,16 +1185,31 @@ class SundayMiningCommands(commands.Cog):
                 
                 indicator_str = "".join(indicators) + " " if indicators else ""
                 
+                # Get location information for best price
+                location_info = "Location Unknown"
+                locations = commodity_data.get('locations', [])
+                if locations:
+                    # Find location with highest sell price
+                    best_location = max(locations, 
+                                      key=lambda x: x.get('sell_price', 0))
+                    location_name = best_location.get('name', 'Unknown Location')
+                    # Truncate long location names for better readability
+                    if len(location_name) > 30:
+                        location_name = location_name[:27] + "..."
+                    location_info = location_name
+                
+                # More spaced out formatting with better alignment
                 price_list.append(
-                    f"{indicator_str}**{commodity_data['name']}** ({commodity_data['code']})"
-                    f"\n└ {commodity_data['price_sell']:>8,.0f} aUEC/SCU"
+                    f"{indicator_str}**{commodity_data['name']}** ({commodity_data['code']})\n"
+                    f"💰 **{commodity_data['price_sell']:,.0f}** aUEC/SCU\n"
+                    f"📍 {location_info}"
                 )
             
-            field_name = f"💰 Prices ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Current Prices"
+            field_name = f"💰 Prices & Locations ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Prices & Best Locations"
             embed.add_field(
                 name=field_name,
-                value="\n".join(price_list),
-                inline=True if len(chunks) > 1 else False
+                value="\n\n".join(price_list),  # Double spacing between items
+                inline=False  # Always use full width for better readability
             )
         
         # Add summary statistics
@@ -1218,8 +1227,8 @@ class SundayMiningCommands(commands.Cog):
         # Add legend
         embed.add_field(
             name="🔍 Legend",
-            value="⛏️ Mineable Ore • ⚠️ Illegal Commodity\n"
-                  "💡 Use `/payroll calculate` to calculate mining payouts",
+            value="⛏️ Mineable Ore • ⚠️ Illegal Commodity • 📍 Best Selling Location\n"
+                  "💡 Use `/redpayroll calculate` to calculate mining payouts",
             inline=False
         )
         
@@ -1228,10 +1237,10 @@ class SundayMiningCommands(commands.Cog):
         return embed
     
     async def _create_ore_prices_embed(self, ore_prices: Dict) -> discord.Embed:
-        """Create an embed showing current ore prices."""
+        """Create an embed showing current ore prices with locations."""
         embed = discord.Embed(
-            title="� Current Ore Prices",
-            description="Live prices from UEX Corp API",
+            title="💰 Current Ore Prices & Best Locations",
+            description="Live prices from UEX Corp API with highest price locations",
             color=0x3498db,
             timestamp=datetime.now()
         )
@@ -1244,6 +1253,15 @@ class SundayMiningCommands(commands.Cog):
             )
             return embed
         
+        # Get detailed price data with locations from cache
+        try:
+            from services.uex_cache import get_uex_cache
+            cache = get_uex_cache()
+            detailed_prices = await cache.get_ore_prices(category="ores")
+        except Exception as e:
+            print(f"⚠️ Could not get detailed location data: {e}")
+            detailed_prices = {}
+        
         # Sort ores by max price (highest first)
         sorted_ores = sorted(
             ore_prices.items(),
@@ -1251,46 +1269,59 @@ class SundayMiningCommands(commands.Cog):
             reverse=True
         )
         
-        # Split into chunks for multiple fields
-        chunk_size = 8
+        # Split into chunks for better readability (smaller chunks to accommodate location data)
+        chunk_size = 6
         chunks = [sorted_ores[i:i + chunk_size] for i in range(0, len(sorted_ores), chunk_size)]
         
         for i, chunk in enumerate(chunks):
             price_list = []
             for ore_key, price_data in chunk:
+                price = price_data['max_price']
+                ore_name = price_data['display_name']
+                
+                # Try to find location information
+                location_info = "Location Unknown"
+                if detailed_prices:
+                    # Look for this ore in detailed cache data
+                    for code, cache_data in detailed_prices.items():
+                        if (cache_data.get('name', '').upper() == ore_key or 
+                            code.upper() == ore_key or
+                            cache_data.get('name', '') == ore_name):
+                            
+                            # Find best location from locations array
+                            locations = cache_data.get('locations', [])
+                            if locations:
+                                # Find location with highest sell price
+                                best_location = max(locations, 
+                                                  key=lambda x: x.get('sell_price', 0))
+                                location_name = best_location.get('name', 'Unknown Location')
+                                # Truncate long location names
+                                if len(location_name) > 20:
+                                    location_name = location_name[:17] + "..."
+                                location_info = location_name
+                            break
+                
                 price_list.append(
-                    f"• **{price_data['display_name']}**: {price_data['max_price']:,.0f} aUEC/SCU"
+                    f"• **{ore_name}**: {price:,.0f} aUEC/SCU\n"
+                    f"  📍 {location_info}"
                 )
             
-            field_name = f"💰 Ore Prices ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Ore Prices"
+            field_name = f"💰 Ore Prices & Locations ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Ore Prices & Locations"
             embed.add_field(
                 name=field_name,
-                value="\n".join(price_list),
+                value="\n\n".join(price_list),
                 inline=True if len(chunks) > 1 else False
-            )
-        
-        # Add calculation example
-        if ore_prices:
-            total_value = sum(p['max_price'] for p in ore_prices.values())
-            embed.add_field(
-                name="📊 Price Summary",
-                value=f"• Highest: **{max(ore_prices.values(), key=lambda x: x['max_price'])['display_name']}** "
-                      f"({max(p['max_price'] for p in ore_prices.values()):,.0f} aUEC/SCU)\n"
-                      f"• Lowest: **{min(ore_prices.values(), key=lambda x: x['max_price'])['display_name']}** "
-                      f"({min(p['max_price'] for p in ore_prices.values()):,.0f} aUEC/SCU)\n"
-                      f"• Average: **{total_value/len(ore_prices):,.0f} aUEC/SCU**",
-                inline=False
             )
         
         embed.add_field(
             name="💡 Usage Tips",
-            value="• Use these prices to calculate total mining haul value\n"
-                  "• Prices update in real-time from UEX Corp\n"
-                  "• Use `/payroll calculate` and enter ore amounts to auto-calculate total value",
+            value="• Prices show the highest available sell price per location\n"
+                  "• Use `/redpayroll calculate` to enter ore amounts and auto-calculate total value\n"
+                  "• Prices update automatically every 4 minutes from UEX Corp",
             inline=False
         )
         
-        embed.set_footer(text="Data from UEX Corp • Prices in aUEC per SCU")
+        embed.set_footer(text="Data from UEX Corp • Cached with location data • Prices in aUEC per SCU")
         
         return embed
     
@@ -1306,25 +1337,25 @@ class SundayMiningCommands(commands.Cog):
             print(f"📋 Found {len(events)} open mining events")
             
             if not events:
-                # If no open events, get recent closed events as fallback for this guild
+                # If no open events, get recent events from mining_events table
                 import psycopg2
                 conn = psycopg2.connect(db_url)
                 c = conn.cursor()
                 c.execute(
                     """
-                    SELECT id, event_name, event_time, created_at
-                    FROM events 
+                    SELECT event_id, name, start_time, created_at, status
+                    FROM mining_events 
                     WHERE guild_id = %s 
-                       AND (event_name ILIKE '%%sunday%%mining%%' OR event_name ILIKE '%%mining%%')
+                       AND is_active = true
                        AND created_at >= NOW() - INTERVAL '7 days'
                     ORDER BY created_at DESC
                     LIMIT 10
                     """,
-                    (guild_id,)
+                    (str(guild_id),)
                 )
                 events = c.fetchall()
                 conn.close()
-                print(f"📋 Found {len(events)} recent events as fallback")
+                print(f"📋 Found {len(events)} recent mining events as fallback")
             
             return events
             
@@ -1575,7 +1606,7 @@ class SundayMiningCommands(commands.Cog):
                 value="1. Review failed tests above\n"
                       "2. Check bot permissions in voice channels\n"
                       "3. Verify mining channel configuration\n"
-                      "4. Test with `/sunday_mining_start` after fixes",
+                      "4. Test with `/redsundayminingstart` after fixes",
                 inline=False
             )
             
@@ -1619,7 +1650,7 @@ def register_commands(bot):
         )
         embed.add_field(
             name="New Commands",
-            value="• `/sunday_mining_start` - Start mining session\n• `/payroll` - Submit ore collections\n• `/sunday_mining_stop` - End session",
+            value="• `/redsundayminingstart` - Start mining session\n• `/redpayroll` - Submit ore collections\n• `/redsundayminingstop` - End session",
             inline=False
         )
         await ctx.send(embed=embed)

@@ -677,7 +677,7 @@ class RedMarketGroup(app_commands.Group):
             
             embed.add_field(
                 name="Browse Marketplace",
-                value="Use `/red-market list` to see all listings",
+                value="Use `/redmarket list` to see all listings",
                 inline=False
             )
             

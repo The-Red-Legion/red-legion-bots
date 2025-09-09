@@ -1148,10 +1148,12 @@ async def get_all_events(category: str = None, guild_id: str = None) -> List[Dic
         events = []
         for row in cursor.fetchall():
             event_dict = {
-                'id': row[0],
+                'event_id': row[0],  # Fixed: use 'event_id' instead of 'id'
+                'id': row[0],        # Keep both for compatibility
                 'name': row[1],
                 'description': row[2],
-                'category': row[3],
+                'event_type': row[3],    # Fixed: use 'event_type' to match database schema
+                'category': row[3],      # Keep both for compatibility
                 'start_time': row[4],
                 'date': row[5].strftime('%Y-%m-%d') if row[5] else None,
                 'time': row[4].strftime('%H:%M') if row[4] else None,

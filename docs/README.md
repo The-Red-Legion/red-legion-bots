@@ -6,18 +6,15 @@ Welcome to the Red Legion Discord Bot documentation! This bot is designed specif
 
 ### 🚀 [Getting Started](./guides/)
 - [Quick Command Reference](./guides/QUICK_COMMAND_REFERENCE.md)
+- [Sunday Mining Operations Guide](./guides/SUNDAY_MINING_OPERATIONS.md)
 - Setup and installation guides
-
-### 🏗️ [Architecture](./architecture/)
-- System architecture overview
-- Database design
-- [Reorganization Summary](./architecture/REORGANIZATION_SUMMARY.md)
 
 ### 🔧 [Development](./development/)
 - [Testing Guide](./development/TESTING_GUIDE.md)
 - [Code Audit Report](./development/CODE_AUDIT_REPORT.md)
 - [Workflow Updates](./development/WORKFLOW_UPDATES.md)
-- Development plans and status
+- [Verification Checklist](./development/VERIFICATION_CHECKLIST.md)
+- Development procedures and validation
 
 ### 🚢 [Deployment](./deployment/)
 - [Ansible Deployment](./deployment/ansible-deployment.md)
@@ -35,40 +32,64 @@ Welcome to the Red Legion Discord Bot documentation! This bot is designed specif
 
 ## 🤖 Bot Features
 
-### ⛏️ Mining Operations
-- Automated Sunday mining sessions
-- Voice channel participation tracking
-- Real-time payroll calculations
-- UEX API integration for ore prices
+### ⛏️ Enhanced Mining Operations
+- **Multi-Channel Voice Tracking**: Automatic participant detection across 7 mining channels
+- **Smart Session Management**: Start/stop mining sessions with comprehensive participant summaries
+- **Advanced Payroll System**: Time-based profit sharing with UEX market integration
+- **Real-Time Price Data**: Live ore prices with best selling locations and intelligent caching
+- **PDF Report Generation**: Automated payroll reports with detailed breakdowns
+- **Visual Indicators**: Bot joins Dispatch channel during active sessions
 
-### 📅 Event Management
-- Create and manage mining events
-- Track participant attendance
-- Automated event scheduling
+### 📅 Comprehensive Event Management
+- **Multi-Category Events**: Mining, Combat, Training, Salvage, Exploration events
+- **Event Lifecycle**: Create, view, list, and delete with proper permission controls
+- **Participant Tracking**: Integration with voice tracking for attendance
+- **Filtering & Search**: Advanced event discovery with category and status filters
 
-### 💰 Financial System
-- Member loan management
-- Marketplace for trading
-- Automated payroll distribution
+### 💰 Advanced Financial System
+- **Loan Management**: Complete request, approval, and tracking system
+- **Marketplace Integration**: Item listing and trading system
+- **Automated Calculations**: Participation-based payroll distribution
+- **Multi-Role Access**: Different permission levels for various financial operations
 
-### 👥 Organization Management
-- Member recruitment system
-- Application processing
-- Role management
+### 👥 Professional Recruitment System
+- **Application Processing**: Streamlined member application workflow
+- **Review System**: Officer tools for application management
+- **Status Tracking**: Real-time application status updates
+- **Integration**: Seamless connection with Discord role management
+
+### 🗄️ Performance & Reliability
+- **Intelligent Caching**: UEX API data cached with auto-refresh (4-minute intervals)
+- **Comprehensive Diagnostics**: Multi-level health checks and system monitoring
+- **Database v2.0.0**: Modern PostgreSQL architecture with proper relationships
+- **CI/CD Integration**: GitHub Actions with automated testing and deployment
 
 ## 🎮 Available Commands
+
+### Core Mining System
+- `/redsundayminingstart` - Start mining session with voice tracking
+- `/redsundayminingstop` - Stop mining session with participant summary
+- `/redpayroll` - Calculate and distribute payroll with UEX integration
+- `/redpricecheck` - Check live ore prices and best selling locations
 
 ### Subcommand Groups
 - `/redevents` - Event management (create, list, view, delete)
 - `/redmarket` - Marketplace system (list, add items)
-- `/redloans` - Loan management (request, status)
-- `/redjoin` - Organization recruitment (apply, status)
+- `/redloans` - Loan management (request, status, approve/deny)
+- `/redjoin` - Organization recruitment (apply, status, review)
 
-### Individual Commands
+### Cache & Diagnostics
+- `/redcachestatus` - UEX API cache status and statistics
+- `/redcacherefresh` - Force refresh cached market data
+- `/redhealth` - Simple health check
+- `/redtest` - Comprehensive system diagnostics
 - `/redping` - Test bot responsiveness
-- `/redhealth` - Health diagnostics
-- `/redsundayminingstart` - Start mining session
-- `/redpayroll` - Calculate and distribute payroll
+
+### Administrative Tools
+- `/redconfigrefresh` - Refresh bot configuration
+- `/redsyncommands` - Sync slash commands
+- `/redtestmining` - Test data management
+- `/redsundayminingtest` - Mining system diagnostics
 
 ## 📊 System Requirements
 

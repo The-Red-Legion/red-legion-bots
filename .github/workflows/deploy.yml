@@ -16,7 +16,7 @@ jobs:
   # Phase 1: Infrastructure Preparation
   infrastructure-setup:
     runs-on: ubuntu-latest
-    if: github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'tests good')
+    if: github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'Ready To Deploy')
     outputs:
       vm_ip: ${{ steps.vm_info.outputs.vm_ip }}
       ssh_status: ${{ steps.ssh_test.outputs.status }}
@@ -87,8 +87,8 @@ jobs:
           path: /tmp/ansible/inventory.ini
           retention-days: 1
 
-  # Phase 2: Ansible Deployment
-  ansible-deployment:
+  # Phase 2: Full Codebase Deployment
+  full-codebase-deployment:
     runs-on: ubuntu-latest
     needs: infrastructure-setup
     outputs:
@@ -125,23 +125,25 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
       
-      - name: Run Ansible Deployment
+      - name: Run Full Codebase Deployment
         id: deploy
         run: |
-          echo "=== Starting Ansible deployment ==="
+          echo "=== Starting Full Codebase Deployment ==="
+          echo "🔄 Performing complete codebase copy deployment"
+          echo "📅 Initiated at: $(date)"
           
-          # Run Ansible playbook with dynamic inventory using environment variables
+          # Run Ansible playbook with full codebase deployment
           if ansible-playbook ansible/deploy.yml -i /tmp/ansible/inventory.ini -v; then
             echo "status=success" >> $GITHUB_OUTPUT
-            echo "✅ Ansible deployment completed successfully"
+            echo "✅ Full codebase deployment completed successfully"
           else
             echo "status=failed" >> $GITHUB_OUTPUT
-            echo "❌ Ansible deployment failed"
+            echo "❌ Full codebase deployment failed"
             exit 1
           fi
           
-          echo "=== Waiting for bot to stabilize ==="
-          sleep 10
+          echo "=== Waiting for bot to stabilize after full deployment ==="
+          sleep 15
           echo "=== Bot startup wait completed ==="
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -243,7 +245,7 @@ jobs:
   # Phase 4: Log Collection and Monitoring
   log-collection:
     runs-on: ubuntu-latest
-    needs: [infrastructure-setup, ansible-deployment, health-verification]
+    needs: [infrastructure-setup, full-codebase-deployment, health-verification]
     if: always()
     steps:
       - name: Authenticate with GCP
@@ -315,11 +317,11 @@ jobs:
   # Phase 5: Post-Deployment Actions
   post-deployment:
     runs-on: ubuntu-latest
-    needs: [infrastructure-setup, ansible-deployment, health-verification, log-collection]
+    needs: [infrastructure-setup, full-codebase-deployment, health-verification, log-collection]
     if: always()
     steps:
       - name: Success Actions
-        if: needs.infrastructure-setup.result == 'success' && needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success'
+        if: needs.infrastructure-setup.result == 'success' && needs.full-codebase-deployment.result == 'success' && needs.health-verification.result == 'success'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -352,7 +354,7 @@ jobs:
               console.log('Ready to Merge label added successfully');
               
               // Add success comment with job details
-              const deploymentSummary = "## ✅ Deployment Successful\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ✅ Success | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip }} |\n| Ansible Deployment | ✅ Success | ${{ needs.ansible-deployment.outputs.deployment_status }} |\n| Health Verification | ✅ Success | Process: ${{ needs.health-verification.outputs.process_status }} |\n| Log Collection | ✅ Success | Logs captured successfully |\n\n🚀 **Bot Status:** The bot has been successfully deployed and is responding to Discord.\n\n**Next Steps:** Add the `merge` label to trigger the merge workflow.";
+              const deploymentSummary = "## ✅ Full Deployment Successful\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ✅ Success | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip }} |\n| Full Codebase Deployment | ✅ Success | ${{ needs.full-codebase-deployment.outputs.deployment_status }} |\n| Health Verification | ✅ Success | Process: ${{ needs.health-verification.outputs.process_status }} |\n| Log Collection | ✅ Success | Logs captured successfully |\n\n🚀 **Bot Status:** Complete codebase has been deployed and bot is responding to Discord.\n\n**Next Steps:** Add the `merge` label to trigger the merge workflow.";
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -365,7 +367,7 @@ jobs:
             }
       
       - name: Failure Actions
-        if: always() && !(needs.infrastructure-setup.result == 'success' && needs.ansible-deployment.result == 'success' && needs.health-verification.result == 'success')
+        if: always() && !(needs.infrastructure-setup.result == 'success' && needs.full-codebase-deployment.result == 'success' && needs.health-verification.result == 'success')
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -403,10 +405,10 @@ jobs:
               // Determine failure point
               const failureDetails = [];
               if ('${{ needs.infrastructure-setup.result }}' === 'failure') failureDetails.push('Infrastructure Setup');
-              if ('${{ needs.ansible-deployment.result }}' === 'failure') failureDetails.push('Ansible Deployment');
+              if ('${{ needs.full-codebase-deployment.result }}' === 'failure') failureDetails.push('Full Codebase Deployment');
               if ('${{ needs.health-verification.result }}' === 'failure') failureDetails.push('Health Verification');
               
-              const failureSummary = "## ❌ Deployment Failed\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ${{ needs.infrastructure-setup.result == 'success' && '✅ Success' || '❌ Failed' }} | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip || 'Not available' }} |\n| Ansible Deployment | ${{ needs.ansible-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} | ${{ needs.ansible-deployment.outputs.deployment_status || 'Failed' }} |\n| Health Verification | ${{ needs.health-verification.result == 'success' && '✅ Success' || '❌ Failed' }} | Process: ${{ needs.health-verification.outputs.process_status || 'Unknown' }} |\n\n**Failed phases:** " + (failureDetails.join(', ') || 'Multiple phases failed') + "\n\n**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.";
+              const failureSummary = "## ❌ Full Deployment Failed\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ${{ needs.infrastructure-setup.result == 'success' && '✅ Success' || '❌ Failed' }} | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip || 'Not available' }} |\n| Full Codebase Deployment | ${{ needs.full-codebase-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} | ${{ needs.full-codebase-deployment.outputs.deployment_status || 'Failed' }} |\n| Health Verification | ${{ needs.health-verification.result == 'success' && '✅ Success' || '❌ Failed' }} | Process: ${{ needs.health-verification.outputs.process_status || 'Unknown' }} |\n\n**Failed phases:** " + (failureDetails.join(', ') || 'Multiple phases failed') + "\n\n**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.";
               
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
