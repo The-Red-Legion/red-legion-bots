@@ -25,6 +25,7 @@ class TestMiningCommands(app_commands.Group):
         try:
             from config.settings import get_database_url, get_sunday_mining_channels
             from database.operations import create_mining_event, save_mining_participation
+            from database.connection import resolve_database_url
             import psycopg2
             from urllib.parse import urlparse
             
@@ -68,15 +69,9 @@ class TestMiningCommands(app_commands.Group):
                 default_channels = ['alpha', 'bravo', 'charlie', 'delta']
                 channel_ids = [f'test_channel_{i}' for i in range(len(default_channels))]
                 
-                # Add test channels to database
-                parsed = urlparse(db_url)
-                conn = psycopg2.connect(
-                    host=parsed.hostname,
-                    database=parsed.path[1:],
-                    user=parsed.username,
-                    password=parsed.password,
-                    port=parsed.port or 5432
-                )
+                # Add test channels to database using resolved URL
+                resolved_url = resolve_database_url(db_url)
+                conn = psycopg2.connect(resolved_url)
                 
                 with conn.cursor() as cursor:
                     for i, channel_name in enumerate(default_channels):
@@ -99,15 +94,9 @@ class TestMiningCommands(app_commands.Group):
             test_users = []
             base_time = datetime.now() - timedelta(hours=hours_ago)
             
-            # Create test users in database first
-            parsed = urlparse(db_url)
-            conn = psycopg2.connect(
-                host=parsed.hostname,
-                database=parsed.path[1:],
-                user=parsed.username,
-                password=parsed.password,
-                port=parsed.port or 5432
-            )
+            # Create test users in database first using resolved URL
+            resolved_url = resolve_database_url(db_url)
+            conn = psycopg2.connect(resolved_url)
             
             with conn.cursor() as cursor:
                 for i in range(participants):
@@ -233,6 +222,7 @@ class TestMiningCommands(app_commands.Group):
                 return
             
             from config.settings import get_database_url
+            from database.connection import resolve_database_url
             import psycopg2
             from urllib.parse import urlparse
             
@@ -243,14 +233,8 @@ class TestMiningCommands(app_commands.Group):
                 await interaction.followup.send("❌ Database connection not available", ephemeral=True)
                 return
             
-            parsed = urlparse(db_url)
-            conn = psycopg2.connect(
-                host=parsed.hostname,
-                database=parsed.path[1:],
-                user=parsed.username,
-                password=parsed.password,
-                port=parsed.port or 5432
-            )
+            resolved_url = resolve_database_url(db_url)
+            conn = psycopg2.connect(resolved_url)
             
             deleted_counts = {}
             
@@ -328,6 +312,7 @@ class TestMiningCommands(app_commands.Group):
         """Show current test data status"""
         try:
             from config.settings import get_database_url
+            from database.connection import resolve_database_url
             import psycopg2
             from urllib.parse import urlparse
             
@@ -336,14 +321,8 @@ class TestMiningCommands(app_commands.Group):
                 await interaction.response.send_message("❌ Database connection not available", ephemeral=True)
                 return
             
-            parsed = urlparse(db_url)
-            conn = psycopg2.connect(
-                host=parsed.hostname,
-                database=parsed.path[1:],
-                user=parsed.username,
-                password=parsed.password,
-                port=parsed.port or 5432
-            )
+            resolved_url = resolve_database_url(db_url)
+            conn = psycopg2.connect(resolved_url)
             
             counts = {}
             
