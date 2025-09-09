@@ -13,8 +13,9 @@ from handlers.voice_tracking import set_bot_instance, add_tracked_channel, join_
 class SundayMiningTester:
     """Comprehensive testing for Sunday Mining functionality."""
     
-    def __init__(self, bot):
+    def __init__(self, bot, guild=None):
         self.bot = bot
+        self.guild = guild
         self.test_results = {}
     
     async def run_comprehensive_test(self, interaction: discord.Interaction):

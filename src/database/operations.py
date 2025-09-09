@@ -830,8 +830,8 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
         with conn.cursor() as cursor:
             # Check if event already exists for this date and guild
             cursor.execute("""
-                SELECT event_id FROM mining_events 
-                WHERE guild_id = %s AND event_date = %s AND is_active = true
+                SELECT event_id FROM events 
+                WHERE guild_id = %s AND event_date = %s AND is_open = true
                 LIMIT 1
             """, (str(guild_id), event_date))
             
@@ -843,95 +843,32 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
             # Generate prefixed event ID
             prefixed_event_id = generate_prefixed_event_id('mining')
             
-            # Ensure ID is unique by checking database
-            max_attempts = 10
-            for attempt in range(max_attempts):
-                cursor.execute("SELECT COUNT(*) FROM mining_events WHERE event_id = %s", (prefixed_event_id,))
-                if cursor.fetchone()[0] == 0:
-                    break  # ID is unique
-                prefixed_event_id = generate_prefixed_event_id('mining')
-                if attempt == max_attempts - 1:
-                    print(f"❌ Could not generate unique event ID after {max_attempts} attempts")
-                    return None
+            # Since the events table uses integer event_id, skip the prefixed ID check
+            # We'll let the database handle auto-incrementing and format for display later
+            print(f"🔍 Using events table with integer event_id")
             
             # Create new event - using flexible column structure
             print(f"🔍 Attempting to create event with guild_id={guild_id}, event_id='{prefixed_event_id}', name='{event_name}', date={event_date}")
             
-            # Skip the prefixed ID approach since database uses integer event_id
-            # Go directly to the working schema based on diagnostics
-            try:
-                print(f"🔄 Creating event using current database schema (integer event_id)")
-                cursor.execute("""
-                    INSERT INTO mining_events (
-                        guild_id, name, event_date, event_type, status, 
-                        start_time, is_active, created_at, updated_at
-                    ) VALUES (
-                        %s, %s, %s, 'mining', 'active', 
-                        %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                    ) RETURNING event_id
-                """, (
-                    str(guild_id), 
-                    event_name, 
-                    event_date,
-                    datetime.now()
-                ))
-                integer_event_id = cursor.fetchone()[0]
-                # Convert to prefixed format for display consistency
-                returned_event_id = f"sm-{integer_event_id:06d}"
-                print(f"✅ Created event using current schema, integer_id: {integer_event_id} -> display_id: {returned_event_id}")
-                
-            except Exception as schema_error:
-                print(f"⚠️ New schema with prefixed ID failed: {schema_error}")
-                print(f"🔄 Trying legacy schema with integer ID...")
-                
-                # Fallback to legacy schema format (auto-incrementing integer id)
-                # This will return an integer ID instead of prefixed string
-                try:
-                    print(f"🔄 Attempting legacy schema INSERT...")
-                    cursor.execute("""
-                        INSERT INTO mining_events (
-                            guild_id, name, event_date, event_type, status, 
-                            start_time, is_active, created_at, updated_at
-                        ) VALUES (
-                            %s, %s, %s, 'mining', 'active', 
-                            %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                        ) RETURNING event_id
-                    """, (
-                        str(guild_id), 
-                        event_name, 
-                        event_date,
-                        datetime.now()
-                    ))
-                    legacy_event_id = cursor.fetchone()[0]
-                    
-                    # Convert integer ID to prefixed format for consistency
-                    returned_event_id = f"sm-{legacy_event_id:06d}"  # sm-000001 format
-                    print(f"✅ Created event using legacy schema format, id: {legacy_event_id} -> prefixed: {returned_event_id}")
-                    
-                except Exception as legacy_error:
-                    print(f"❌ Both new and legacy schema formats failed")
-                    print(f"New schema error: {schema_error}")
-                    print(f"Legacy schema error: {legacy_error}")
-                    # Try one more fallback - very basic insert
-                    try:
-                        print(f"🔄 Attempting basic schema INSERT as final fallback...")
-                        cursor.execute("""
-                            INSERT INTO mining_events (guild_id, name, event_date, status, is_active)
-                            VALUES (%s, %s, %s, 'active', true)
-                            RETURNING event_id
-                        """, (str(guild_id), event_name, event_date))
-                        basic_event_id = cursor.fetchone()[0]
-                        returned_event_id = f"sm-{basic_event_id:06d}"
-                        print(f"✅ Created event using basic schema, id: {basic_event_id} -> prefixed: {returned_event_id}")
-                    except Exception as basic_error:
-                        print(f"❌ All schema formats failed:")
-                        print(f"  - New schema: {schema_error}")
-                        print(f"  - Legacy schema: {legacy_error}")
-                        print(f"  - Basic schema: {basic_error}")
-                        return None
+            # Use the actual events table schema from diagnostics
+            print(f"🔄 Creating event using events table (integer event_id)")
+            cursor.execute("""
+                INSERT INTO events (
+                    guild_id, name, event_date, is_open
+                ) VALUES (
+                    %s, %s, %s, true
+                ) RETURNING event_id
+            """, (
+                str(guild_id), 
+                event_name, 
+                event_date
+            ))
+            integer_event_id = cursor.fetchone()[0]
+            # Convert to prefixed format for display consistency
+            returned_event_id = f"sm-{integer_event_id:06d}"
+            print(f"✅ Created event using events table, integer_id: {integer_event_id} -> display_id: {returned_event_id}")
             
             conn.commit()
-            
             print(f"✅ Created mining event {returned_event_id} for guild {guild_id} on {event_date}")
             return returned_event_id
             

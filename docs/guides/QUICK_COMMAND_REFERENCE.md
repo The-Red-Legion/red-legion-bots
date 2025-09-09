@@ -28,15 +28,18 @@ This document provides a comprehensive reference for all available commands in t
 ## ⛏️ Mining Commands
 
 ### `/redsundayminingstart`
-**Description:** Start a Sunday mining session with voice tracking  
+**Description:** Start a Sunday mining session with enhanced voice tracking and database integration  
 **Usage:** `/redsundayminingstart`  
 **Permissions:** Organization members  
 **Features:**
-- Creates database event for tracking
-- Starts voice channel monitoring across 7 mining channels
-- Bot joins Dispatch/Main channel as visual indicator
-- Tracks participant join/leave times
-- Generates session ID and event ID for reference
+- Creates database event with prefixed Event ID (sm-YYYYMMDD-HHMMSS format)
+- Starts real-time voice channel monitoring across all 7 configured mining channels
+- Bot joins Dispatch/Main channel as visual activity indicator
+- Tracks participant join/leave timestamps with 30-second minimum participation
+- Enhanced member listing showing current voice channel occupancy
+- Database event integration for seamless payroll calculation workflow
+- Automatic channel detection for Dispatch/Main channel (supports both naming conventions)
+- Comprehensive error reporting with specific channel ID validation
 
 ### `/redsundayminingstop` 
 **Description:** Stop the current Sunday mining session  
@@ -50,37 +53,62 @@ This document provides a comprehensive reference for all available commands in t
 - Bot leaves all voice channels
 
 ### `/redpayroll`
-**Description:** Calculate and manage Sunday mining payroll distribution  
+**Description:** Enhanced payroll calculation and management system with donation support  
 **Usage:** `/redpayroll [action]`  
 **Permissions:** Admin/OrgLeaders only  
 **Options:**
-- `Calculate Payroll` - Calculate earnings distribution with modal form
-- `View Participation Summary` - Show participation statistics
-- `Show Current Ore Prices` - Display live UEX market prices with best locations
+- `Calculate Payroll` - Multi-step enhanced payroll calculation with donation system
+- `View Participation Summary` - Show detailed participation statistics and time breakdown
+- `Show Current Ore Prices` - Display live UEX market prices with consistent location data
 
-**Features:**
-- Interactive ore amount input form with current market prices
-- Real-time UEX price integration with location data
-- Participation-based profit sharing calculations
-- PDF report generation for record keeping
-- Voice time tracking integration
-- Cached price data for performance
+**Enhanced Payroll Features:**
+- **Step 1: Event Selection** - Choose from available Sunday Mining events with prefixed IDs (sm-)
+- **Step 2: Donation Selection** - Interactive participant donation system allowing voluntary earnings donation
+- **Step 3: Price Configuration** - Editable UEX ore prices with real-time market data integration
+- **Step 4: Final Calculation** - Complete profit distribution with donation tracking and detailed breakdowns
+
+**Advanced Features:**
+- Participation-based time-weighted profit sharing calculations
+- Voluntary donation system where participants can donate earnings back to organization
+- Real-time UEX price integration with manual override capabilities
+- PDF report generation with donation tracking and detailed participant breakdowns
+- Voice channel time tracking integration across all 7 mining channels
+- Cached price data with 24-hour refresh cycle for optimal performance
+- Event ID prefix system integration (sm- for Sunday Mining events)
 
 ### `/redpricecheck`
 **Description:** Check live ore prices and best selling locations from UEX API  
 **Usage:** `/redpricecheck [category]`  
 **Permissions:** Anyone  
 **Options:**
-- `ores` - Mineable ores (default)
+- `ores` - Mineable ores (default) - Shows all 19 configured ore types
 - `all` - All commodities  
 - `high_value` - High value commodities only
 
 **Features:**
-- Live UEX market data with location information
-- Shows highest price per SCU and best selling location
-- Cached data for improved performance
-- Clean formatting with commodity indicators
-- Price statistics and market overview
+- Live UEX market data with highest available prices
+- Shows all configured mineable ores (Quantainium, Gold, Iron, etc.)
+- Cached data updated every 24 hours for performance
+- Clean formatting with commodity indicators and price statistics
+- Displays UEX highest price information
+- Comprehensive ore coverage including high, mid, and low value ores
+
+### `/redpricerefresh`
+**Description:** Force refresh UEX price data immediately bypassing 24-hour cache  
+**Usage:** `/redpricerefresh [category]`  
+**Permissions:** Admin/OrgLeaders only  
+**Options:**
+- `ores` - Refresh mineable ores (default)
+- `all` - Refresh all commodities  
+- `high_value` - Refresh high value commodities only
+
+**Features:**
+- Overrides normal 24-hour cache refresh cycle
+- Shows before/after cache statistics
+- Displays sample of updated prices after successful refresh  
+- Detailed status reporting with cache age and validity
+- Essential for getting fresh prices before payroll calculations
+- Permission-controlled to prevent API abuse
 
 ### `/redsundayminingtest`
 **Description:** Run diagnostics for Sunday Mining voice channel issues  
@@ -93,6 +121,21 @@ This document provides a comprehensive reference for all available commands in t
 - `permissions` - Bot permission checks
 - `connection` - Voice connection tests
 - `guild` - Guild configuration validation
+
+### `/redeventdiagnostics`
+**Description:** Comprehensive event system diagnostics and troubleshooting  
+**Usage:** `/redeventdiagnostics`  
+**Permissions:** Admin only  
+**Features:**
+- Complete database schema validation and table structure analysis
+- Event ID system testing with prefix validation
+- Database connection and query performance testing
+- Mining channel configuration verification
+- Voice channel accessibility and permission checks
+- Event creation and management system testing
+- Detailed error reporting with actionable troubleshooting steps
+- Schema compatibility detection (integer vs VARCHAR event_id handling)
+- Mining event history analysis and validation
 
 ---
 
@@ -284,19 +327,22 @@ This document provides a comprehensive reference for all available commands in t
 - Shows sync results
 
 ### `/redtestmining`
-**Description:** Manage test data for bot testing  
+**Description:** Manage test data for bot testing and development  
 **Usage:** `/redtestmining [action]`  
 **Permissions:** Admin only  
 **Options:**
-- `create` - Create comprehensive test data
-- `show` - Display current test data
-- `delete` - Remove all test data (requires confirmation)
+- `create` - Create comprehensive test data with prefixed event IDs
+- `show` - Display current test data and event summary
+- `delete` - Remove all test data with confirmation dialog
 
-**Test Data Created:**
-- Multiple mining events (past, current, future)
-- Participation records across all 7 mining channels
-- Test participants with varying participation times
-- Realistic mining scenarios for testing
+**Test Data Features:**
+- Multiple mining events with proper prefixed IDs (sm-, op-, tr-, etc.)
+- Participation records across all 7 configured mining channels  
+- Test participants with realistic varying participation times (30s-3hrs)
+- Complete mining scenarios including past, current, and future events
+- Database schema compatibility testing for both integer and VARCHAR event_id
+- Voice channel participation tracking simulation
+- Payroll calculation test scenarios with multiple participant combinations
 
 ---
 
