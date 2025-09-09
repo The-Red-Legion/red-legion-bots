@@ -1087,8 +1087,12 @@ class SundayMiningCommands(commands.Cog):
                         
                         for commodity in data.get('data', []):
                             commodity_name = commodity.get('name', '').upper()
-                            price_sell = float(commodity.get('price_sell', 0))
-                            price_buy = float(commodity.get('price_buy', 0))
+                            price_sell_raw = commodity.get('price_sell')
+                            price_buy_raw = commodity.get('price_buy')
+                            
+                            # Handle None values
+                            price_sell = float(price_sell_raw) if price_sell_raw is not None else 0.0
+                            price_buy = float(price_buy_raw) if price_buy_raw is not None else 0.0
                             
                             # Filter by category
                             include_commodity = False
@@ -1592,7 +1596,13 @@ async def setup(bot):
     from handlers.voice_tracking import set_bot_instance
     set_bot_instance(bot)
     
-    await bot.add_cog(SundayMiningCommands(bot))
+    cog = SundayMiningCommands(bot)
+    await bot.add_cog(cog)
+    
+    # Debug: List the commands in this cog
+    print(f"✅ Mining cog loaded with {len(cog.get_app_commands())} app commands:")
+    for cmd in cog.get_app_commands():
+        print(f"  • {cmd.name} - {cmd.description}")
 
 
 # Legacy function for command registration compatibility

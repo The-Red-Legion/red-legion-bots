@@ -113,67 +113,7 @@ class Admin(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"❌ Failed to restart bot: {str(e)}")
 
-    @app_commands.command(name="redaddminingchannel", description="Add a mining channel to the Red Legion system (Admin only)")
-    @app_commands.describe(channel="Voice channel to add for mining tracking")
-    @app_commands.default_permissions(administrator=True)
-    async def add_mining_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
-        """Add a voice channel to the mining system"""
-        try:
-            # This would integrate with the mining channel management system
-            embed = discord.Embed(
-                title="✅ Red Legion Mining Channel Added",
-                description=f"Successfully added {channel.mention} to the mining system",
-                color=discord.Color.green()
-            )
-            
-            embed.add_field(
-                name="Channel Info",
-                value=f"**Name:** {channel.name}\\n"
-                      f"**ID:** {channel.id}\\n"
-                      f"**Category:** {channel.category.name if channel.category else 'None'}",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="Added By",
-                value=f"{interaction.user.display_name}",
-                inline=True
-            )
-            
-            await interaction.response.send_message(embed=embed)
-            
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Failed to add mining channel: {str(e)}")
-
-    @app_commands.command(name="redremoveminingchannel", description="Remove a mining channel from the Red Legion system (Admin only)")
-    @app_commands.describe(channel="Voice channel to remove from mining tracking")
-    @app_commands.default_permissions(administrator=True)
-    async def remove_mining_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
-        """Remove a voice channel from the mining system"""
-        try:
-            embed = discord.Embed(
-                title="🗑️ Red Legion Mining Channel Removed",
-                description=f"Successfully removed {channel.mention} from the mining system",
-                color=discord.Color.orange()
-            )
-            
-            embed.add_field(
-                name="Channel Info",
-                value=f"**Name:** {channel.name}\\n"
-                      f"**ID:** {channel.id}",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="Removed By",
-                value=f"{interaction.user.display_name}",
-                inline=True
-            )
-            
-            await interaction.response.send_message(embed=embed)
-            
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Failed to remove mining channel: {str(e)}")
+# Mining channel commands removed as they are no longer needed
 
     @app_commands.command(name="redlistminingchannels", description="List all Red Legion mining channels (Admin only)")
     @app_commands.default_permissions(administrator=True)
@@ -218,6 +158,49 @@ class Admin(commands.Cog):
             
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed to list mining channels: {str(e)}")
+
+    @app_commands.command(name="redsyncommands", description="Force sync Discord slash commands (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def sync_commands(self, interaction: discord.Interaction):
+        """Force sync Discord slash commands"""
+        try:
+            await interaction.response.defer()
+            
+            # Sync commands
+            synced = await self.bot.tree.sync()
+            
+            embed = discord.Embed(
+                title="🔄 Command Sync Complete",
+                description=f"Successfully synced {len(synced)} slash commands with Discord",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+            
+            # List some of the synced commands
+            if synced:
+                command_list = []
+                for i, cmd in enumerate(synced[:10]):  # Show first 10
+                    command_list.append(f"• {cmd.name}")
+                
+                if len(synced) > 10:
+                    command_list.append(f"• ... and {len(synced) - 10} more")
+                
+                embed.add_field(
+                    name="Synced Commands",
+                    value="\n".join(command_list),
+                    inline=False
+                )
+            
+            embed.add_field(
+                name="⏰ Note",
+                value="Discord may take a few minutes to update the slash command menu",
+                inline=False
+            )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(f"❌ Failed to sync commands: {str(e)}")
 
 
 async def setup(bot):

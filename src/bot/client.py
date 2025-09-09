@@ -52,6 +52,7 @@ class RedLegionBot(commands.Bot):
                 'commands.loans_subcommand',   # /redloans request|status (subcommand group)
                 'commands.join_subcommand',    # /redjoin apply|status|withdraw (subcommand group)
                 'commands.mining.core',        # /redsundayminingstart, /redpayroll, etc.
+                'commands.test_mining',        # /redtestmining create|delete|status (test commands)
             ]
             
             for extension in extensions:

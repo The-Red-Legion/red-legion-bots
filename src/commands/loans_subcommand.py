@@ -135,9 +135,13 @@ class RedLoansGroup(app_commands.Group):
     async def request_loan(self, interaction: discord.Interaction, amount: int, purpose: str, repayment_plan: str = None):
         """Request a loan from the organization"""
         try:
-            from ..database.database import Database
+            from config.settings import get_database_url
+            from database import issue_loan, get_user_loans
             
-            db = Database()
+            db_url = get_database_url()
+            if not db_url:
+                await interaction.response.send_message("❌ Database connection not available", ephemeral=True)
+                return
             
             # Validate amount
             if amount <= 0:
@@ -145,21 +149,22 @@ class RedLoansGroup(app_commands.Group):
                 return
             
             # Check for existing pending loans
-            existing = await db.get_user_pending_loans(str(interaction.guild_id), str(interaction.user.id))
+            existing = get_user_loans(db_url, interaction.user.id, interaction.guild.id)
             if existing:
                 embed = discord.Embed(
                     title="❌ Existing Loan Found",
                     description="You already have a pending or active loan.",
                     color=discord.Color.red()
                 )
-                embed.add_field(name="Existing Loan ID", value=f"`{existing[0]['loan_id']}`", inline=True)
-                embed.add_field(name="Status", value=existing[0]['status'].title(), inline=True)
+                loan_id, amount, issued_date, due_date, status, paid_amount, interest_rate = existing[0]
+                embed.add_field(name="Existing Loan ID", value=f"`{loan_id}`", inline=True)
+                embed.add_field(name="Status", value=status.title(), inline=True)
+                embed.add_field(name="Amount", value=f"{amount:,.0f} aUEC", inline=True)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
             
-            # Get loan settings
-            settings = await db.get_loan_settings(str(interaction.guild_id))
-            max_amount = settings.get('max_loan_amount', 1000000) if settings else 1000000
+            # Set default loan settings (could be made configurable later)
+            max_amount = 1000000  # 1M aUEC default max
             
             if amount > max_amount:
                 await interaction.response.send_message(
@@ -168,57 +173,64 @@ class RedLoansGroup(app_commands.Group):
                 )
                 return
             
-            # Calculate interest (if applicable)
-            interest_rate = float(settings.get('default_interest_rate', 0.05)) if settings else 0.05
+            # Calculate interest (could be made configurable later)
+            interest_rate = 0.05  # 5% default interest
             interest_amount = amount * interest_rate if interest_rate > 0 else 0
             total_repayment = amount + interest_amount
             
-            # Create loan data
-            loan_data = {
-                'guild_id': str(interaction.guild_id),
-                'borrower_id': str(interaction.user.id),
-                'borrower_name': interaction.user.display_name,
-                'amount': amount,
-                'purpose': purpose,
-                'repayment_plan': repayment_plan,
-                'interest_rate': interest_rate,
-                'interest_amount': interest_amount,
-                'total_amount': total_repayment,
-                'status': 'pending'
-            }
+            # Issue the loan (for now, auto-approve. Could add approval workflow later)
+            from datetime import date, timedelta
+            issued_date = date.today()
+            due_date = issued_date + timedelta(days=30)  # 30 days default
             
-            # Create confirmation embed
-            embed = discord.Embed(
-                title="💰 Loan Request Confirmation",
-                description="Please review your loan request details:",
-                color=discord.Color.blue(),
-                timestamp=datetime.now(timezone.utc)
+            loan_id = issue_loan(
+                db_url,
+                interaction.user.id,
+                interaction.guild.id,
+                amount,
+                issued_date,
+                due_date,
+                interest_rate
             )
             
-            embed.add_field(name="Requested Amount", value=f"{amount:,} UEC", inline=True)
-            if interest_amount > 0:
-                embed.add_field(name="Interest", value=f"{interest_amount:,.2f} UEC ({interest_rate*100:.1f}%)", inline=True)
-                embed.add_field(name="Total Repayment", value=f"{total_repayment:,.2f} UEC", inline=True)
+            if loan_id:
+                # Create success embed
+                embed = discord.Embed(
+                    title="✅ Loan Approved",
+                    description=f"Your loan has been approved and issued!",
+                    color=discord.Color.green(),
+                    timestamp=datetime.now(timezone.utc)
+                )
+                
+                embed.add_field(name="Loan ID", value=f"`{loan_id}`", inline=True)
+                embed.add_field(name="Amount", value=f"{amount:,} aUEC", inline=True)
+                embed.add_field(name="Due Date", value=due_date.strftime("%Y-%m-%d"), inline=True)
+                
+                if interest_amount > 0:
+                    embed.add_field(name="Interest", value=f"{interest_amount:,.2f} aUEC ({interest_rate*100:.1f}%)", inline=True)
+                    embed.add_field(name="Total Repayment", value=f"{total_repayment:,.2f} aUEC", inline=True)
+                
+                embed.add_field(name="Purpose", value=purpose, inline=False)
+                
+                if repayment_plan:
+                    embed.add_field(name="Repayment Plan", value=repayment_plan, inline=False)
+                
+                embed.add_field(
+                    name="📋 Next Steps",
+                    value="• Use `/loans status` to check your loan details\n"
+                          "• Make payments using `/loans pay`\n"
+                          "• Contact finance officers for questions",
+                    inline=False
+                )
+            else:
+                # Create failure embed
+                embed = discord.Embed(
+                    title="❌ Loan Request Failed",
+                    description="There was an error processing your loan request. Please try again later.",
+                    color=discord.Color.red()
+                )
             
-            embed.add_field(name="Purpose", value=purpose, inline=False)
-            
-            if repayment_plan:
-                embed.add_field(name="Repayment Plan", value=repayment_plan, inline=False)
-            
-            embed.add_field(
-                name="⚠️ Important",
-                value="• Loan approval is subject to officer review\n"
-                      "• You are responsible for timely repayment\n"
-                      "• Late payments may affect future loan eligibility",
-                inline=False
-            )
-            
-            embed.set_footer(text="Confirm to submit your loan request")
-            
-            # Create confirmation view
-            view = LoanConfirmationView(loan_data)
-            
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             
         except Exception as e:
             logger.error(f"Error in loan request: {e}")
@@ -231,10 +243,15 @@ class RedLoansGroup(app_commands.Group):
     async def loan_status(self, interaction: discord.Interaction):
         """Check the status of your loans"""
         try:
-            from ..database.database import Database
+            from config.settings import get_database_url
+            from database import get_user_loans
             
-            db = Database()
-            loans = await db.get_user_loans(str(interaction.guild_id), str(interaction.user.id))
+            db_url = get_database_url()
+            if not db_url:
+                await interaction.response.send_message("❌ Database connection not available", ephemeral=True)
+                return
+            
+            loans = get_user_loans(db_url, interaction.user.id, interaction.guild.id)
             
             if not loans:
                 embed = discord.Embed(
@@ -254,6 +271,8 @@ class RedLoansGroup(app_commands.Group):
             )
             
             for loan in loans:
+                loan_id, amount, issued_date, due_date, status, paid_amount, interest_rate = loan
+                
                 status_colors = {
                     'pending': '🟡',
                     'approved': '🟢',
@@ -263,26 +282,21 @@ class RedLoansGroup(app_commands.Group):
                     'overdue': '⚠️'
                 }
                 
-                status_emoji = status_colors.get(loan['status'], '⚪')
+                status_emoji = status_colors.get(status, '⚪')
                 
-                value = f"**Amount:** {loan['amount']:,} UEC\n"
-                value += f"**Status:** {status_emoji} {loan['status'].title()}\n"
+                value = f"**Amount:** {amount:,} aUEC\n"
+                value += f"**Status:** {status_emoji} {status.title()}\n"
                 
-                if loan['status'] == 'active':
-                    remaining = loan['total_amount'] - loan.get('amount_paid', 0)
-                    value += f"**Remaining:** {remaining:,.2f} UEC\n"
-                    
-                    if loan.get('due_date'):
-                        due_date = datetime.fromisoformat(str(loan['due_date']))
-                        value += f"**Due:** <t:{int(due_date.timestamp())}:D>\n"
+                if status == 'active':
+                    remaining = amount - paid_amount
+                    value += f"**Remaining:** {remaining:,.2f} aUEC\n"
+                    value += f"**Due:** {due_date.strftime('%Y-%m-%d')}\n"
                 
-                if loan.get('approved_by_name'):
-                    value += f"**Approved by:** {loan['approved_by_name']}\n"
-                
-                value += f"**Purpose:** {loan['purpose']}"
+                if interest_rate > 0:
+                    value += f"**Interest:** {interest_rate*100:.1f}%\n"
                 
                 embed.add_field(
-                    name=f"Loan #{loan['loan_id']}",
+                    name=f"Loan #{loan_id}",
                     value=value,
                     inline=True
                 )
