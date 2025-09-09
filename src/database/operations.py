@@ -44,7 +44,7 @@ def generate_prefixed_event_id(event_type: str = 'mining', length: int = 6) -> s
     
     # Generate random alphanumeric suffix (excluding confusing characters)
     chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    chars = chars.replace('o', '').replace('0', '').replace('l', '').replace('1')  # Remove confusing chars
+    chars = chars.replace('o', '').replace('0', '').replace('l', '').replace('1', '')  # Remove confusing chars
     
     suffix = ''.join(random.choice(chars) for _ in range(length))
     
@@ -304,10 +304,10 @@ def get_mining_channels_dict(database_url, guild_id):
         
         # Query mining channels for the guild
         c.execute('''
-            SELECT channel_name, channel_id 
+            SELECT name, channel_id 
             FROM mining_channels 
             WHERE guild_id = %s AND is_active = TRUE
-            ORDER BY channel_name
+            ORDER BY name
         ''', (guild_id,))
         
         rows = c.fetchall()
@@ -490,7 +490,7 @@ def remove_mining_channel(database_url, guild_id, channel_id):
         with conn.cursor() as cursor:
             # Check if channel exists
             cursor.execute("""
-                SELECT channel_name FROM mining_channels 
+                SELECT name FROM mining_channels 
                 WHERE guild_id = %s AND channel_id = %s AND is_active = true
             """, (str(guild_id), str(channel_id)))
             
