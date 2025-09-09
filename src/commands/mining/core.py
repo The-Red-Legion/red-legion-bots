@@ -1162,10 +1162,10 @@ class SundayMiningCommands(commands.Cog):
         return embed
     
     async def _create_ore_prices_embed(self, ore_prices: Dict) -> discord.Embed:
-        """Create an embed showing current ore prices."""
+        """Create an embed showing current ore prices with locations."""
         embed = discord.Embed(
-            title="� Current Ore Prices",
-            description="Live prices from UEX Corp API",
+            title="💰 Current Ore Prices & Best Locations",
+            description="Live prices from UEX Corp API with highest price locations",
             color=0x3498db,
             timestamp=datetime.now()
         )
@@ -1178,6 +1178,15 @@ class SundayMiningCommands(commands.Cog):
             )
             return embed
         
+        # Get detailed price data with locations from cache
+        try:
+            from services.uex_cache import get_uex_cache
+            cache = get_uex_cache()
+            detailed_prices = await cache.get_ore_prices(category="ores")
+        except Exception as e:
+            print(f"⚠️ Could not get detailed location data: {e}")
+            detailed_prices = {}
+        
         # Sort ores by max price (highest first)
         sorted_ores = sorted(
             ore_prices.items(),
@@ -1185,46 +1194,59 @@ class SundayMiningCommands(commands.Cog):
             reverse=True
         )
         
-        # Split into chunks for multiple fields
-        chunk_size = 8
+        # Split into chunks for better readability (smaller chunks to accommodate location data)
+        chunk_size = 6
         chunks = [sorted_ores[i:i + chunk_size] for i in range(0, len(sorted_ores), chunk_size)]
         
         for i, chunk in enumerate(chunks):
             price_list = []
             for ore_key, price_data in chunk:
+                price = price_data['max_price']
+                ore_name = price_data['display_name']
+                
+                # Try to find location information
+                location_info = "Location Unknown"
+                if detailed_prices:
+                    # Look for this ore in detailed cache data
+                    for code, cache_data in detailed_prices.items():
+                        if (cache_data.get('name', '').upper() == ore_key or 
+                            code.upper() == ore_key or
+                            cache_data.get('name', '') == ore_name):
+                            
+                            # Find best location from locations array
+                            locations = cache_data.get('locations', [])
+                            if locations:
+                                # Find location with highest sell price
+                                best_location = max(locations, 
+                                                  key=lambda x: x.get('sell_price', 0))
+                                location_name = best_location.get('name', 'Unknown Location')
+                                # Truncate long location names
+                                if len(location_name) > 20:
+                                    location_name = location_name[:17] + "..."
+                                location_info = location_name
+                            break
+                
                 price_list.append(
-                    f"• **{price_data['display_name']}**: {price_data['max_price']:,.0f} aUEC/SCU"
+                    f"• **{ore_name}**: {price:,.0f} aUEC/SCU\n"
+                    f"  📍 {location_info}"
                 )
             
-            field_name = f"💰 Ore Prices ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Ore Prices"
+            field_name = f"💰 Ore Prices & Locations ({i+1}/{len(chunks)})" if len(chunks) > 1 else "💰 Ore Prices & Locations"
             embed.add_field(
                 name=field_name,
-                value="\n".join(price_list),
+                value="\n\n".join(price_list),
                 inline=True if len(chunks) > 1 else False
-            )
-        
-        # Add calculation example
-        if ore_prices:
-            total_value = sum(p['max_price'] for p in ore_prices.values())
-            embed.add_field(
-                name="📊 Price Summary",
-                value=f"• Highest: **{max(ore_prices.values(), key=lambda x: x['max_price'])['display_name']}** "
-                      f"({max(p['max_price'] for p in ore_prices.values()):,.0f} aUEC/SCU)\n"
-                      f"• Lowest: **{min(ore_prices.values(), key=lambda x: x['max_price'])['display_name']}** "
-                      f"({min(p['max_price'] for p in ore_prices.values()):,.0f} aUEC/SCU)\n"
-                      f"• Average: **{total_value/len(ore_prices):,.0f} aUEC/SCU**",
-                inline=False
             )
         
         embed.add_field(
             name="💡 Usage Tips",
-            value="• Use these prices to calculate total mining haul value\n"
-                  "• Prices update in real-time from UEX Corp\n"
-                  "• Use `/payroll calculate` and enter ore amounts to auto-calculate total value",
+            value="• Prices show the highest available sell price per location\n"
+                  "• Use `/payroll calculate` to enter ore amounts and auto-calculate total value\n"
+                  "• Prices update automatically every 4 minutes from UEX Corp",
             inline=False
         )
         
-        embed.set_footer(text="Data from UEX Corp • Prices in aUEC per SCU")
+        embed.set_footer(text="Data from UEX Corp • Cached with location data • Prices in aUEC per SCU")
         
         return embed
     
