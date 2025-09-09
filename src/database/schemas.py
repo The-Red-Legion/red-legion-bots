@@ -303,13 +303,7 @@ def init_database(database_url=None):
             CREATE INDEX IF NOT EXISTS idx_admin_actions_guild ON admin_actions(guild_id);
             CREATE INDEX IF NOT EXISTS idx_admin_actions_type ON admin_actions(action_type);
             
-            -- Add foreign key constraints after all tables are created
-            ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_event 
-                FOREIGN KEY (event_id) REFERENCES mining_events(event_id);
-            ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_user 
-                FOREIGN KEY (user_id) REFERENCES users(user_id);
-            ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_channel 
-                FOREIGN KEY (channel_id) REFERENCES mining_channels(channel_id);
+            -- Foreign key constraints will be added separately after schema creation
             """
             
             # Drop and recreate mining_participation table if it exists in corrupted state
@@ -319,9 +313,32 @@ def init_database(database_url=None):
             except Exception as e:
                 print(f"Info: mining_participation table cleanup: {e}")
             
-            cursor.execute(schema_sql)
+            # Execute schema creation with better error handling
+            print("🔧 Creating database schema...")
+            try:
+                cursor.execute(schema_sql)
+                print("✅ Schema SQL executed successfully")
+            except Exception as e:
+                print(f"❌ Schema SQL execution failed: {e}")
+                # Try to get more specific error information
+                import traceback
+                traceback.print_exc()
+                raise
             
-            # Migration queries removed - columns already defined in table creation above
+            # Add foreign key constraints with error handling
+            fk_constraints = [
+                ("fk_mining_participation_event", "ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_event FOREIGN KEY (event_id) REFERENCES mining_events(event_id)"),
+                ("fk_mining_participation_user", "ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_user FOREIGN KEY (user_id) REFERENCES users(user_id)"),
+                ("fk_mining_participation_channel", "ALTER TABLE mining_participation ADD CONSTRAINT fk_mining_participation_channel FOREIGN KEY (channel_id) REFERENCES mining_channels(channel_id)")
+            ]
+            
+            for constraint_name, constraint_sql in fk_constraints:
+                try:
+                    cursor.execute(constraint_sql)
+                    print(f"✅ Added foreign key constraint: {constraint_name}")
+                except Exception as e:
+                    print(f"⚠️ Foreign key constraint {constraint_name} failed (may already exist): {e}")
+                    # Continue with other constraints
             
         print("✅ Database schema initialized successfully")
         return True
