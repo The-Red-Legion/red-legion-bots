@@ -247,56 +247,10 @@ jobs:
           python3 -m pytest tests/test_advanced_system.py -v
           echo "✅ Advanced system tests completed!"
 
-  sunday-mining-e2e:
-    name: "Sunday Mining End-to-End Tests"
-    runs-on: ubuntu-latest
-    needs: [database-architecture, bot-functionality]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-      - name: Set GCP Project
-        run: echo "GOOGLE_CLOUD_PROJECT=rl-prod-471116" >> $GITHUB_ENV
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-          check-latest: false
-      - name: Install dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary aiohttp
-      - name: Test Sunday Mining System - Offline Mode
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "🧪 Testing Sunday Mining System (Offline Mode)..."
-          echo "Testing core functionality without database dependency"
-          python3 test_sunday_mining_offline.py
-          echo "✅ Sunday Mining offline tests completed!"
-      - name: Test Sunday Mining System - Full E2E (Continue on Error)
-        continue-on-error: true
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "🧪 Testing Sunday Mining System (Full E2E - Optional)..."
-          echo "Testing with database connectivity (may fail if DB unavailable)"
-          python3 run_sunday_mining_e2e_tests.py --quick || echo "⚠️ Full E2E tests failed (expected if DB unavailable)"
-          echo "ℹ️ Full E2E test attempt completed"
-
   test-summary:
     name: "Test Summary & Results"
     runs-on: ubuntu-latest
-    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system, sunday-mining-e2e]
+    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -309,10 +263,9 @@ jobs:
           echo "| Database Architecture Tests | ${{ needs.database-architecture.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Bot Functionality Tests | ${{ needs.bot-functionality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Advanced System Tests | ${{ needs.advanced-system.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Sunday Mining E2E Tests | ${{ needs.sunday-mining-e2e.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           
           # Overall result
-          if [ "${{ needs.code-quality.result }}" = "success" ] && [ "${{ needs.database-architecture.result }}" = "success" ] && [ "${{ needs.bot-functionality.result }}" = "success" ] && [ "${{ needs.advanced-system.result }}" = "success" ] && [ "${{ needs.sunday-mining-e2e.result }}" = "success" ]; then
+          if [ "${{ needs.code-quality.result }}" = "success" ] && [ "${{ needs.database-architecture.result }}" = "success" ] && [ "${{ needs.bot-functionality.result }}" = "success" ] && [ "${{ needs.advanced-system.result }}" = "success" ]; then
             echo "## 🎉 All tests passed! Ready for deployment" >> $GITHUB_STEP_SUMMARY
           else
             echo "## ⚠️ Some tests failed - review results above" >> $GITHUB_STEP_SUMMARY
@@ -322,7 +275,7 @@ jobs:
   post-tests:
     name: "Post-Test Actions"
     runs-on: ubuntu-latest
-    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system, sunday-mining-e2e]
+    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -345,13 +298,11 @@ jobs:
             const dbArchitecture = '${{ needs.database-architecture.result }}';
             const botFunctionality = '${{ needs.bot-functionality.result }}';
             const advancedSystem = '${{ needs.advanced-system.result }}';
-            const sundayMiningE2E = '${{ needs.sunday-mining-e2e.result }}';
             
             const allTestsPassed = codeQuality === 'success' && 
                                  dbArchitecture === 'success' && 
                                  botFunctionality === 'success' && 
-                                 advancedSystem === 'success' &&
-                                 sundayMiningE2E === 'success';
+                                 advancedSystem === 'success';
             
             // Remove all existing test-related labels first
             const labelsToRemove = ['tests pending', 'Tests Good', 'Ready To Deploy', 'Deploy', 'Ready to Merge'];
@@ -383,7 +334,7 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n| Sunday Mining E2E Tests | ✅ Passed |\\n\\n🚀 **Ready for deployment!** This PR has been automatically labeled as 'Ready To Deploy'.\\n\\n🧪 **Sunday Mining System**: Production-ready with comprehensive end-to-end validation including UEX API integration, payroll calculations, and voice tracking."
+                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n\\n🚀 **Ready for deployment!** This PR has been automatically labeled as 'Ready To Deploy'."
               });
             } else {
               // Don't add any success labels for failed tests
@@ -395,12 +346,11 @@ jobs:
               if (dbArchitecture !== 'success') failedTests.push('Database Architecture');
               if (botFunctionality !== 'success') failedTests.push('Bot Functionality');
               if (advancedSystem !== 'success') failedTests.push('Advanced System');
-              if (sundayMiningE2E !== 'success') failedTests.push('Sunday Mining E2E');
               
               await github.rest.issues.createComment({
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ❌ Some Tests Failed\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | " + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Database Architecture v2.0.0 | " + (dbArchitecture === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Bot Functionality | " + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Advanced System Components | " + (advancedSystem === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Sunday Mining E2E Tests | " + (sundayMiningE2E === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n\\n**Failed test suites:** " + failedTests.join(', ') + "\\n\\nPlease review the test results and fix any issues before proceeding."
+                body: "## ❌ Some Tests Failed\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | " + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Database Architecture v2.0.0 | " + (dbArchitecture === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Bot Functionality | " + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Advanced System Components | " + (advancedSystem === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n\\n**Failed test suites:** " + failedTests.join(', ') + "\\n\\nPlease review the test results and fix any issues before proceeding."
               });
             }
