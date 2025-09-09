@@ -1422,14 +1422,22 @@ class SundayMiningCommands(commands.Cog):
             # Create success embed
             embed = discord.Embed(
                 title="🚀 Sunday Mining Session Started",
-                description=f"Session ID: `{session_id}`",
+                description="Voice tracking and participation logging is now active",
                 color=0x00ff00,
                 timestamp=datetime.now()
             )
             
+            session_details = f"• Started: <t:{int(datetime.now().timestamp())}:t>\n• Status: Active tracking"
+            
+            if event_id:
+                session_details += f"\n• **Event ID**: `{event_id}` (for payroll reference)"
+            else:
+                session_details += f"\n• **Session ID**: `{session_id}` (local tracking only)"
+                session_details += f"\n• ⚠️ Database event creation failed - check logs"
+            
             embed.add_field(
                 name="📊 Session Details",
-                value=f"• Started: <t:{int(datetime.now().timestamp())}:t>\n• Status: Active tracking",
+                value=session_details,
                 inline=False
             )
             
@@ -2448,6 +2456,191 @@ class SundayMiningCommands(commands.Cog):
         except Exception as e:
             await interaction.followup.send(
                 f"❌ Error running diagnostics: {str(e)}",
+                ephemeral=True
+            )
+    
+    @app_commands.command(name="redeventdiagnostics", description="Debug event creation and retrieval (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def event_diagnostics(self, interaction: discord.Interaction):
+        """Diagnose event creation and retrieval issues."""
+        try:
+            await interaction.response.defer()
+            
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
+            from database.operations import get_open_mining_events
+            import psycopg2
+            
+            db_url = get_database_url()
+            guild_id = interaction.guild.id
+            
+            embed = discord.Embed(
+                title="🔍 Event Diagnostics",
+                description=f"Checking event creation and retrieval for guild {guild_id}",
+                color=discord.Color.blue(),
+                timestamp=datetime.now()
+            )
+            
+            if not db_url:
+                embed.add_field(
+                    name="❌ Database Connection",
+                    value="No database URL available",
+                    inline=False
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Test database connection
+            try:
+                resolved_url = resolve_database_url(db_url)
+                conn = psycopg2.connect(resolved_url)
+                cursor = conn.cursor()
+                
+                embed.add_field(
+                    name="✅ Database Connection",
+                    value="Successfully connected to database",
+                    inline=False
+                )
+                
+                # Check mining_events table schema
+                cursor.execute("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'mining_events' 
+                    ORDER BY ordinal_position
+                """)
+                
+                schema_info = cursor.fetchall()
+                schema_text = "\n".join([f"• {row[0]}: {row[1]}" for row in schema_info])
+                
+                embed.add_field(
+                    name="📋 Table Schema",
+                    value=f"```\n{schema_text[:800]}{'...' if len(schema_text) > 800 else ''}\n```",
+                    inline=False
+                )
+                
+                # Check recent events in this guild
+                cursor.execute("""
+                    SELECT event_id, guild_id, COALESCE(name, event_name) as name, 
+                           status, event_date, created_at 
+                    FROM mining_events 
+                    WHERE guild_id = %s AND created_at >= NOW() - INTERVAL '7 days'
+                    ORDER BY created_at DESC 
+                    LIMIT 5
+                """, (str(guild_id),))
+                
+                recent_events = cursor.fetchall()
+                
+                if recent_events:
+                    events_text = []
+                    for event in recent_events:
+                        events_text.append(
+                            f"• ID: `{event[0]}` | Status: `{event[3]}` | Date: {event[4]} | Name: {event[2]}"
+                        )
+                    embed.add_field(
+                        name="📅 Recent Events (Last 7 Days)",
+                        value="\n".join(events_text),
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="📅 Recent Events (Last 7 Days)",
+                        value="❌ No events found in the last 7 days",
+                        inline=False
+                    )
+                
+                # Test get_open_mining_events function
+                try:
+                    open_events = get_open_mining_events(db_url, guild_id)
+                    embed.add_field(
+                        name="🔍 get_open_mining_events()",
+                        value=f"Found {len(open_events)} open events" + (f"\n• First event ID: `{open_events[0]['id']}`" if open_events else ""),
+                        inline=False
+                    )
+                except Exception as e:
+                    embed.add_field(
+                        name="❌ get_open_mining_events() Error",
+                        value=f"Function failed: {str(e)[:200]}",
+                        inline=False
+                    )
+                
+                # Search for specific session ID (if provided)
+                search_session = "sunday_20250909_180124"
+                cursor.execute("""
+                    SELECT event_id, guild_id, COALESCE(name, event_name) as name, 
+                           status, event_date, created_at 
+                    FROM mining_events 
+                    WHERE COALESCE(name, event_name) ILIKE %s
+                       OR event_id::text = %s
+                    ORDER BY created_at DESC
+                """, (f'%{search_session}%', search_session))
+                
+                session_results = cursor.fetchall()
+                if session_results:
+                    session_text = []
+                    for event in session_results:
+                        session_text.append(
+                            f"• ID: `{event[0]}` | Name: {event[2]} | Status: `{event[3]}`"
+                        )
+                    embed.add_field(
+                        name=f"🔍 Session ID Search: {search_session}",
+                        value="\n".join(session_text),
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name=f"🔍 Session ID Search: {search_session}",
+                        value="❌ No events found matching this session ID",
+                        inline=False
+                    )
+                
+                # Test creating a test event
+                from datetime import date
+                test_event_name = f"DIAGNOSTIC TEST - {datetime.now().strftime('%H:%M:%S')}"
+                
+                try:
+                    from database.operations import create_mining_event
+                    test_event_id = create_mining_event(
+                        db_url,
+                        guild_id,
+                        date.today(),
+                        test_event_name
+                    )
+                    
+                    if test_event_id:
+                        embed.add_field(
+                            name="✅ Event Creation Test",
+                            value=f"Successfully created test event: `{test_event_id}`\nName: {test_event_name}",
+                            inline=False
+                        )
+                    else:
+                        embed.add_field(
+                            name="❌ Event Creation Test",
+                            value="create_mining_event() returned None",
+                            inline=False
+                        )
+                except Exception as e:
+                    embed.add_field(
+                        name="❌ Event Creation Test",
+                        value=f"Failed to create test event: {str(e)[:200]}",
+                        inline=False
+                    )
+                
+                conn.close()
+                
+            except Exception as e:
+                embed.add_field(
+                    name="❌ Database Error",
+                    value=f"Connection failed: {str(e)[:300]}",
+                    inline=False
+                )
+            
+            embed.set_footer(text="Use this information to troubleshoot event creation issues")
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error running event diagnostics: {str(e)}",
                 ephemeral=True
             )
 

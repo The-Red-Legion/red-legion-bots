@@ -871,18 +871,11 @@ def get_open_mining_events(database_url, guild_id=None):
     """Get open/active mining events from the database."""
     try:
         import psycopg2
-        from urllib.parse import urlparse
+        from .connection import resolve_database_url
         
-        # Convert database_url to use proxy if running locally
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Use standardized database connection approach
+        resolved_url = resolve_database_url(database_url)
+        conn = psycopg2.connect(resolved_url)
         
         cursor = conn.cursor()
         
