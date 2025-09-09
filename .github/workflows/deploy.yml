@@ -132,8 +132,8 @@ jobs:
           echo "🔄 Performing complete codebase copy deployment"
           echo "📅 Initiated at: $(date)"
           
-          # Run Ansible playbook with full copy deployment
-          if ansible-playbook ansible/full-deploy.yml -i /tmp/ansible/inventory.ini -v; then
+          # Run Ansible playbook with full codebase deployment
+          if ansible-playbook ansible/deploy.yml -i /tmp/ansible/inventory.ini -v; then
             echo "status=success" >> $GITHUB_OUTPUT
             echo "✅ Full codebase deployment completed successfully"
           else
