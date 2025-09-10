@@ -55,12 +55,10 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
         event_id: Optional[str] = None
     ):
         """Unified handler for payroll calculation across all event types."""
-        await interaction.response.defer()
-        
         try:
-            # Check permissions
+            # Check permissions first (before any response)
             if not await self._check_payroll_permissions(interaction.user):
-                await interaction.followup.send(
+                await interaction.response.send_message(
                     embed=discord.Embed(
                         title="❌ Permission Denied",
                         description="You need payroll management permissions to use this command.",
@@ -72,11 +70,11 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
             
             guild_id = interaction.guild_id
             
-            # If specific event_id provided, handle directly
+            # If specific event_id provided, handle directly (no defer needed for modals)
             if event_id:
                 event_data = await self.calculator.get_event_by_id(event_id)
                 if not event_data:
-                    await interaction.followup.send(
+                    await interaction.response.send_message(
                         embed=discord.Embed(
                             title="❌ Event Not Found",
                             description=f"Event `{event_id}` not found or not accessible.",
@@ -93,6 +91,9 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 # Skip event selection, go straight to collection input
                 await self._show_collection_modal(interaction, event_data, processor)
                 return
+            
+            # For dropdown selection, we need to defer since we're doing database queries
+            await interaction.response.defer()
             
             # Get all pending events across all types
             all_events = {}
