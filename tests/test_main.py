@@ -47,16 +47,29 @@ def test_init_db(mock_db):
         mock_init_db.assert_called_once_with("postgresql://test:test@localhost:5432/testdb")
         print("✅ init_db function completed successfully")
 
-def test_start_logging_command(mock_db, mock_discord):
-    """Test legacy command replaced by new mining system."""
-    # Legacy start_logging command replaced by /sunday_mining_start
-    # This test verifies the database init still works
+def test_mining_module_architecture(mock_db, mock_discord):
+    """Test new modules architecture for mining system."""
+    # New modules architecture replaces legacy scattered commands
+    # This test verifies the new structure exists
     conn, cursor = mock_db
     assert cursor is not None
     assert conn is not None
     
-    # Simple test to ensure the command files exist
+    # Test that new modules architecture exists
     import os
-    mining_core_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'commands', 'mining', 'core.py')
-    assert os.path.exists(mining_core_path), "Mining commands core module should exist"
-    print("✅ New mining commands module file exists")
+    base_path = os.path.join(os.path.dirname(__file__), '..', 'src')
+    
+    # Check new modules structure
+    mining_module_path = os.path.join(base_path, 'modules', 'mining', 'commands.py')
+    payroll_module_path = os.path.join(base_path, 'modules', 'payroll', 'commands.py')
+    mining_wrapper_path = os.path.join(base_path, 'commands', 'mining.py')
+    payroll_wrapper_path = os.path.join(base_path, 'commands', 'payroll.py')
+    
+    assert os.path.exists(mining_module_path), "Mining module should exist at src/modules/mining/commands.py"
+    assert os.path.exists(payroll_module_path), "Payroll module should exist at src/modules/payroll/commands.py"
+    assert os.path.exists(mining_wrapper_path), "Mining command wrapper should exist at src/commands/mining.py"
+    assert os.path.exists(payroll_wrapper_path), "Payroll command wrapper should exist at src/commands/payroll.py"
+    
+    print("✅ New modules architecture verified")
+    print("✅ Mining and payroll modules exist")
+    print("✅ Command wrappers exist")
