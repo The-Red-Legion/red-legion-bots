@@ -4,7 +4,7 @@ Creates dummy events and participation data for testing the payroll module.
 """
 
 import discord
-from discord import app_commands, ui
+from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timedelta
 import random
@@ -16,66 +16,21 @@ from typing import Optional
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-class TestDataCreationModal(ui.Modal):
-    """Modal for creating test data with custom parameters."""
+class TestDataCommands(commands.GroupCog, name="test-data"):
+    """Test data generation commands for mining system (Admin only)"""
     
-    def __init__(self):
-        super().__init__(title='Create Test Mining Event')
-        
-        self.participants = ui.TextInput(
-            label='Number of Participants',
-            placeholder='10',
-            default='10',
-            required=True,
-            max_length=2
-        )
-        
-        self.hours_ago = ui.TextInput(
-            label='Hours Ago (when event started)',
-            placeholder='4',
-            default='4',
-            required=True,
-            max_length=2
-        )
-        
-        self.duration = ui.TextInput(
-            label='Event Duration (hours)',
-            placeholder='3.5',
-            default='3.5',
-            required=True,
-            max_length=4
-        )
-        
-        self.location = ui.TextInput(
-            label='Mining Location (optional)',
-            placeholder='Random location will be chosen',
-            required=False,
-            max_length=50
-        )
-        
-        self.event_name = ui.TextInput(
-            label='Event Name (optional)',
-            placeholder='Test Mining Event at [Location]',
-            required=False,
-            max_length=100
-        )
-        
-        self.add_item(self.participants)
-        self.add_item(self.hours_ago)
-        self.add_item(self.duration)
-        self.add_item(self.location)
-        self.add_item(self.event_name)
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.command(name="create", description="Create test mining event with dummy participation data")
+    @app_commands.default_permissions(administrator=True)
+    async def create_test_data(self, interaction: discord.Interaction):
+        """Create test mining event with dummy participation data for payroll testing"""
+        # Open test data creation modal
+        modal = TestDataCreationModal()
+        await interaction.response.send_modal(modal)
         try:
-            # Parse and validate inputs
-            participants = int(self.participants.value.strip())
-            hours_ago = int(self.hours_ago.value.strip())
-            duration = float(self.duration.value.strip())
-            location = self.location.value.strip() if self.location.value.strip() else None
-            event_name = self.event_name.value.strip() if self.event_name.value.strip() else None
+            await interaction.response.defer()
             
             # Validate parameters
             if not (1 <= participants <= 50):
@@ -86,77 +41,6 @@ class TestDataCreationModal(ui.Modal):
                 await interaction.followup.send("❌ Hours ago must be between 0 and 48", ephemeral=True)
                 return
             
-            if not (0.5 <= duration <= 12):
-                await interaction.followup.send("❌ Duration must be between 0.5 and 12 hours", ephemeral=True)
-                return
-            
-            # Show creating progress
-            await interaction.followup.send(
-                embed=discord.Embed(
-                    title="⏳ Creating Test Event",
-                    description=f"Creating test mining event with {participants} participants...",
-                    color=discord.Color.blue()
-                )
-            )
-            
-            # Create test data
-            result = await self._create_test_event(interaction, participants, hours_ago, duration, location, event_name)
-            
-            if result['success']:
-                embed = discord.Embed(
-                    title="✅ Test Mining Event Created",
-                    description=f"Successfully created test event `{result['event_id']}` with dummy participation data",
-                    color=discord.Color.green(),
-                    timestamp=datetime.now()
-                )
-                
-                embed.add_field(name="Event ID", value=f"`{result['event_id']}`", inline=True)
-                embed.add_field(name="Location", value=result['location'], inline=True)
-                embed.add_field(name="Status", value="Closed (Ready for payroll)", inline=True)
-                
-                embed.add_field(name="Event Start", value=f"<t:{int(result['event_start'].timestamp())}:R>", inline=True)
-                embed.add_field(name="Event Duration", value=f"{duration} hours", inline=True)
-                embed.add_field(name="Participants", value=f"{participants}", inline=True)
-                
-                embed.add_field(name="Participation Records", value=f"{result['participation_records']}", inline=True)
-                embed.add_field(name="Total Participation Time", value=f"{result['total_participation_time']:,} minutes", inline=True)
-                embed.add_field(name="Avg Time per Participant", value=f"{result['avg_participation']:.1f} minutes", inline=True)
-                
-                embed.add_field(
-                    name="🧪 Testing Commands",
-                    value=f"• Use `/payroll mining` with event ID `{result['event_id']}`\n"
-                          f"• Use `/mining status` to see event details\n"
-                          f"• Use `/test-data delete` when done testing",
-                    inline=False
-                )
-                
-                embed.set_footer(text="⚠️ Remember to clean up test data when finished!")
-                
-                await interaction.edit_original_response(embed=embed, view=None)
-            else:
-                await interaction.edit_original_response(
-                    embed=discord.Embed(
-                        title="❌ Error Creating Test Data",
-                        description=result['error'],
-                        color=discord.Color.red()
-                    ),
-                    view=None
-                )
-        
-        except ValueError as e:
-            await interaction.followup.send(
-                f"❌ Invalid input: Please enter valid numbers for participants, hours, and duration.",
-                ephemeral=True
-            )
-        except Exception as e:
-            await interaction.followup.send(
-                f"❌ Error creating test data: {str(e)}",
-                ephemeral=True
-            )
-    
-    async def _create_test_event(self, interaction, participants, hours_ago, duration, location, event_name):
-        """Create test event and participation data."""
-        try:
             # Import required modules
             from config.settings import get_database_url
             from database.connection import resolve_database_url
@@ -165,7 +49,8 @@ class TestDataCreationModal(ui.Modal):
             
             db_url = get_database_url()
             if not db_url:
-                return {'success': False, 'error': 'Database connection not available'}
+                await interaction.followup.send("❌ Database connection not available", ephemeral=True)
+                return
             
             # Generate event ID
             random_part = ''.join(random.choices('0123456789', k=5))
@@ -173,14 +58,12 @@ class TestDataCreationModal(ui.Modal):
             
             # Calculate event times
             event_start = datetime.now() - timedelta(hours=hours_ago)
-            event_end = event_start + timedelta(hours=duration)
+            event_end = event_start + timedelta(hours=random.randint(2, 6))  # 2-6 hour session
             
             location = location or random.choice([
                 "Daymar", "Yela", "Aberdeen", "Magda", "Arial", "Lyria", 
                 "Wala", "Cellin", "Hurston", "ArcCorp"
             ])
-            
-            event_name = event_name or f'Test Mining Event at {location}'
             
             # Connect to database
             resolved_url = resolve_database_url(db_url)
@@ -199,7 +82,7 @@ class TestDataCreationModal(ui.Modal):
                         event_id,
                         str(interaction.guild.id),
                         'mining',
-                        event_name,
+                        f'Test Mining Event at {location}',
                         str(interaction.user.id),
                         interaction.user.display_name,
                         event_start,
@@ -298,79 +181,65 @@ class TestDataCreationModal(ui.Modal):
             finally:
                 conn.close()
             
-            # Calculate stats
+            # Calculate stats for display
             avg_participation = total_participation_time / participants if participants > 0 else 0
+            org_members = sum(1 for i in range(participants) if random.choice([True, False]))
             
-            return {
-                'success': True,
-                'event_id': event_id,
-                'location': location,
-                'event_start': event_start,
-                'participation_records': participation_records,
-                'total_participation_time': total_participation_time,
-                'avg_participation': avg_participation
-            }
+            # Create success embed
+            embed = discord.Embed(
+                title="✅ Test Mining Event Created",
+                description=f"Successfully created test event `{event_id}` with dummy participation data",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+            
+            embed.add_field(name="Event ID", value=f"`{event_id}`", inline=True)
+            embed.add_field(name="Location", value=location, inline=True)
+            embed.add_field(name="Status", value="Closed (Ready for payroll)", inline=True)
+            
+            embed.add_field(name="Event Start", value=f"<t:{int(event_start.timestamp())}:R>", inline=True)
+            embed.add_field(name="Event Duration", value=f"{(event_end - event_start).total_seconds() / 3600:.1f} hours", inline=True)
+            embed.add_field(name="Participants", value=f"{participants}", inline=True)
+            
+            embed.add_field(name="Participation Records", value=f"{participation_records}", inline=True)
+            embed.add_field(name="Total Participation Time", value=f"{total_participation_time:,} minutes", inline=True)
+            embed.add_field(name="Avg Time per Participant", value=f"{avg_participation:.1f} minutes", inline=True)
+            
+            embed.add_field(
+                name="🧪 Testing Commands",
+                value=f"• Use `/payroll mining` with event ID `{event_id}`\\n"
+                      f"• Use `/mining status` to see event details\\n"
+                      f"• Use `/test-data delete` when done testing",
+                inline=False
+            )
+            
+            embed.set_footer(text="⚠️ Remember to clean up test data when finished!")
+            
+            await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            error_msg = f"❌ Error creating test data: {str(e)}"
+            await interaction.followup.send(error_msg, ephemeral=True)
+            import traceback
+            print(f"Test data creation error: {traceback.format_exc()}")
 
-
-class TestDataDeletionView(ui.View):
-    """UI for deleting test data with confirmation."""
-    
-    def __init__(self):
-        super().__init__(timeout=300)
-        
-        # Add delete button (requires confirmation)
-        self.add_item(ConfirmDeleteButton())
-        
-        # Add cancel button
-        self.add_item(CancelDeleteButton())
-
-
-class ConfirmDeleteButton(ui.Button):
-    """Button to confirm test data deletion."""
-    
-    def __init__(self):
-        super().__init__(
-            label="⚠️ DELETE ALL TEST DATA",
-            style=discord.ButtonStyle.danger,
-            emoji="🗑️"
-        )
-    
-    async def callback(self, interaction: discord.Interaction):
-        # Show final confirmation modal
-        modal = FinalDeleteConfirmationModal()
-        await interaction.response.send_modal(modal)
-
-
-class FinalDeleteConfirmationModal(ui.Modal):
-    """Final confirmation modal for deletion."""
-    
-    def __init__(self):
-        super().__init__(title='Confirm Test Data Deletion')
-        
-        self.confirmation = ui.TextInput(
-            label='Type "DELETE" to confirm',
-            placeholder='Type DELETE (all caps) to confirm deletion',
-            required=True,
-            max_length=10
-        )
-        
-        self.add_item(self.confirmation)
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        if self.confirmation.value.upper() != 'DELETE':
-            await interaction.response.send_message(
-                "❌ Deletion cancelled. You must type 'DELETE' (all caps) to confirm.",
-                ephemeral=True
-            )
-            return
-        
-        await interaction.response.defer()
-        
+    @app_commands.command(name="delete", description="Delete all test mining data")
+    @app_commands.describe(
+        confirm="Type 'DELETE' to confirm deletion of all test data"
+    )
+    @app_commands.default_permissions(administrator=True)
+    async def delete_test_data(self, interaction: discord.Interaction, confirm: str):
+        """Delete all test mining data from the unified database"""
         try:
-            # Perform deletion
+            if confirm.upper() != 'DELETE':
+                await interaction.response.send_message(
+                    "❌ Please type 'DELETE' to confirm deletion of test data",
+                    ephemeral=True
+                )
+                return
+            
+            await interaction.response.defer()
+            
             from config.settings import get_database_url
             from database.connection import resolve_database_url
             import psycopg2
@@ -389,41 +258,57 @@ class FinalDeleteConfirmationModal(ui.Modal):
             try:
                 with conn.cursor() as cursor:
                     # Delete test participation records (must be first due to foreign keys)
-                    cursor.execute("""
-                        DELETE FROM participation 
-                        WHERE user_id >= 9000000000000000000
-                    """)
-                    deleted_counts['participation'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM participation 
+                            WHERE user_id >= 9000000000000000000
+                        """)
+                        deleted_counts['participation'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting participation records: {e}", ephemeral=True)
+                        return
                     
                     # Delete test payroll records
-                    cursor.execute("""
-                        DELETE FROM payrolls 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND event_id IN (
-                            SELECT event_id FROM events 
-                            WHERE organizer_id = %s OR location_notes LIKE '%Test%'
-                        )
-                    """, (str(interaction.user.id),))
-                    deleted_counts['payrolls'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM payrolls 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND event_id IN (
+                                SELECT event_id FROM events 
+                                WHERE organizer_id = %s OR location_notes LIKE '%Test%'
+                            )
+                        """, (str(interaction.user.id),))
+                        deleted_counts['payrolls'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting payroll records: {e}", ephemeral=True)
+                        return
                     
-                    # Delete test events
-                    cursor.execute("""
-                        DELETE FROM events 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND (organizer_id = %s OR location_notes IN (
-                            'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
-                            'Wala', 'Cellin', 'Hurston', 'ArcCorp'
-                        ))
-                        AND created_at > NOW() - INTERVAL '7 days'
-                    """, (str(interaction.user.id),))
-                    deleted_counts['events'] = cursor.rowcount
+                    # Delete test events (look for events created by this command or with test characteristics)
+                    try:
+                        cursor.execute("""
+                            DELETE FROM events 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND (organizer_id = %s OR location_notes IN (
+                                'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
+                                'Wala', 'Cellin', 'Hurston', 'ArcCorp'
+                            ))
+                            AND created_at > NOW() - INTERVAL '7 days'
+                        """, (str(interaction.user.id),))
+                        deleted_counts['events'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting event records: {e}", ephemeral=True)
+                        return
                     
                     # Delete test users
-                    cursor.execute("""
-                        DELETE FROM users 
-                        WHERE user_id >= 9000000000000000000
-                    """)
-                    deleted_counts['users'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM users 
+                            WHERE user_id >= 9000000000000000000
+                        """)
+                        deleted_counts['users'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting user records: {e}", ephemeral=True)
+                        return
                     
                     conn.commit()
             
@@ -460,80 +345,12 @@ class FinalDeleteConfirmationModal(ui.Modal):
                     inline=False
                 )
             
-            # Disable all buttons in parent view
-            original_view = interaction.message.components[0] if interaction.message.components else None
-            if original_view:
-                for item in original_view.children:
-                    item.disabled = True
-            
-            await interaction.edit_original_response(embed=embed, view=None)
+            await interaction.followup.send(embed=embed)
             
         except Exception as e:
             await interaction.followup.send(f"❌ Error deleting test data: {str(e)}", ephemeral=True)
-
-
-class CancelDeleteButton(ui.Button):
-    """Button to cancel deletion."""
-    
-    def __init__(self):
-        super().__init__(
-            label="Cancel",
-            style=discord.ButtonStyle.secondary,
-            emoji="❌"
-        )
-    
-    async def callback(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="❌ Deletion Cancelled",
-            description="Test data deletion has been cancelled.",
-            color=discord.Color.orange()
-        )
-        
-        # Disable all buttons
-        for item in self.view.children:
-            item.disabled = True
-        
-        await interaction.response.edit_message(embed=embed, view=self.view)
-
-
-class TestDataCommands(commands.GroupCog, name="test-data"):
-    """Test data generation commands for mining system (Admin only)"""
-    
-    def __init__(self, bot):
-        self.bot = bot
-
-    @app_commands.command(name="create", description="Create test mining event with dummy participation data")
-    @app_commands.default_permissions(administrator=True)
-    async def create_test_data(self, interaction: discord.Interaction):
-        """Create test mining event with dummy participation data for payroll testing"""
-        # Open test data creation modal
-        modal = TestDataCreationModal()
-        await interaction.response.send_modal(modal)
-
-    @app_commands.command(name="delete", description="Delete all test mining data")
-    @app_commands.default_permissions(administrator=True)
-    async def delete_test_data(self, interaction: discord.Interaction):
-        """Delete all test mining data from the unified database"""
-        # Show deletion confirmation UI
-        embed = discord.Embed(
-            title="⚠️ Delete All Test Data",
-            description="**WARNING: This action cannot be undone!**\n\n"
-                       "This will permanently remove:\n"
-                       "• All test events (sm-xxxxx)\n"
-                       "• All test users (TestMiner###)\n"
-                       "• All participation records for test events\n"
-                       "• Any payroll calculations for test events",
-            color=discord.Color.red()
-        )
-        
-        embed.add_field(
-            name="🛑 Confirmation Required",
-            value="Click the deletion button below and confirm to proceed.",
-            inline=False
-        )
-        
-        view = TestDataDeletionView()
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            import traceback
+            print(f"Test data deletion error: {traceback.format_exc()}")
 
     @app_commands.command(name="status", description="Show current test data in database")
     @app_commands.default_permissions(administrator=True)
@@ -586,7 +403,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     
                     # Get recent test events
                     cursor.execute("""
-                        SELECT event_id, location_notes, started_at, ended_at, status, created_at 
+                        SELECT event_id, location, start_time, end_time, status, created_at 
                         FROM events 
                         WHERE event_id LIKE 'sm-%' 
                         AND created_at > NOW() - INTERVAL '7 days'
@@ -616,18 +433,18 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                 event_list = []
                 for event in recent_events[:3]:  # Show max 3 events
                     status_emoji = "🔴" if event['status'] == 'closed' else "🟢"
-                    event_list.append(f"{status_emoji} `{event['event_id']}` - {event['location_notes']}")
+                    event_list.append(f"{status_emoji} `{event['event_id']}` - {event['location']}")
                 
                 embed.add_field(
                     name="Recent Test Events",
-                    value="\n".join(event_list) if event_list else "None",
+                    value="\\n".join(event_list) if event_list else "None",
                     inline=False
                 )
             
             if any(counts.values()):
                 embed.add_field(
                     name="⚠️ Cleanup Available",
-                    value="Use `/test-data delete` to remove test data",
+                    value="Use `/test-data delete DELETE` to remove test data",
                     inline=False
                 )
             else:
