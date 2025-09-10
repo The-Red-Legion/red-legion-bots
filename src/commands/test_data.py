@@ -273,7 +273,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                         WHERE event_id LIKE 'sm-%' 
                         AND event_id IN (
                             SELECT event_id FROM events 
-                            WHERE created_by = %s OR location LIKE 'Test%'
+                            WHERE organizer_id = %s OR location_notes LIKE 'Test%'
                         )
                     """, (str(interaction.user.id),))
                     deleted_counts['payrolls'] = cursor.rowcount
@@ -282,7 +282,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     cursor.execute("""
                         DELETE FROM events 
                         WHERE event_id LIKE 'sm-%' 
-                        AND (created_by = %s OR location IN (
+                        AND (organizer_id = %s OR location_notes IN (
                             'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
                             'Wala', 'Cellin', 'Hurston', 'ArcCorp'
                         ))
