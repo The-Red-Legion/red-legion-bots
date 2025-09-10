@@ -265,55 +265,72 @@ class VoiceTracker:
     
     async def join_voice_channel(self, channel_id: int) -> bool:
         """Join a voice channel to indicate active tracking."""
+        print(f"🎤 Attempting to join voice channel {channel_id}")
         logger.info(f"🎤 Attempting to join voice channel {channel_id}")
         
         if not self.bot:
+            print("❌ Bot instance not set, cannot join voice channels")
             logger.error("❌ Bot instance not set, cannot join voice channels")
             return False
         
         try:
+            print(f"🔍 Looking up channel {channel_id} using bot instance...")
             logger.info(f"🔍 Looking up channel {channel_id} using bot instance...")
             channel = self.bot.get_channel(channel_id)
             if not channel:
+                print(f"❌ Could not find channel {channel_id}")
                 logger.error(f"❌ Could not find channel {channel_id}")
+                print(f"🔍 Available channels in guilds:")
                 logger.info(f"🔍 Available channels in guilds:")
                 for guild in self.bot.guilds:
+                    print(f"  Guild: {guild.name} ({guild.id})")
                     logger.info(f"  Guild: {guild.name} ({guild.id})")
                     for ch in guild.channels:
                         if hasattr(ch, 'type') and str(ch.type) == 'voice':
+                            print(f"    Voice Channel: {ch.name} ({ch.id})")
                             logger.info(f"    Voice Channel: {ch.name} ({ch.id})")
                 return False
             
+            print(f"🔍 Found channel: {channel.name} (type: {type(channel)}) in guild: {channel.guild.name}")
             logger.info(f"🔍 Found channel: {channel.name} (type: {type(channel)}) in guild: {channel.guild.name}")
             
             if not isinstance(channel, discord.VoiceChannel):
+                print(f"❌ Channel {channel_id} ({channel.name}) is not a voice channel, it's a {type(channel)}")
                 logger.error(f"❌ Channel {channel_id} ({channel.name}) is not a voice channel, it's a {type(channel)}")
                 return False
             
             # Check if bot is already connected to this channel
             if channel_id in self.bot_voice_connections:
+                print(f"✅ Bot already connected to {channel.name}")
                 logger.info(f"✅ Bot already connected to {channel.name}")
                 return True
             
+            print(f"🎵 Attempting to connect to voice channel: {channel.name}")
             logger.info(f"🎵 Attempting to connect to voice channel: {channel.name}")
             
             # Connect to the voice channel
             voice_client = await channel.connect()
             self.bot_voice_connections[channel_id] = voice_client
             
+            print(f"🎤 Bot successfully joined voice channel: {channel.name}")
             logger.info(f"🎤 Bot successfully joined voice channel: {channel.name}")
             return True
             
         except discord.errors.ClientException as e:
             if "already connected" in str(e):
+                print("⚠️ Bot already connected to a voice channel")
                 logger.warning("⚠️ Bot already connected to a voice channel")
                 return True
+            print(f"❌ ClientException joining voice channel {channel_id}: {e}")
             logger.error(f"❌ ClientException joining voice channel {channel_id}: {e}")
             return False
         except Exception as e:
+            print(f"❌ Unexpected error joining voice channel {channel_id}: {e}")
             logger.error(f"❌ Unexpected error joining voice channel {channel_id}: {e}")
             import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
+            traceback_str = traceback.format_exc()
+            print(f"Full traceback: {traceback_str}")
+            logger.error(f"Full traceback: {traceback_str}")
             return False
 
     async def leave_voice_channel(self, channel_id: int) -> bool:

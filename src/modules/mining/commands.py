@@ -421,9 +421,17 @@ class MiningStartModal(discord.ui.Modal):
                         vc = guild.get_channel(int(channel_id_str))
                         if vc:
                             voice_channel_names.append(f"`{vc.name}`")
+                            
+                            # Convert channel_name to friendly name for lookup
+                            friendly_name = channel_name.title()
+                            if channel_name == 'dispatch':
+                                friendly_name = 'Dispatch/Main'
+                            elif channel_name.startswith('group') or len(channel_name) <= 2:
+                                friendly_name = f"Group {channel_name.upper()}"
+                            
                             # Show current participants in this channel
-                            if channel_name in current_voice_participants and current_voice_participants[channel_name]:
-                                member_count = len(current_voice_participants[channel_name])
+                            if friendly_name in current_voice_participants and current_voice_participants[friendly_name]:
+                                member_count = len(current_voice_participants[friendly_name])
                                 tracked_channels_info.append(f"🎤 **{vc.name}**: {member_count} active")
                             else:
                                 tracked_channels_info.append(f"🎤 **{vc.name}**: Empty")
