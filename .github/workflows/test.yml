@@ -302,16 +302,14 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: `## ✅ All Tests Passed!
-
-| Test Suite | Result |
-|------------|--------|
-| Code Quality & Validation | ✅ Passed |
-| Database Tests | ✅ Passed |
-| Bot Functionality | ✅ Passed |
-| API & Integration Tests | ✅ Passed |
-
-🚀 **Ready for deployment!** This PR has been automatically labeled as 'Ready To Deploy'.`
+                body: '## ✅ All Tests Passed!\n\n' +
+                      '| Test Suite | Result |\n' +
+                      '|------------|--------|\n' +
+                      '| Code Quality & Validation | ✅ Passed |\n' +
+                      '| Database Tests | ✅ Passed |\n' +
+                      '| Bot Functionality | ✅ Passed |\n' +
+                      '| API & Integration Tests | ✅ Passed |\n\n' +
+                      '🚀 **Ready for deployment!** This PR has been automatically labeled as \'Ready To Deploy\'.'
               });
             } else {
               // Don't add any success labels for failed tests
@@ -328,18 +326,15 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: `## ❌ Some Tests Failed
-
-| Test Suite | Result |
-|------------|--------|
-| Code Quality & Validation | ${codeQuality === 'success' ? '✅ Passed' : '❌ Failed'} |
-| Database Tests | ${databaseTests === 'success' ? '✅ Passed' : '❌ Failed'} |
-| Bot Functionality | ${botFunctionality === 'success' ? '✅ Passed' : '❌ Failed'} |
-| API & Integration Tests | ${apiTests === 'success' ? '✅ Passed' : '❌ Failed'} |
-
-**Failed test suites:** ${failedTests.join(', ')}
-
-Please review the test results and fix any issues before proceeding.`
+                body: '## ❌ Some Tests Failed\n\n' +
+                      '| Test Suite | Result |\n' +
+                      '|------------|--------|\n' +
+                      '| Code Quality & Validation | ' + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n' +
+                      '| Database Tests | ' + (databaseTests === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n' +
+                      '| Bot Functionality | ' + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n' +
+                      '| API & Integration Tests | ' + (apiTests === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n\n' +
+                      '**Failed test suites:** ' + failedTests.join(', ') + '\n\n' +
+                      'Please review the test results and fix any issues before proceeding.'
               });
             }
 
