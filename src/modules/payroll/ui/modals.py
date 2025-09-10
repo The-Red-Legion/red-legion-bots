@@ -1368,7 +1368,7 @@ class AlphabeticalOreSelector(ui.Select):
             
             embed.add_field(
                 name="🔄 Next Step",
-                value="Click 'Next: Enter Quantities' to proceed to Step 3",
+                value="Click 'Next' to proceed to Step 3",
                 inline=False
             )
         else:
@@ -1392,7 +1392,7 @@ class NextToQuantitiesButton(ui.Button):
     
     def __init__(self, event_data, processor, calculator, selected_ores, parent_view):
         super().__init__(
-            label="Next: Enter Quantities →",
+            label="Next",
             style=discord.ButtonStyle.primary,
             emoji="📊"
         )
@@ -2820,6 +2820,27 @@ class DirectPricingButton(ui.Button):
     
     async def callback(self, interaction: discord.Interaction):
         try:
+            # Validate that we have prices before opening modal
+            if not self.ore_prices:
+                await interaction.response.send_message(
+                    "❌ Error Loading UEX Pricing\nFailed to load UEX pricing: No price data available. Please try again.",
+                    ephemeral=True
+                )
+                return
+                
+            # Check if any of our collected ores have prices
+            has_prices = any(
+                self.ore_prices.get(ore_code, {}).get('price', 0) > 0 
+                for ore_code in self.ore_quantities.keys()
+            )
+            
+            if not has_prices:
+                await interaction.response.send_message(
+                    "❌ Error Loading UEX Pricing\nFailed to load UEX pricing: No prices found for collected ores. Please try again.",
+                    ephemeral=True
+                )
+                return
+            
             # Show UEX pricing modal with title as requested by user
             modal = DirectUEXPricingModal(
                 self.event_data, self.processor, self.calculator,
@@ -2827,10 +2848,17 @@ class DirectPricingButton(ui.Button):
             )
             await interaction.response.send_modal(modal)
         except Exception as e:
-            await interaction.response.send_message(
-                f"❌ Error opening pricing modal: {str(e)}", 
-                ephemeral=True
-            )
+            # Check if interaction was already responded to
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    f"❌ Error Loading UEX Pricing\nFailed to load UEX pricing: {str(e)}", 
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    f"❌ Error Loading UEX Pricing\nFailed to load UEX pricing: {str(e)}", 
+                    ephemeral=True
+                )
 
 
 class DirectUEXPricingModal(ui.Modal):
@@ -2850,14 +2878,19 @@ class DirectUEXPricingModal(ui.Modal):
         for ore_code, quantity in ore_quantities.items():
             if quantity > 0:
                 ore_name = self.get_ore_name(ore_code)
-                current_price = ore_prices.get(ore_code, {}).get('price', 0)
+                # Get price safely with fallback
+                price_data = ore_prices.get(ore_code, {})
+                if isinstance(price_data, dict):
+                    current_price = price_data.get('price', 0)
+                else:
+                    current_price = 0
                 
                 price_input = ui.TextInput(
                     label=f'{ore_name} (aUEC/SCU)',
-                    placeholder=f'Current UEX price: {current_price}',
+                    placeholder=f'Current UEX price: {current_price}' if current_price > 0 else 'Enter price per SCU',
                     required=True,
                     max_length=10,
-                    default=str(current_price)
+                    default=str(current_price) if current_price > 0 else '0'
                 )
                 
                 self.price_inputs[ore_code] = price_input
