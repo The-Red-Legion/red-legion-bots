@@ -120,19 +120,33 @@ class PayrollCalculator:
                 record_check = cursor.fetchone()
                 logger.info(f"Found {record_check['total_records']} participation records for event {event_id}")
                 
+                # Debug: Show sample records
+                cursor.execute("""
+                    SELECT user_id, username, duration_minutes, joined_at, left_at
+                    FROM participation 
+                    WHERE event_id = %s
+                    LIMIT 3
+                """, (event_id,))
+                sample_records = cursor.fetchall()
+                for record in sample_records:
+                    logger.info(f"Sample participation: {record['username']} - {record['duration_minutes']} mins")
+                
                 # Get participants with their participation time
                 cursor.execute("""
                     SELECT 
                         user_id, username, display_name,
-                        SUM(COALESCE(duration_minutes, 
-                            CASE 
-                                WHEN left_at IS NOT NULL AND joined_at IS NOT NULL THEN 
-                                    EXTRACT(EPOCH FROM (left_at - joined_at))/60
-                                WHEN joined_at IS NOT NULL THEN 
-                                    EXTRACT(EPOCH FROM (NOW() - joined_at))/60
-                                ELSE 0
-                            END
-                        )) as total_minutes,
+                        SUM(
+                            COALESCE(
+                                duration_minutes,
+                                CASE 
+                                    WHEN left_at IS NOT NULL AND joined_at IS NOT NULL THEN 
+                                        EXTRACT(EPOCH FROM (left_at - joined_at))/60
+                                    WHEN joined_at IS NOT NULL THEN 
+                                        EXTRACT(EPOCH FROM (NOW() - joined_at))/60
+                                    ELSE 0
+                                END
+                            )
+                        ) as total_minutes,
                         COUNT(*) as session_count,
                         MAX(is_org_member) as is_org_member,
                         MIN(joined_at) as first_joined,
@@ -140,15 +154,18 @@ class PayrollCalculator:
                     FROM participation 
                     WHERE event_id = %s
                     GROUP BY user_id, username, display_name
-                    HAVING SUM(COALESCE(duration_minutes, 
-                        CASE 
-                            WHEN left_at IS NOT NULL AND joined_at IS NOT NULL THEN 
-                                EXTRACT(EPOCH FROM (left_at - joined_at))/60
-                            WHEN joined_at IS NOT NULL THEN 
-                                EXTRACT(EPOCH FROM (NOW() - joined_at))/60
-                            ELSE 0
-                        END
-                    )) > 0
+                    HAVING SUM(
+                        COALESCE(
+                            duration_minutes,
+                            CASE 
+                                WHEN left_at IS NOT NULL AND joined_at IS NOT NULL THEN 
+                                    EXTRACT(EPOCH FROM (left_at - joined_at))/60
+                                WHEN joined_at IS NOT NULL THEN 
+                                    EXTRACT(EPOCH FROM (NOW() - joined_at))/60
+                                ELSE 0
+                            END
+                        )
+                    ) > 0
                     ORDER BY total_minutes DESC
                 """, (event_id,))
                 
