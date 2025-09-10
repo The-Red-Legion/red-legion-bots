@@ -389,41 +389,60 @@ class FinalDeleteConfirmationModal(ui.Modal):
             try:
                 with conn.cursor() as cursor:
                     # Delete test participation records (must be first due to foreign keys)
-                    cursor.execute("""
-                        DELETE FROM participation 
-                        WHERE user_id >= 9000000000000000000
-                    """)
-                    deleted_counts['participation'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM participation 
+                            WHERE user_id >= 9000000000000000000
+                        """)
+                        deleted_counts['participation'] = cursor.rowcount
+                    except Exception as e:
+                        print(f"Error deleting participation: {e}")
+                        deleted_counts['participation'] = 0
                     
                     # Delete test payroll records
-                    cursor.execute("""
-                        DELETE FROM payrolls 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND event_id IN (
-                            SELECT event_id FROM events 
-                            WHERE organizer_id = %s OR location_notes LIKE '%Test%'
-                        )
-                    """, (str(interaction.user.id),))
-                    deleted_counts['payrolls'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM payrolls 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND event_id IN (
+                                SELECT event_id FROM events 
+                                WHERE organizer_id = %s OR location_notes IN (
+                                    'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
+                                    'Wala', 'Cellin', 'Hurston', 'ArcCorp'
+                                )
+                            )
+                        """, (str(interaction.user.id),))
+                        deleted_counts['payrolls'] = cursor.rowcount
+                    except Exception as e:
+                        print(f"Error deleting payrolls: {e}")
+                        deleted_counts['payrolls'] = 0
                     
                     # Delete test events
-                    cursor.execute("""
-                        DELETE FROM events 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND (organizer_id = %s OR location_notes IN (
-                            'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
-                            'Wala', 'Cellin', 'Hurston', 'ArcCorp'
-                        ))
-                        AND created_at > NOW() - INTERVAL '7 days'
-                    """, (str(interaction.user.id),))
-                    deleted_counts['events'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM events 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND (organizer_id = %s OR location_notes IN (
+                                'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
+                                'Wala', 'Cellin', 'Hurston', 'ArcCorp'
+                            ))
+                            AND created_at > NOW() - INTERVAL '7 days'
+                        """, (str(interaction.user.id),))
+                        deleted_counts['events'] = cursor.rowcount
+                    except Exception as e:
+                        print(f"Error deleting events: {e}")
+                        deleted_counts['events'] = 0
                     
                     # Delete test users
-                    cursor.execute("""
-                        DELETE FROM users 
-                        WHERE user_id >= 9000000000000000000
-                    """)
-                    deleted_counts['users'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM users 
+                            WHERE user_id >= 9000000000000000000
+                        """)
+                        deleted_counts['users'] = cursor.rowcount
+                    except Exception as e:
+                        print(f"Error deleting users: {e}")
+                        deleted_counts['users'] = 0
                     
                     conn.commit()
             
@@ -559,42 +578,66 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             try:
                 with conn.cursor() as cursor:
                     # Count test users
-                    cursor.execute("SELECT COUNT(*) FROM users WHERE user_id >= 9000000000000000000")
-                    counts['users'] = cursor.fetchone()[0]
+                    try:
+                        cursor.execute("SELECT COUNT(*) FROM users WHERE user_id >= 9000000000000000000")
+                        result = cursor.fetchone()
+                        counts['users'] = result[0] if result else 0
+                    except Exception as e:
+                        print(f"Error counting users: {e}")
+                        counts['users'] = 0
                     
                     # Count test events (recent ones created by this command)
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM events 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND created_at > NOW() - INTERVAL '7 days'
-                        AND event_type = 'mining'
-                    """)
-                    counts['events'] = cursor.fetchone()[0]
+                    try:
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM events 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND created_at > NOW() - INTERVAL '7 days'
+                            AND event_type = 'mining'
+                        """)
+                        result = cursor.fetchone()
+                        counts['events'] = result[0] if result else 0
+                    except Exception as e:
+                        print(f"Error counting events: {e}")
+                        counts['events'] = 0
                     
                     # Count test participation
-                    cursor.execute("SELECT COUNT(*) FROM participation WHERE user_id >= 9000000000000000000")
-                    counts['participation'] = cursor.fetchone()[0]
+                    try:
+                        cursor.execute("SELECT COUNT(*) FROM participation WHERE user_id >= 9000000000000000000")
+                        result = cursor.fetchone()
+                        counts['participation'] = result[0] if result else 0
+                    except Exception as e:
+                        print(f"Error counting participation: {e}")
+                        counts['participation'] = 0
                     
                     # Count test payrolls
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM payrolls p
-                        JOIN events e ON p.event_id = e.event_id
-                        WHERE e.created_at > NOW() - INTERVAL '7 days'
-                        AND e.event_type = 'mining'
-                    """)
-                    counts['payrolls'] = cursor.fetchone()[0]
+                    try:
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM payrolls p
+                            JOIN events e ON p.event_id = e.event_id
+                            WHERE e.created_at > NOW() - INTERVAL '7 days'
+                            AND e.event_type = 'mining'
+                        """)
+                        result = cursor.fetchone()
+                        counts['payrolls'] = result[0] if result else 0
+                    except Exception as e:
+                        print(f"Error counting payrolls: {e}")
+                        counts['payrolls'] = 0
                     
                     # Get recent test events
-                    cursor.execute("""
-                        SELECT event_id, location_notes, started_at, ended_at, status, created_at 
-                        FROM events 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND created_at > NOW() - INTERVAL '7 days'
-                        AND event_type = 'mining'
-                        ORDER BY created_at DESC 
-                        LIMIT 5
-                    """)
-                    recent_events = cursor.fetchall()
+                    try:
+                        cursor.execute("""
+                            SELECT event_id, location_notes, started_at, ended_at, status, created_at 
+                            FROM events 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND created_at > NOW() - INTERVAL '7 days'
+                            AND event_type = 'mining'
+                            ORDER BY created_at DESC 
+                            LIMIT 5
+                        """)
+                        recent_events = cursor.fetchall()
+                    except Exception as e:
+                        print(f"Error fetching recent events: {e}")
+                        recent_events = []
             
             finally:
                 conn.close()
