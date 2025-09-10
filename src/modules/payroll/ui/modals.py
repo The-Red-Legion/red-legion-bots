@@ -1790,6 +1790,645 @@ class OreQuantityModal2(ui.Modal):
             await interaction.followup.send(embed=embed, view=view)
 
 
+class ParticipantSelectionView(ui.View):
+    """Step 4: Select which participants want to donate their share."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants):
+        super().__init__(timeout=600)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.donors = set()  # Track who is donating
+        
+        # Add participant checkboxes (up to 25 per dropdown due to Discord limits)
+        if len(participants) <= 25:
+            self.add_item(ParticipantDonationSelector(participants, self.donors, self))
+        else:
+            # Split into multiple dropdowns if too many participants
+            batch_size = 25
+            for i in range(0, len(participants), batch_size):
+                batch = participants[i:i+batch_size]
+                batch_num = i // batch_size + 1
+                self.add_item(ParticipantDonationSelector(batch, self.donors, self, f"Batch {batch_num}"))
+        
+        # Add proceed to price review button
+        self.add_item(ProceedToPriceReviewButton(
+            event_data, processor, calculator, ore_quantities, participants, self.donors
+        ))
+        
+        # Add back button
+        self.add_item(BackToQuantitiesButton(event_data, processor, calculator, ore_quantities.keys()))
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+
+
+class ParticipantDonationSelector(ui.Select):
+    """Dropdown for selecting participants who want to donate."""
+    
+    def __init__(self, participants, donors, parent_view, batch_label=""):
+        self.participants = participants
+        self.donors = donors
+        self.parent_view = parent_view
+        
+        options = []
+        for participant in participants:
+            username = participant.get('username', 'Unknown User')
+            participation_time = participant.get('participation_minutes', 0)
+            
+            options.append(discord.SelectOption(
+                label=f"{username} ({participation_time}min)",
+                description=f"Select if {username} wants to donate their share",
+                value=str(participant.get('user_id', username)),
+                emoji="💝"
+            ))
+        
+        placeholder = f"Select donors{f' - {batch_label}' if batch_label else ''}..."
+        
+        super().__init__(
+            placeholder=placeholder,
+            options=options,
+            min_values=0,
+            max_values=len(options)
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Update donors set with current selections
+        for participant in self.participants:
+            user_id = str(participant.get('user_id', participant.get('username', '')))
+            if user_id in self.values:
+                self.donors.add(user_id)
+            else:
+                self.donors.discard(user_id)
+        
+        # Show feedback
+        if self.values:
+            donor_names = []
+            for participant in self.participants:
+                user_id = str(participant.get('user_id', participant.get('username', '')))
+                if user_id in self.values:
+                    donor_names.append(participant.get('username', 'Unknown'))
+            
+            await interaction.response.send_message(
+                f"💝 **Donation Selection Updated**\n"
+                f"**Donors:** {', '.join(donor_names)}\n"
+                f"**Total donors:** {len(self.donors)} of {len(self.parent_view.participants)} participants\n\n"
+                f"💡 Donated shares will be redistributed to non-donors based on participation time.",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                "⭕ Cleared donation selections from this group.",
+                ephemeral=True
+            )
+
+
+class ProceedToPriceReviewButton(ui.Button):
+    """Button to proceed to Step 5: Price Review."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, donors):
+        super().__init__(
+            label="Next: Review Prices →",
+            style=discord.ButtonStyle.primary,
+            emoji="💰"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.donors = donors
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Get current ore prices
+            prices = await self.processor.get_current_prices()
+            if not prices:
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ Price Data Unavailable",
+                        description="Could not fetch ore prices from UEX Corp API or cache. Please try again later.",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+                return
+            
+            # Calculate total value
+            total_value, breakdown = await self.processor.calculate_total_value(self.ore_quantities, prices)
+            
+            if total_value <= 0:
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ No Valid Ore Values",
+                        description="Could not calculate value for any of the entered ores.",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+                return
+            
+            # Move to Step 5: Price Review
+            view = PriceReviewView(
+                self.event_data, self.processor, self.calculator,
+                self.ore_quantities, self.participants, self.donors,
+                prices, total_value, breakdown
+            )
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+                description=f"**Step 1 of 5: Event Selected** ✅\n"
+                           f"**Step 2 of 5: Select Ore Types** ✅\n"
+                           f"**Step 3 of 5: Enter Quantities** ✅\n"
+                           f"**Step 4 of 5: Participant Donations** ✅\n"
+                           f"**Step 5 of 5: Review & Calculate** ⏳\n\n"
+                           f"Review prices and finalize payroll calculation.",
+                color=discord.Color.green()
+            )
+            
+            embed.add_field(
+                name="💰 Total Value",
+                value=f"{total_value:,.2f} aUEC",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="👥 Participants",
+                value=f"{len(self.participants)} total\n{len(self.donors)} donors",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="📊 Ore Types",
+                value=f"{len(self.ore_quantities)} types",
+                inline=True
+            )
+            
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Loading Price Data",
+                    description=f"An error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class BackToQuantitiesButton(ui.Button):
+    """Button to go back to Step 3: Quantities."""
+    
+    def __init__(self, event_data, processor, calculator, selected_ores):
+        super().__init__(
+            label="← Back: Change Quantities",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.selected_ores = selected_ores
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Go back to Step 3
+        view = OreQuantityView(self.event_data, self.processor, self.calculator, self.selected_ores)
+        
+        # Create ore names list for display
+        all_ores = {
+            'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+            'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+            'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+            'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+            'TITA': 'Titanium', 'TUNG': 'Tungsten'
+        }
+        
+        ore_names = []
+        for code in sorted(self.selected_ores):
+            ore_names.append(all_ores.get(code, code))
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 5: Event Selected** ✅\n"
+                       f"**Step 2 of 5: Select Ore Types** ✅\n"
+                       f"**Step 3 of 5: Enter Quantities** ⏳\n\n"
+                       f"Enter the SCU amounts for each selected ore type.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="📦 Selected Ores",
+            value=f"{', '.join(ore_names)} ({len(ore_names)} types)",
+            inline=False
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class PriceReviewView(ui.View):
+    """Step 5: Review prices and calculate final payroll."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, donors, prices, total_value, breakdown):
+        super().__init__(timeout=600)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.donors = donors
+        self.prices = prices
+        self.total_value = total_value
+        self.breakdown = breakdown
+        
+        # Add edit prices button
+        self.add_item(EditPricesInlineButton(
+            event_data, processor, calculator, ore_quantities, participants, donors,
+            prices, total_value, breakdown, self
+        ))
+        
+        # Add final calculate button
+        self.add_item(FinalCalculateButton(
+            event_data, processor, calculator, ore_quantities, participants, donors,
+            prices, total_value, breakdown
+        ))
+        
+        # Add back button
+        self.add_item(BackToParticipantsButton(
+            event_data, processor, calculator, ore_quantities, participants
+        ))
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+
+
+class EditPricesInlineButton(ui.Button):
+    """Button to edit ore prices inline."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, donors, prices, total_value, breakdown, parent_view):
+        super().__init__(
+            label="Edit Prices",
+            style=discord.ButtonStyle.secondary,
+            emoji="✏️"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.donors = donors
+        self.prices = prices
+        self.total_value = total_value
+        self.breakdown = breakdown
+        self.parent_view = parent_view
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Create price editing modal
+        modal = InlinePriceEditModal(
+            self.event_data, self.processor, self.calculator,
+            self.ore_quantities, self.participants, self.donors,
+            self.prices, self.breakdown, self.parent_view
+        )
+        await interaction.response.send_modal(modal)
+
+
+class InlinePriceEditModal(ui.Modal):
+    """Modal for editing ore prices in Step 5."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, donors, prices, breakdown, parent_view):
+        super().__init__(title=f'Edit Prices - {event_data["event_id"]}')
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.donors = donors
+        self.prices = prices
+        self.breakdown = breakdown
+        self.parent_view = parent_view
+        
+        self.price_inputs = {}
+        
+        # Add price inputs for up to 5 ores
+        ore_count = 0
+        for ore_code, quantity in list(ore_quantities.items())[:5]:
+            if quantity > 0:  # Only show ores with quantities
+                all_ores = {
+                    'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+                    'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+                    'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+                    'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+                    'TITA': 'Titanium', 'TUNG': 'Tungsten'
+                }
+                
+                ore_name = all_ores.get(ore_code, ore_code)
+                current_price = breakdown.get(ore_code.upper(), {}).get('price_per_scu', 0)
+                
+                price_input = ui.TextInput(
+                    label=f'{ore_name} Price (per SCU)',
+                    placeholder=f'Current UEX price: {current_price:,.0f} aUEC',
+                    default=str(int(current_price)) if current_price > 0 else '',
+                    required=True,
+                    max_length=10
+                )
+                
+                self.price_inputs[ore_code] = price_input
+                self.add_item(price_input)
+                ore_count += 1
+                
+                if ore_count >= 5:
+                    break
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse new prices
+            updated_prices = {}
+            for ore_code, input_field in self.price_inputs.items():
+                try:
+                    new_price = float(input_field.value.strip())
+                    if new_price < 0:
+                        await interaction.followup.send(
+                            f"❌ Price for {ore_code} must be 0 or greater.",
+                            ephemeral=True
+                        )
+                        return
+                    updated_prices[ore_code] = new_price
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ Invalid price for {ore_code}: '{input_field.value}'",
+                        ephemeral=True
+                    )
+                    return
+            
+            # Recalculate total value with new prices
+            new_breakdown = {}
+            new_total_value = 0
+            
+            for ore_code, quantity in self.ore_quantities.items():
+                if quantity > 0:
+                    if ore_code in updated_prices:
+                        price_per_scu = updated_prices[ore_code]
+                    else:
+                        price_per_scu = self.breakdown.get(ore_code.upper(), {}).get('price_per_scu', 0)
+                    
+                    total_ore_value = quantity * price_per_scu
+                    new_breakdown[ore_code.upper()] = {
+                        'scu_amount': quantity,
+                        'price_per_scu': price_per_scu,
+                        'total_value': total_ore_value
+                    }
+                    new_total_value += total_ore_value
+            
+            # Update parent view
+            self.parent_view.breakdown = new_breakdown
+            self.parent_view.total_value = new_total_value
+            
+            # Update all buttons with new values
+            for item in self.parent_view.children:
+                if hasattr(item, 'total_value'):
+                    item.total_value = new_total_value
+                    item.breakdown = new_breakdown
+            
+            # Create updated embed
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {self.event_data['event_id']} (Prices Updated)",
+                description=f"**Step 1 of 5: Event Selected** ✅\n"
+                           f"**Step 2 of 5: Select Ore Types** ✅\n"
+                           f"**Step 3 of 5: Enter Quantities** ✅\n"
+                           f"**Step 4 of 5: Participant Donations** ✅\n"
+                           f"**Step 5 of 5: Review & Calculate** ⏳\n\n"
+                           f"Prices updated! Ready to calculate final payroll.",
+                color=discord.Color.green()
+            )
+            
+            embed.add_field(
+                name="💰 Updated Total Value",
+                value=f"{new_total_value:,.2f} aUEC",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="👥 Participants",
+                value=f"{len(self.participants)} total\n{len(self.donors)} donors",
+                inline=True
+            )
+            
+            # Show price changes
+            price_changes = []
+            for ore_code, new_price in updated_prices.items():
+                all_ores = {
+                    'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+                    'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+                    'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+                    'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+                    'TITA': 'Titanium', 'TUNG': 'Tungsten'
+                }
+                ore_name = all_ores.get(ore_code, ore_code)
+                price_changes.append(f"**{ore_name}:** {new_price:,.0f} aUEC ✏️")
+            
+            if price_changes:
+                embed.add_field(
+                    name="✏️ Price Updates",
+                    value="\n".join(price_changes[:5]),
+                    inline=False
+                )
+            
+            await interaction.edit_original_response(embed=embed, view=self.parent_view)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Updating Prices",
+                    description=f"An error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class FinalCalculateButton(ui.Button):
+    """Button to execute final payroll calculation."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, donors, prices, total_value, breakdown):
+        super().__init__(
+            label="Calculate Final Payroll",
+            style=discord.ButtonStyle.success,
+            emoji="✅"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.donors = donors
+        self.prices = prices
+        self.total_value = total_value
+        self.breakdown = breakdown
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Calculate final payroll with donations
+            result = await self.calculator.calculate_payroll(
+                event_id=self.event_data['event_id'],
+                total_value_auec=self.total_value,
+                collection_data={
+                    'ores': self.ore_quantities,
+                    'total_scu': sum(self.ore_quantities.values()),
+                    'breakdown': self.breakdown
+                },
+                price_data=self.prices,
+                calculated_by_id=interaction.user.id,
+                calculated_by_name=interaction.user.display_name,
+                donation_data={
+                    'donors': list(self.donors),
+                    'donation_percentage': 0  # Individual donation system, not percentage
+                }
+            )
+            
+            if not result['success']:
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ Payroll Calculation Failed",
+                        description=result['error'],
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+                return
+            
+            # Show final payroll results
+            embed = discord.Embed(
+                title="✅ Payroll Calculation Complete!",
+                description=f"**Event:** {self.event_data['event_id']}\n"
+                           f"**Total Value:** {result['total_value_auec']:,.2f} aUEC\n"
+                           f"**Participants:** {result['total_participants']}",
+                color=discord.Color.green(),
+                timestamp=discord.utils.utcnow()
+            )
+            
+            embed.add_field(
+                name="📊 Distribution Summary",
+                value=f"**Session Duration:** {result.get('total_minutes', 'Unknown')} minutes\n"
+                      f"**Donors:** {len(self.donors)} participants\n"
+                      f"**Payroll ID:** `{result.get('payroll_id', 'Unknown')}`",
+                inline=False
+            )
+            
+            # Show top payouts
+            if result.get('payouts'):
+                top_payouts = sorted(result['payouts'], key=lambda x: x.get('final_payout_auec', 0), reverse=True)[:5]
+                payout_text = []
+                for payout in top_payouts:
+                    donation_marker = " 💝" if str(payout.get('user_id', '')) in self.donors else ""
+                    payout_text.append(
+                        f"**{payout.get('username', 'Unknown')}:** {payout.get('final_payout_auec', 0):,.0f} aUEC "
+                        f"({payout.get('participation_minutes', 0)}min){donation_marker}"
+                    )
+                
+                embed.add_field(
+                    name="🏆 Top Payouts",
+                    value="\n".join(payout_text),
+                    inline=False
+                )
+            
+            embed.set_footer(text=f"Calculated by {interaction.user.display_name}")
+            
+            # Disable all buttons in the view
+            for item in self.view.children:
+                item.disabled = True
+            
+            await interaction.edit_original_response(embed=embed, view=self.view)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Calculating Payroll",
+                    description=f"An unexpected error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
+class BackToParticipantsButton(ui.Button):
+    """Button to go back to Step 4: Participant selection."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants):
+        super().__init__(
+            label="← Back: Change Participants",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Go back to Step 4
+        view = ParticipantSelectionView(
+            self.event_data, self.processor, self.calculator,
+            self.ore_quantities, self.participants
+        )
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 5: Event Selected** ✅\n"
+                       f"**Step 2 of 5: Select Ore Types** ✅\n"
+                       f"**Step 3 of 5: Enter Quantities** ✅\n"
+                       f"**Step 4 of 5: Participant Donations** ⏳\n\n"
+                       f"Select which participants want to donate their share.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="👥 Event Participants",
+            value=f"Found {len(self.participants)} participants",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="💰 Donation Options",
+            value="Check boxes for participants who want to donate their share to others",
+            inline=True
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class CancelButton(ui.Button):
+    """Universal cancel button."""
+    
+    def __init__(self):
+        super().__init__(
+            label="Cancel",
+            style=discord.ButtonStyle.secondary,
+            emoji="❌"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="❌ Payroll Calculation Cancelled",
+            description="The payroll calculation has been cancelled.",
+            color=discord.Color.orange()
+        )
+        
+        # Disable all buttons
+        for item in self.view.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(embed=embed, view=self.view)
+
+
 class SalvageCollectionModal(ui.Modal):
     """Modal for inputting salvage collections."""
     
