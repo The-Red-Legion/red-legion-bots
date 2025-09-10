@@ -1260,6 +1260,536 @@ class PriceEditModal(ui.Modal):
             )
 
 
+class ImprovedOreSelectionView(ui.View):
+    """Improved 5-step ore selection workflow for mining payroll."""
+    
+    def __init__(self, event_data: Dict, processor, calculator):
+        super().__init__(timeout=600)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.selected_ores = set()
+        self.step = 2  # Step 2: Ore Selection
+        
+        # Add alphabetical ore selection dropdown
+        self.add_item(AlphabeticalOreSelector(self.selected_ores, self))
+        
+        # Add next button (initially disabled)
+        next_button = NextToQuantitiesButton(self.event_data, self.processor, self.calculator, self.selected_ores, self)
+        next_button.disabled = True
+        self.add_item(next_button)
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+    
+    def update_next_button(self):
+        """Enable/disable next button based on selections."""
+        for item in self.children:
+            if isinstance(item, NextToQuantitiesButton):
+                item.disabled = len(self.selected_ores) == 0
+
+
+class AlphabeticalOreSelector(ui.Select):
+    """Single dropdown with all ores in alphabetical order."""
+    
+    def __init__(self, selected_ores: set, parent_view):
+        self.selected_ores = selected_ores
+        self.parent_view = parent_view
+        
+        # All ores in alphabetical order (no groupings)
+        all_ores = {
+            'AGRI': 'Agricium',
+            'ALUM': 'Aluminum', 
+            'BERY': 'Beryl',
+            'BEXA': 'Bexalite',
+            'BORA': 'Borase',
+            'COPP': 'Copper',
+            'DIAM': 'Diamond',
+            'GOLD': 'Gold',
+            'HADA': 'Hadanite',
+            'HEPH': 'Hephaestanite',
+            'INRT': 'Inert Materials',
+            'LARA': 'Laranite',
+            'QUAN': 'Quantanium',
+            'TARA': 'Taranite',
+            'TITA': 'Titanium',
+            'TUNG': 'Tungsten'
+        }
+        
+        # Sort by full name alphabetically
+        sorted_ores = sorted(all_ores.items(), key=lambda x: x[1])
+        
+        options = []
+        for ore_code, ore_name in sorted_ores:
+            options.append(discord.SelectOption(
+                label=ore_name,
+                description=f"Select if {ore_name} was collected",
+                value=ore_code,
+                emoji="⛏️"
+            ))
+        
+        super().__init__(
+            placeholder="Select ore types that were collected...",
+            options=options,
+            min_values=0,
+            max_values=len(options)  # Allow selecting all ores
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Update selected ores
+        self.selected_ores.clear()
+        self.selected_ores.update(self.values)
+        
+        # Update parent view button states
+        self.parent_view.update_next_button()
+        
+        # Show selection feedback
+        if self.values:
+            ore_names = []
+            all_ores = {
+                'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+                'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+                'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+                'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+                'TITA': 'Titanium', 'TUNG': 'Tungsten'
+            }
+            
+            for code in self.values:
+                ore_names.append(all_ores.get(code, code))
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {self.parent_view.event_data['event_id']}",
+                description=f"**Step 1 of 5: Event Selected** ✅\n"
+                           f"**Step 2 of 5: Select Ore Types** ✅\n\n"
+                           f"**Selected {len(self.selected_ores)} ore types:**\n"
+                           f"{', '.join(sorted(ore_names))}",
+                color=discord.Color.green()
+            )
+            
+            embed.add_field(
+                name="🔄 Next Step",
+                value="Click 'Next: Enter Quantities' to proceed to Step 3",
+                inline=False
+            )
+        else:
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {self.parent_view.event_data['event_id']}",
+                description=f"**Step 1 of 5: Event Selected** ✅\n"
+                           f"**Step 2 of 5: Select Ore Types** ⏳\n\n"
+                           f"Select which ore types were collected during this mining session.",
+                color=discord.Color.blue()
+            )
+        
+        # Force update the view to refresh button states
+        try:
+            await interaction.response.edit_message(embed=embed, view=self.parent_view)
+        except:
+            await interaction.response.defer()
+
+
+class NextToQuantitiesButton(ui.Button):
+    """Button to proceed to Step 3: Ore Quantities."""
+    
+    def __init__(self, event_data, processor, calculator, selected_ores, parent_view):
+        super().__init__(
+            label="Next: Enter Quantities →",
+            style=discord.ButtonStyle.primary,
+            emoji="📊"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.selected_ores = selected_ores
+        self.parent_view = parent_view
+    
+    async def callback(self, interaction: discord.Interaction):
+        if not self.selected_ores:
+            await interaction.response.send_message(
+                "❌ Please select at least one ore type before proceeding.",
+                ephemeral=True
+            )
+            return
+        
+        # Move to Step 3: Quantity Entry
+        view = OreQuantityView(self.event_data, self.processor, self.calculator, self.selected_ores)
+        
+        # Create ore names list for display
+        all_ores = {
+            'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+            'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+            'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+            'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+            'TITA': 'Titanium', 'TUNG': 'Tungsten'
+        }
+        
+        ore_names = []
+        for code in sorted(self.selected_ores):
+            ore_names.append(all_ores.get(code, code))
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 5: Event Selected** ✅\n"
+                       f"**Step 2 of 5: Select Ore Types** ✅\n"
+                       f"**Step 3 of 5: Enter Quantities** ⏳\n\n"
+                       f"Enter the SCU amounts for each selected ore type.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="📦 Selected Ores",
+            value=f"{', '.join(ore_names)} ({len(ore_names)} types)",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🔄 Instructions",
+            value="1. Click 'Enter SCU Amounts' below\n"
+                  "2. Fill in quantities for each ore type\n"
+                  "3. Submit to proceed to participant selection",
+            inline=False
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class OreQuantityView(ui.View):
+    """Step 3: Enter quantities for selected ores."""
+    
+    def __init__(self, event_data, processor, calculator, selected_ores):
+        super().__init__(timeout=600)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.selected_ores = selected_ores
+        
+        # Add enter quantities button
+        self.add_item(EnterQuantitiesButton(event_data, processor, calculator, selected_ores))
+        
+        # Add back button
+        self.add_item(BackToOreSelectionButton(event_data, processor, calculator))
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+
+
+class EnterQuantitiesButton(ui.Button):
+    """Button to open quantity entry modal."""
+    
+    def __init__(self, event_data, processor, calculator, selected_ores):
+        super().__init__(
+            label="Enter SCU Amounts",
+            style=discord.ButtonStyle.primary,
+            emoji="📊"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.selected_ores = selected_ores
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Open modal for quantity entry
+        modal = OreQuantityModal(self.event_data, self.processor, self.calculator, self.selected_ores)
+        await interaction.response.send_modal(modal)
+
+
+class BackToOreSelectionButton(ui.Button):
+    """Button to go back to Step 2."""
+    
+    def __init__(self, event_data, processor, calculator):
+        super().__init__(
+            label="← Back: Change Ore Selection",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Go back to Step 2
+        view = ImprovedOreSelectionView(self.event_data, self.processor, self.calculator)
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 5: Event Selected** ✅\n"
+                       f"**Step 2 of 5: Select Ore Types** ⏳\n\n"
+                       f"Select which ore types were collected during this mining session.",
+            color=discord.Color.blue()
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class OreQuantityModal(ui.Modal):
+    """Modal for entering ore quantities (Step 3)."""
+    
+    def __init__(self, event_data, processor, calculator, selected_ores):
+        super().__init__(title=f'Enter Ore Quantities - {event_data["event_id"]}')
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.selected_ores = selected_ores
+        
+        # Create input fields for selected ores (no 5-field limit!)
+        all_ores = {
+            'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+            'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+            'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+            'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+            'TITA': 'Titanium', 'TUNG': 'Tungsten'
+        }
+        
+        self.ore_inputs = {}
+        sorted_selected = sorted(selected_ores)
+        
+        # Add input fields for up to 5 ores (Discord modal limit)
+        # If more than 5, we'll need to handle in batches
+        for i, ore_code in enumerate(sorted_selected[:5]):
+            ore_name = all_ores.get(ore_code, ore_code)
+            
+            ore_input = ui.TextInput(
+                label=f'{ore_name} (SCU)',
+                placeholder=f'Enter SCU amount for {ore_name}',
+                required=True,
+                max_length=10
+            )
+            
+            self.ore_inputs[ore_code] = ore_input
+            self.add_item(ore_input)
+        
+        # If more than 5 ores selected, show note
+        if len(selected_ores) > 5:
+            self.remaining_ores = sorted_selected[5:]
+        else:
+            self.remaining_ores = []
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse entered quantities
+            ore_quantities = {}
+            for ore_code, input_field in self.ore_inputs.items():
+                try:
+                    quantity = float(input_field.value.strip())
+                    if quantity < 0:
+                        await interaction.followup.send(
+                            f"❌ Quantity for {ore_code} must be 0 or greater.",
+                            ephemeral=True
+                        )
+                        return
+                    ore_quantities[ore_code] = quantity
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ Invalid quantity for {ore_code}: '{input_field.value}'",
+                        ephemeral=True
+                    )
+                    return
+            
+            # If there are remaining ores, show second modal
+            if self.remaining_ores:
+                modal = OreQuantityModal2(
+                    self.event_data, self.processor, self.calculator, 
+                    self.remaining_ores, ore_quantities
+                )
+                await interaction.followup.send_modal(modal)
+                return
+            
+            # All quantities collected, move to Step 4: Participant Selection
+            await self._proceed_to_participants(interaction, ore_quantities)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Processing Quantities",
+                    description=f"An error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+    
+    async def _proceed_to_participants(self, interaction, ore_quantities):
+        """Move to Step 4: Participant Selection."""
+        # Get event participants
+        participants = await self.calculator.get_event_participants(self.event_data['event_id'])
+        
+        if not participants:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ No Participants Found",
+                    description="No participants found for this event.",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+            return
+        
+        view = ParticipantSelectionView(
+            self.event_data, self.processor, self.calculator, 
+            ore_quantities, participants
+        )
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 5: Event Selected** ✅\n"
+                       f"**Step 2 of 5: Select Ore Types** ✅\n"
+                       f"**Step 3 of 5: Enter Quantities** ✅\n"
+                       f"**Step 4 of 5: Participant Donations** ⏳\n\n"
+                       f"Select which participants want to donate their share.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="👥 Event Participants",
+            value=f"Found {len(participants)} participants",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="💰 Donation Options",
+            value="Check boxes for participants who want to donate their share to others",
+            inline=True
+        )
+        
+        await interaction.followup.edit_message(
+            interaction.message.id,
+            embed=embed,
+            view=view
+        )
+
+
+class OreQuantityModal2(ui.Modal):
+    """Second modal for remaining ores if more than 5 selected."""
+    
+    def __init__(self, event_data, processor, calculator, remaining_ores, first_batch_quantities):
+        super().__init__(title=f'More Ore Quantities - {event_data["event_id"]}')
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.remaining_ores = remaining_ores
+        self.first_batch_quantities = first_batch_quantities
+        
+        all_ores = {
+            'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+            'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+            'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+            'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+            'TITA': 'Titanium', 'TUNG': 'Tungsten'
+        }
+        
+        self.ore_inputs = {}
+        
+        # Add input fields for remaining ores (up to 5 more)
+        for i, ore_code in enumerate(remaining_ores[:5]):
+            ore_name = all_ores.get(ore_code, ore_code)
+            
+            ore_input = ui.TextInput(
+                label=f'{ore_name} (SCU)',
+                placeholder=f'Enter SCU amount for {ore_name}',
+                required=True,
+                max_length=10
+            )
+            
+            self.ore_inputs[ore_code] = ore_input
+            self.add_item(ore_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse entered quantities and combine with first batch
+            all_ore_quantities = self.first_batch_quantities.copy()
+            
+            for ore_code, input_field in self.ore_inputs.items():
+                try:
+                    quantity = float(input_field.value.strip())
+                    if quantity < 0:
+                        await interaction.followup.send(
+                            f"❌ Quantity for {ore_code} must be 0 or greater.",
+                            ephemeral=True
+                        )
+                        return
+                    all_ore_quantities[ore_code] = quantity
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ Invalid quantity for {ore_code}: '{input_field.value}'",
+                        ephemeral=True
+                    )
+                    return
+            
+            # Check if there are even more ores (highly unlikely but possible)
+            if len(self.remaining_ores) > 5:
+                # Would need OreQuantityModal3, but this is very edge case
+                await interaction.followup.send(
+                    "❌ Too many ore types selected. Please reduce selection or contact admin.",
+                    ephemeral=True
+                )
+                return
+            
+            # Move to Step 4: Participant Selection
+            await self._proceed_to_participants(interaction, all_ore_quantities)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Processing Quantities",
+                    description=f"An error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+    
+    async def _proceed_to_participants(self, interaction, ore_quantities):
+        """Move to Step 4: Participant Selection."""
+        # Get event participants
+        participants = await self.calculator.get_event_participants(self.event_data['event_id'])
+        
+        if not participants:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ No Participants Found", 
+                    description="No participants found for this event.",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+            return
+        
+        view = ParticipantSelectionView(
+            self.event_data, self.processor, self.calculator,
+            ore_quantities, participants
+        )
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 5: Event Selected** ✅\n"
+                       f"**Step 2 of 5: Select Ore Types** ✅\n"
+                       f"**Step 3 of 5: Enter Quantities** ✅\n"
+                       f"**Step 4 of 5: Participant Donations** ⏳\n\n"
+                       f"Select which participants want to donate their share.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="👥 Event Participants",
+            value=f"Found {len(participants)} participants",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="💰 Donation Options", 
+            value="Check boxes for participants who want to donate their share to others",
+            inline=True
+        )
+        
+        # Try to edit the original message
+        try:
+            original_message = interaction.message
+            await original_message.edit(embed=embed, view=view)
+        except:
+            await interaction.followup.send(embed=embed, view=view)
+
+
 class SalvageCollectionModal(ui.Modal):
     """Modal for inputting salvage collections."""
     

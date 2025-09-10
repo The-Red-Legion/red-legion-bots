@@ -118,11 +118,35 @@ class EventSelectionDropdown(ui.Select):
         
         # Show appropriate collection interface
         if self.event_type == 'mining':
-            # Use direct mining collection modal for simplicity
-            from .modals import MiningCollectionModal
-            modal = MiningCollectionModal(selected_event, self.processor, self.calculator)
-            await interaction.response.send_modal(modal)
-            return
+            # Use proper 5-step ore selection workflow
+            from .modals import ImprovedOreSelectionView
+            view = ImprovedOreSelectionView(selected_event, self.processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
+                description=f"**Step 1 of 5: Event Selected** ✅\n"
+                           f"**Step 2 of 5: Select Ore Types** ⏳\n\n"
+                           f"Select which ore types were collected during this mining session.",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="📋 Event Details",
+                value=f"**Event:** {selected_event['event_name']}\n"
+                      f"**Organizer:** {selected_event['organizer_name']}\n"
+                      f"**Date:** {format_event_date(selected_event.get('started_at'))}",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🔄 Instructions",
+                value="1. Select ore types from the dropdown below\n"
+                      "2. Click 'Next: Enter Quantities' to proceed\n"
+                      "3. You can select multiple ore types",
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
             
         elif self.event_type == 'salvage':
             from .modals import SalvageCollectionModal
@@ -130,9 +154,16 @@ class EventSelectionDropdown(ui.Select):
             await interaction.response.send_modal(modal)
         else:
             # Default to mining system for combat/other types for now
-            from .modals import MiningCollectionModal
-            modal = MiningCollectionModal(selected_event, self.processor, self.calculator)
-            await interaction.response.send_modal(modal)
+            from .modals import ImprovedOreSelectionView
+            view = ImprovedOreSelectionView(selected_event, self.processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"📋 {self.event_type.title()} Payroll - {selected_event['event_id']}",
+                description="Using mining collection system as placeholder.\nSelect materials collected during the operation.",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 
 class UnifiedEventSelectionDropdown(ui.Select):
@@ -219,11 +250,35 @@ class UnifiedEventSelectionDropdown(ui.Select):
         
         # Show appropriate collection interface
         if event_type == 'mining':
-            # Use direct mining collection modal for simplicity
-            from .modals import MiningCollectionModal
-            modal = MiningCollectionModal(selected_event, processor, self.calculator)
-            await interaction.response.send_modal(modal)
-            return
+            # Use proper 5-step ore selection workflow
+            from .modals import ImprovedOreSelectionView
+            view = ImprovedOreSelectionView(selected_event, processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
+                description=f"**Step 1 of 5: Event Selected** ✅\n"
+                           f"**Step 2 of 5: Select Ore Types** ⏳\n\n"
+                           f"Select which ore types were collected during this mining session.",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="📋 Event Details",
+                value=f"**Event:** {selected_event['event_name']}\n"
+                      f"**Organizer:** {selected_event['organizer_name']}\n"
+                      f"**Date:** {format_event_date(selected_event.get('started_at'))}",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🔄 Instructions",
+                value="1. Select ore types from the dropdown below\n"
+                      "2. Click 'Next: Enter Quantities' to proceed\n"
+                      "3. You can select multiple ore types",
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
             
         elif event_type == 'salvage':
             from .modals import SalvageCollectionModal
@@ -231,9 +286,16 @@ class UnifiedEventSelectionDropdown(ui.Select):
             await interaction.response.send_modal(modal)
         else:
             # Default to mining system for combat/other types for now
-            from .modals import MiningCollectionModal
-            modal = MiningCollectionModal(selected_event, processor, self.calculator)
-            await interaction.response.send_modal(modal)
+            from .modals import ImprovedOreSelectionView
+            view = ImprovedOreSelectionView(selected_event, processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"📋 {event_type.title()} Payroll - {selected_event['event_id']}",
+                description="Using mining collection system as placeholder.\nSelect materials collected during the operation.",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 
 class PayrollConfirmationView(ui.View):
