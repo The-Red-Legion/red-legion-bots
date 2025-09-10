@@ -305,8 +305,14 @@ class EventDeleteConfirmationModal(discord.ui.Modal):
             
             # 2. Check Mining Channels Configuration
             try:
-                from config.settings import get_sunday_mining_channels
-                channels_config = get_sunday_mining_channels(guild.id)
+                from config.settings import get_sunday_mining_channels, SUNDAY_MINING_CHANNELS_FALLBACK
+                
+                # Try database lookup with fallback if it hangs/fails
+                try:
+                    channels_config = get_sunday_mining_channels(guild.id)
+                except Exception as db_error:
+                    print(f"Database lookup failed, using fallback: {db_error}")
+                    channels_config = SUNDAY_MINING_CHANNELS_FALLBACK
                 
                 channel_status = []
                 dispatch_channel = None
@@ -314,17 +320,19 @@ class EventDeleteConfirmationModal(discord.ui.Modal):
                 
                 if channels_config:
                     # Check dispatch channel
-                    if 'dispatch_channel_id' in channels_config:
-                        dispatch_id = channels_config['dispatch_channel_id']
+                    if 'dispatch' in channels_config:
+                        dispatch_id = int(channels_config['dispatch'])
                         dispatch_channel = guild.get_channel(dispatch_id)
                         if dispatch_channel:
                             channel_status.append(f"📢 Dispatch: `{dispatch_channel.name}` ✅")
                         else:
                             channel_status.append(f"📢 Dispatch: ID `{dispatch_id}` ❌ Not Found")
                     
-                    # Check voice channels
-                    if 'voice_channel_ids' in channels_config:
-                        for vc_id in channels_config['voice_channel_ids']:
+                    # Check voice channels (all non-dispatch channels)
+                    voice_channel_configs = {k: v for k, v in channels_config.items() if k != 'dispatch'}
+                    for channel_name, vc_id_str in voice_channel_configs.items():
+                        try:
+                            vc_id = int(vc_id_str)
                             vc = guild.get_channel(vc_id)
                             if vc:
                                 # Check bot permissions in this specific channel
@@ -334,6 +342,8 @@ class EventDeleteConfirmationModal(discord.ui.Modal):
                                 voice_channels.append((vc, vc_perms))
                             else:
                                 channel_status.append(f"🎤 Voice: ID `{vc_id}` ❌ Not Found")
+                        except (ValueError, TypeError):
+                            channel_status.append(f"🎤 Voice: `{channel_name}` ❌ Invalid ID")
                 else:
                     channel_status.append("❌ No mining channels configured")
                 

@@ -120,16 +120,22 @@ class DiagnosticCommands(commands.GroupCog, name="diagnostics", description="Bot
                 timestamp=datetime.now()
             )
             
-            # Try to get mining channels config
+            # Try to get mining channels config with timeout fallback
             try:
-                from config.settings import get_sunday_mining_channels
-                channels_config = get_sunday_mining_channels(guild.id)
+                from config.settings import get_sunday_mining_channels, SUNDAY_MINING_CHANNELS_FALLBACK
+                
+                # Try database lookup with fallback if it hangs/fails
+                try:
+                    channels_config = get_sunday_mining_channels(guild.id)
+                except Exception as db_error:
+                    print(f"Database lookup failed, using fallback: {db_error}")
+                    channels_config = SUNDAY_MINING_CHANNELS_FALLBACK
                 
                 if channels_config:
                     # Test dispatch channel
                     dispatch_status = []
-                    if 'dispatch_channel_id' in channels_config:
-                        dispatch_id = channels_config['dispatch_channel_id']
+                    if 'dispatch' in channels_config:
+                        dispatch_id = int(channels_config['dispatch'])
                         dispatch_ch = guild.get_channel(dispatch_id)
                         if dispatch_ch:
                             perms = dispatch_ch.permissions_for(bot_member)
@@ -146,20 +152,26 @@ class DiagnosticCommands(commands.GroupCog, name="diagnostics", description="Bot
                         inline=False
                     )
                     
-                    # Test voice channels
+                    # Test voice channels (all non-dispatch channels)
                     voice_status = []
-                    if 'voice_channel_ids' in channels_config:
-                        for i, vc_id in enumerate(channels_config['voice_channel_ids'][:5]):  # Limit to 5
-                            vc = guild.get_channel(vc_id)
-                            if vc:
-                                perms = vc.permissions_for(bot_member)
-                                can_connect = perms.connect and perms.view_channel
-                                voice_status.append(f"`{vc.name}`: {'✅' if can_connect else '❌'}")
-                            else:
-                                voice_status.append(f"ID `{vc_id}`: ❌ Not Found")
+                    voice_channels = {k: v for k, v in channels_config.items() if k != 'dispatch'}
+                    
+                    if voice_channels:
+                        for channel_name, vc_id_str in list(voice_channels.items())[:5]:  # Limit to 5
+                            try:
+                                vc_id = int(vc_id_str)
+                                vc = guild.get_channel(vc_id)
+                                if vc:
+                                    perms = vc.permissions_for(bot_member)
+                                    can_connect = perms.connect and perms.view_channel
+                                    voice_status.append(f"`{vc.name}`: {'✅' if can_connect else '❌'}")
+                                else:
+                                    voice_status.append(f"ID `{vc_id}`: ❌ Not Found")
+                            except (ValueError, TypeError):
+                                voice_status.append(f"`{channel_name}`: ❌ Invalid ID")
                         
-                        if len(channels_config['voice_channel_ids']) > 5:
-                            voice_status.append(f"... and {len(channels_config['voice_channel_ids']) - 5} more")
+                        if len(voice_channels) > 5:
+                            voice_status.append(f"... and {len(voice_channels) - 5} more")
                     else:
                         voice_status.append("❌ No voice channels configured")
                     
