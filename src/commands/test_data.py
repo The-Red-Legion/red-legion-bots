@@ -90,8 +90,8 @@ class TestDataCreationModal(ui.Modal):
                 await interaction.followup.send("❌ Duration must be between 0.5 and 12 hours", ephemeral=True)
                 return
             
-            # Show creating progress
-            await interaction.followup.send(
+            # Show creating progress message
+            progress_message = await interaction.followup.send(
                 embed=discord.Embed(
                     title="⏳ Creating Test Event",
                     description=f"Creating test mining event with {participants} participants...",
@@ -124,7 +124,7 @@ class TestDataCreationModal(ui.Modal):
                 
                 embed.add_field(
                     name="🧪 Testing Commands",
-                    value=f"• Use `/payroll mining` with event ID `{result['event_id']}`\n"
+                    value=f"• Use `/payroll calculate` to calculate payroll for this event\n"
                           f"• Use `/mining status` to see event details\n"
                           f"• Use `/test-data delete` when done testing",
                     inline=False
@@ -132,15 +132,14 @@ class TestDataCreationModal(ui.Modal):
                 
                 embed.set_footer(text="⚠️ Remember to clean up test data when finished!")
                 
-                await interaction.edit_original_response(embed=embed, view=None)
+                await progress_message.edit(embed=embed)
             else:
-                await interaction.edit_original_response(
+                await progress_message.edit(
                     embed=discord.Embed(
                         title="❌ Error Creating Test Data",
                         description=result['error'],
                         color=discord.Color.red()
-                    ),
-                    view=None
+                    )
                 )
         
         except ValueError as e:
@@ -552,42 +551,59 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             try:
                 with conn.cursor() as cursor:
                     # Get test events to show (only new ts- format)
-                    cursor.execute("""
-                        SELECT event_id, event_name, location_notes, started_at, status, created_at 
-                        FROM events 
-                        WHERE event_id LIKE 'ts-%'
-                        ORDER BY created_at DESC 
-                        LIMIT 10
-                    """)
-                    test_data_summary['events'] = cursor.fetchall()
+                    try:
+                        cursor.execute("""
+                            SELECT event_id, event_name, location_notes, started_at, status, created_at 
+                            FROM events 
+                            WHERE event_id LIKE 'ts-%'
+                            ORDER BY created_at DESC 
+                            LIMIT 10
+                        """)
+                        test_data_summary['events'] = cursor.fetchall() or []
+                    except Exception as e:
+                        print(f"Error querying test events: {e}")
+                        test_data_summary['events'] = []
                     
                     # Count test users (both numeric test users and string-based legacy users)
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM users 
-                        WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
-                           OR user_id LIKE 'test_user_%'
-                           OR user_id LIKE 'TestMiner%'
-                    """)
-                    result = cursor.fetchone()
-                    test_data_summary['users'] = result[0] if result else 0
+                    try:
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM users 
+                            WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                               OR user_id LIKE 'test_user_%'
+                               OR user_id LIKE 'TestMiner%'
+                        """)
+                        result = cursor.fetchone()
+                        test_data_summary['users'] = result[0] if result else 0
+                    except Exception as e:
+                        print(f"Error counting test users: {e}")
+                        test_data_summary['users'] = 0
                     
                     # Count participation records (both numeric and legacy string user IDs)
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM participation 
-                        WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
-                           OR user_id LIKE 'test_user_%'
-                           OR user_id LIKE 'TestMiner%'
-                    """)
-                    result = cursor.fetchone()
-                    test_data_summary['participation'] = result[0] if result else 0
+                    try:
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM participation 
+                            WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                               OR user_id LIKE 'test_user_%'
+                               OR user_id LIKE 'TestMiner%'
+                        """)
+                        result = cursor.fetchone()
+                        test_data_summary['participation'] = result[0] if result else 0
+                    except Exception as e:
+                        print(f"Error counting participation records: {e}")
+                        test_data_summary['participation'] = 0
                     
                     # Count payroll records
-                    cursor.execute("SELECT COUNT(*) FROM payrolls WHERE event_id LIKE 'ts-%'")
-                    result = cursor.fetchone()
-                    test_data_summary['payrolls'] = result[0] if result else 0
+                    try:
+                        cursor.execute("SELECT COUNT(*) FROM payrolls WHERE event_id LIKE 'ts-%'")
+                        result = cursor.fetchone()
+                        test_data_summary['payrolls'] = result[0] if result else 0
+                    except Exception as e:
+                        print(f"Error counting payroll records: {e}")
+                        test_data_summary['payrolls'] = 0
             
             finally:
-                conn.close()
+                if conn:
+                    conn.close()
             
             # Create enhanced deletion confirmation UI
             embed = discord.Embed(
@@ -648,8 +664,13 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
             
         except Exception as e:
+            error_msg = str(e) if str(e) else f"Unknown error occurred (type: {type(e).__name__})"
+            print(f"Error in delete_test_data scanning: {error_msg}")
+            print(f"Exception type: {type(e)}")
+            print(f"Exception args: {e.args}")
+            
             await interaction.followup.send(
-                f"❌ Error scanning test data: {str(e)}", 
+                f"❌ Error scanning test data: {error_msg}", 
                 ephemeral=True
             )
 
