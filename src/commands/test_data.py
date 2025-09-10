@@ -9,7 +9,12 @@ from discord.ext import commands
 from datetime import datetime, timedelta
 import random
 import string
+import sys
+from pathlib import Path
 from typing import Optional
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 class TestDataCommands(commands.GroupCog, name="test-data"):
     """Test data generation commands for mining system (Admin only)"""
@@ -45,8 +50,8 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                 return
             
             # Import required modules
-            from src.config.settings import get_database_url
-            from src.database.connection import resolve_database_url
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
             import psycopg2
             from psycopg2.extras import RealDictCursor
             
@@ -223,8 +228,8 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             
             await interaction.response.defer()
             
-            from src.config.settings import get_database_url
-            from src.database.connection import resolve_database_url
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
             import psycopg2
             from psycopg2.extras import RealDictCursor
             
@@ -324,8 +329,8 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
     async def test_status(self, interaction: discord.Interaction):
         """Show current test data status in the unified database"""
         try:
-            from src.config.settings import get_database_url
-            from src.database.connection import resolve_database_url
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
             import psycopg2
             from psycopg2.extras import RealDictCursor
             
