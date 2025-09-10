@@ -68,11 +68,11 @@ class AdminCommands(commands.GroupCog, name="admin", description="Administrative
             view = EventDeleteView(events)
             
             embed = discord.Embed(
-                title="🗑️ Delete Event",
+                title="🗑️ Delete Events",
                 description="⚠️ **WARNING: This action cannot be undone!**\n\n"
-                           "Select an event to delete from the dropdown below.\n"
+                           "Select one or more events to delete from the dropdown below.\n"
                            "This will permanently remove:\n"
-                           "• The event record\n"
+                           "• The event records\n"
                            "• All participation data\n" 
                            "• Any payroll calculations\n"
                            "• All associated data",
@@ -150,31 +150,30 @@ class EventDeleteDropdown(discord.ui.Select):
             ))
         
         super().__init__(
-            placeholder="Select an event to delete...",
+            placeholder="Select one or more events to delete...",
             options=options,
             min_values=1,
-            max_values=1
+            max_values=min(len(options), 25)  # Allow selecting up to all available events
         )
     
     async def callback(self, interaction: discord.Interaction):
-        selected_event_id = self.values[0]
+        selected_event_ids = self.values  # Now handling multiple selections
         
-        # Find the selected event
-        selected_event = None
+        # Find the selected events
+        selected_events = []
         for event in self.events:
-            if event['event_id'] == selected_event_id:
-                selected_event = event
-                break
+            if event['event_id'] in selected_event_ids:
+                selected_events.append(event)
         
-        if not selected_event:
+        if not selected_events:
             await interaction.response.send_message(
-                "❌ Selected event not found.",
+                "❌ Selected events not found.",
                 ephemeral=True
             )
             return
         
-        # Show confirmation modal
-        modal = EventDeleteConfirmationModal(selected_event)
+        # Show confirmation modal for bulk deletion
+        modal = EventBulkDeleteConfirmationModal(selected_events)
         await interaction.response.send_modal(modal)
 
 
@@ -269,7 +268,124 @@ class EventDeleteConfirmationModal(discord.ui.Modal):
                 color=discord.Color.red()
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+class EventBulkDeleteConfirmationModal(discord.ui.Modal):
+    """Modal for confirming bulk event deletion."""
     
+    def __init__(self, events: List[Dict]):
+        event_count = len(events)
+        super().__init__(title=f'Confirm Delete {event_count} Event{"s" if event_count > 1 else ""}')
+        self.events = events
+        
+        # Show summary of what will be deleted
+        event_ids = [event['event_id'] for event in events[:5]]  # Show first 5 IDs
+        if len(events) > 5:
+            event_ids.append(f"... and {len(events) - 5} more")
+        
+        # Confirmation input - require typing the count
+        self.confirmation = discord.ui.TextInput(
+            label=f'Type "{event_count}" to confirm deletion of {event_count} events',
+            placeholder=f'Type {event_count} to confirm bulk deletion',
+            required=True,
+            max_length=10
+        )
+        self.add_item(self.confirmation)
+        
+        # Event list display
+        self.event_summary = discord.ui.TextInput(
+            label='Events to be deleted (READ ONLY)',
+            default=", ".join(event_ids),
+            required=False,
+            max_length=1000,
+            style=discord.TextStyle.paragraph
+        )
+        self.add_item(self.event_summary)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        expected_count = str(len(self.events))
+        if self.confirmation.value.strip() != expected_count:
+            await interaction.response.send_message(
+                f"❌ Deletion cancelled. You must type '{expected_count}' to confirm deletion of {len(self.events)} events.",
+                ephemeral=True
+            )
+            return
+        
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            deleted_events = []
+            total_participation_deleted = 0
+            total_payrolls_deleted = 0
+            
+            # Delete events in bulk transaction
+            with get_cursor() as cursor:
+                cursor.execute("BEGIN")
+                
+                try:
+                    for event in self.events:
+                        event_id = event['event_id']
+                        
+                        # Delete payrolls for this event
+                        cursor.execute("DELETE FROM payrolls WHERE event_id = %s", (event_id,))
+                        total_payrolls_deleted += cursor.rowcount
+                        
+                        # Delete participation records for this event
+                        cursor.execute("DELETE FROM participation WHERE event_id = %s", (event_id,))
+                        total_participation_deleted += cursor.rowcount
+                        
+                        # Delete the event itself
+                        cursor.execute("DELETE FROM events WHERE event_id = %s", (event_id,))
+                        if cursor.rowcount > 0:
+                            deleted_events.append(event_id)
+                    
+                    cursor.execute("COMMIT")
+                    
+                    # Create success embed
+                    embed = discord.Embed(
+                        title="✅ Bulk Event Deletion Successful",
+                        description=f"Successfully deleted **{len(deleted_events)}** events.",
+                        color=discord.Color.green()
+                    )
+                    
+                    embed.add_field(
+                        name="🗑️ Deleted Data Summary",
+                        value=f"• {len(deleted_events)} event records\n"
+                              f"• {total_participation_deleted} participation records\n" 
+                              f"• {total_payrolls_deleted} payroll calculations",
+                        inline=False
+                    )
+                    
+                    if len(deleted_events) <= 10:
+                        embed.add_field(
+                            name="📋 Deleted Events",
+                            value=", ".join(deleted_events),
+                            inline=False
+                        )
+                    else:
+                        embed.add_field(
+                            name="📋 Deleted Events (First 10)",
+                            value=", ".join(deleted_events[:10]) + f"\n... and {len(deleted_events) - 10} more",
+                            inline=False
+                        )
+                    
+                    embed.set_footer(text="⚠️ This action cannot be undone")
+                    
+                except Exception as e:
+                    cursor.execute("ROLLBACK")
+                    raise e
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Error During Bulk Deletion",
+                description=f"An error occurred while deleting events: {str(e)}",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+
     @app_commands.command(name="voice-diagnostic", description="Diagnose voice channel connectivity issues")
     @app_commands.default_permissions(administrator=True)
     async def voice_diagnostic(self, interaction: discord.Interaction):
