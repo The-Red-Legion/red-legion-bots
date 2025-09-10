@@ -27,20 +27,39 @@
     msg: "Import test result: {{ import_test.stdout if import_test.rc == 0 else import_test.stderr }}"
   when: not ansible_check_mode and import_test is defined
 
-- name: Deploy complete database schema
-  command: python3 scripts/deploy_complete_schema.py
+- name: Test database connection
+  shell: |
+    python3 -c "
+    import sys, logging
+    sys.path.insert(0, 'src')
+    logging.disable(logging.CRITICAL)
+    from config.settings import get_database_url
+    from database.connection import resolve_database_url
+    import psycopg2
+    try:
+        db_url = get_database_url()
+        if not db_url:
+            print('ERROR: No database URL configured')
+            exit(1)
+        conn = psycopg2.connect(resolve_database_url(db_url))
+        conn.close()
+        print('SUCCESS: Database connection verified')
+    except Exception as e:
+        print(f'ERROR: Database connection failed: {e}')
+        exit(1)
+    "
   args:
     chdir: "{{ app_dir }}"
   environment:
     PYTHONPATH: "{{ app_dir }}:$PYTHONPATH"
-  register: db_init
+  register: db_test
   when: not ansible_check_mode
   ignore_errors: true
 
-- name: Show complete schema deployment result
+- name: Show database connection test result
   debug:
-    msg: "Complete schema deployment: {{ db_init.stdout if db_init.rc == 0 else db_init.stderr }}"
-  when: not ansible_check_mode and db_init is defined
+    msg: "Database connection test: {{ db_test.stdout if db_test.rc == 0 else db_test.stderr }}"
+  when: not ansible_check_mode and db_test is defined
 
 - name: Create environment file from template
   template:
@@ -87,7 +106,7 @@
     enabled: yes
     state: started
   register: start_result
-  when: not ansible_check_mode and (import_test is undefined or import_test.rc == 0) and (config_validation is undefined or config_validation.rc == 0)
+  when: not ansible_check_mode and (import_test is undefined or import_test.rc == 0) and (config_validation is undefined or config_validation.rc == 0) and (db_test is undefined or db_test.rc == 0)
 
 - name: Show startup debug info
   debug:

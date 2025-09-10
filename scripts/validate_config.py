@@ -16,9 +16,11 @@ def test_imports():
     """Test critical imports."""
     print("🧪 Testing imports...")
     try:
-        from src.config import get_database_url, DISCORD_CONFIG, UEX_API_CONFIG
-        from src.config.settings import get_secret
-        print("   ✅ Config imports successful")
+        # Test new modular config system
+        from src.config.settings import get_database_url, DISCORD_CONFIG, UEX_API_CONFIG, get_secret
+        from src.modules.mining import MiningCommands
+        from src.modules.payroll import PayrollCommands
+        print("   ✅ Config and module imports successful")
         return True
     except Exception as e:
         print(f"   ❌ Import error: {e}")
@@ -28,7 +30,7 @@ def test_environment():
     """Test environment configuration."""
     print("🧪 Testing environment configuration...")
     try:
-        from src.config import get_database_url, DISCORD_CONFIG, UEX_API_CONFIG
+        from src.config.settings import get_database_url, DISCORD_CONFIG, UEX_API_CONFIG
         
         # Test database URL
         db_url = get_database_url()

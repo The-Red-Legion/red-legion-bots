@@ -37,7 +37,7 @@ These commands are disabled as they reference the old event_handlers module.
 
 Created backward-compatible versions of moved files to ensure tests pass:
 
-- **`src/participation_bot.py`** - Legacy entry point that redirects to `main.py`
+- **`src/main.py`** - Primary bot entry point (clean, standard naming)
 - **`src/config.py`** - Compatibility wrapper for `config.settings`
 - **`src/database.py`** - Compatibility wrapper for `database.operations`
 - **`src/event_handlers.py`** - Compatibility wrapper for `handlers.*`

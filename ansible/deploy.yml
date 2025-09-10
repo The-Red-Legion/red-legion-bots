@@ -1,5 +1,5 @@
 ---
-- name: Full Deploy Participation Bot (Complete Codebase Copy)
+- name: Full Deploy Red Legion Bot (Complete Codebase Copy)
   hosts: arccorp_compute
   become: yes
   gather_facts: yes
@@ -261,7 +261,7 @@
       when: pycache_dirs.files is defined
 
     - name: Test Python imports (fresh environment)
-      command: python3 -c "import sys; print('Python path:', sys.path); import src.participation_bot"
+      command: python3 -c "import sys; print('Python path:', sys.path); sys.path.insert(0, 'src'); import main"
       args:
         chdir: "{{ app_dir }}"
       environment:

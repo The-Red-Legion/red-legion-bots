@@ -1,152 +1,195 @@
 ---
-# Database Migration Tasks for Red Legion Bot
-# Handles automated database schema updates during deployment
+# Database Migration Tasks for Red Legion Bot v2.0
+# Uses unified migration system with fallback to individual migrations
 
 - name: Database Migration - Setup and Execute
   block:
     - name: Display migration info
       debug:
         msg: |
-          ===== DATABASE MIGRATIONS =====
-          Running database schema migrations...
+          ===== DATABASE MIGRATIONS v2.0 =====
+          Running unified mining system migration...
           Time: {{ ansible_date_time.iso8601 }}
-          ================================
+          =====================================
 
-    - name: Check if migration tracking table exists
-      command: |
-        python3 -c "
-        import sys
-        import logging
-        sys.path.insert(0, '{{ app_dir }}/src')
-        
-        # Suppress logging output
-        logging.disable(logging.CRITICAL)
-        
-        from config.settings import get_database_url
-        from database.connection import resolve_database_url
-        import psycopg2
-        
-        db_url = get_database_url()
-        if not db_url:
-            print('NO_DB_URL')
-            exit(1)
-        
-        try:
+    - name: Check for unified migration system
+      stat:
+        path: "{{ app_dir }}/database_migrations/run_unified_migration.py"
+      register: unified_migration_script
+
+    - name: Apply unified migration system
+      when: unified_migration_script.stat.exists
+      block:
+        - name: Execute unified migration
+          command: python3 run_unified_migration.py
+          args:
+            chdir: "{{ app_dir }}/database_migrations"
+          register: unified_migration_result
+
+        - name: Parse unified migration result
+          set_fact:
+            unified_result: "{{ unified_migration_result.stdout_lines | select('match', '^\\{.*\\}$') | list | last | from_json }}"
+
+        - name: Display unified migration success
+          debug:
+            msg: |
+              ✅ UNIFIED MIGRATION COMPLETED ✅
+              Status: {{ unified_result.status }}
+              Message: {{ unified_result.message }}
+              Migration File: {{ unified_result.migration_file }}
+              Tables Created: {{ unified_result.tables_created | join(', ') }}
+              Applied At: {{ unified_result.applied_at }}
+              =====================================
+          when: unified_result.status == 'success'
+
+        - name: Handle unified migration failure
+          fail:
+            msg: |
+              ❌ UNIFIED MIGRATION FAILED ❌
+              Status: {{ unified_result.status }}
+              Error: {{ unified_result.message }}
+              Migration File: {{ unified_result.migration_file }}
+              ===================================
+          when: unified_result.status != 'success'
+
+    - name: Fallback to individual migrations
+      when: not unified_migration_script.stat.exists
+      block:
+        - name: Check if migration tracking table exists
+          command: |
+            python3 -c "
+            import sys
+            import logging
+            sys.path.insert(0, '{{ app_dir }}/src')
+            
+            # Suppress logging output
+            logging.disable(logging.CRITICAL)
+            
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
+            import psycopg2
+            
+            db_url = get_database_url()
+            if not db_url:
+                print('NO_DB_URL')
+                exit(1)
+            
+            try:
+                conn = psycopg2.connect(resolve_database_url(db_url))
+                with conn.cursor() as cursor:
+                    cursor.execute('''
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = 'schema_migrations'
+                        );
+                    ''')
+                    exists = cursor.fetchone()[0]
+                    print('EXISTS' if exists else 'NOT_EXISTS')
+                conn.close()
+            except Exception as e:
+                print(f'ERROR: {e}')
+                exit(1)
+            "
+          args:
+            chdir: "{{ app_dir }}"
+          register: migration_table_check
+          failed_when: migration_table_check.stdout.startswith('ERROR') or migration_table_check.stdout == 'NO_DB_URL'
+
+        - name: Create migration tracking table if needed
+          command: |
+            python3 -c "
+            import sys
+            import logging
+            sys.path.insert(0, '{{ app_dir }}/src')
+            
+            # Suppress logging output
+            logging.disable(logging.CRITICAL)
+            
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
+            import psycopg2
+            
+            db_url = get_database_url()
             conn = psycopg2.connect(resolve_database_url(db_url))
             with conn.cursor() as cursor:
                 cursor.execute('''
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_schema = 'public' 
-                        AND table_name = 'schema_migrations'
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        migration_name VARCHAR(255) PRIMARY KEY,
+                        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        success BOOLEAN DEFAULT TRUE,
+                        error_message TEXT,
+                        execution_time_ms INTEGER
                     );
                 ''')
-                exists = cursor.fetchone()[0]
-                print('EXISTS' if exists else 'NOT_EXISTS')
+                conn.commit()
             conn.close()
-        except Exception as e:
-            print(f'ERROR: {e}')
-            exit(1)
-        "
-      args:
-        chdir: "{{ app_dir }}"
-      register: migration_table_check
-      failed_when: migration_table_check.stdout.startswith('ERROR') or migration_table_check.stdout == 'NO_DB_URL'
+            print('MIGRATION_TABLE_CREATED')
+            "
+          args:
+            chdir: "{{ app_dir }}"
+          when: migration_table_check.stdout == 'NOT_EXISTS'
 
-    - name: Create migration tracking table if needed
-      command: |
-        python3 -c "
-        import sys
-        import logging
-        sys.path.insert(0, '{{ app_dir }}/src')
-        
-        # Suppress logging output
-        logging.disable(logging.CRITICAL)
-        
-        from config.settings import get_database_url
-        from database.connection import resolve_database_url
-        import psycopg2
-        
-        db_url = get_database_url()
-        conn = psycopg2.connect(resolve_database_url(db_url))
-        with conn.cursor() as cursor:
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    migration_name VARCHAR(255) PRIMARY KEY,
-                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    success BOOLEAN DEFAULT TRUE,
-                    error_message TEXT
-                );
-            ''')
-            conn.commit()
-        conn.close()
-        print('MIGRATION_TABLE_CREATED')
-        "
-      args:
-        chdir: "{{ app_dir }}"
-      when: migration_table_check.stdout == 'NOT_EXISTS'
-      register: create_migration_table
+        - name: Find all migration files
+          find:
+            paths: "{{ app_dir }}/database_migrations"
+            patterns: "*.sql"
+            file_type: file
+          register: migration_files
 
-    - name: Find all migration files
-      find:
-        paths: "{{ app_dir }}/database_migrations"
-        patterns: "*.sql"
-        file_type: file
-      register: migration_files
+        - name: Sort migration files by name
+          set_fact:
+            sorted_migrations: "{{ migration_files.files | sort(attribute='path') }}"
 
-    - name: Sort migration files by name
-      set_fact:
-        sorted_migrations: "{{ migration_files.files | sort(attribute='path') }}"
+        - name: Check which migrations have already been applied
+          command: |
+            python3 -c "
+            import sys
+            import os
+            sys.path.insert(0, '{{ app_dir }}/src')
+            
+            # Suppress logging output
+            import logging
+            logging.disable(logging.CRITICAL)
+            
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
+            import psycopg2
+            import json
+            
+            db_url = get_database_url()
+            conn = psycopg2.connect(resolve_database_url(db_url))
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT migration_name FROM schema_migrations WHERE success = TRUE')
+                applied = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            print(json.dumps(applied))
+            "
+          args:
+            chdir: "{{ app_dir }}"
+          register: applied_migrations_result
 
-    - name: Check which migrations have already been applied
-      command: |
-        python3 -c "
-        import sys
-        import os
-        sys.path.insert(0, '{{ app_dir }}/src')
-        
-        # Suppress logging output by redirecting stderr
-        import logging
-        logging.disable(logging.CRITICAL)
-        
-        from config.settings import get_database_url
-        from database.connection import resolve_database_url
-        import psycopg2
-        import json
-        
-        db_url = get_database_url()
-        conn = psycopg2.connect(resolve_database_url(db_url))
-        with conn.cursor() as cursor:
-            cursor.execute('SELECT migration_name FROM schema_migrations WHERE success = TRUE')
-            applied = [row[0] for row in cursor.fetchall()]
-        conn.close()
-        print(json.dumps(applied))
-        "
-      args:
-        chdir: "{{ app_dir }}"
-      register: applied_migrations_result
+        - name: Parse applied migrations
+          set_fact:
+            applied_migrations: "{{ applied_migrations_result.stdout_lines | select('match', '^\\[.*\\]$') | list | last | from_json }}"
 
-    - name: Parse applied migrations
-      set_fact:
-        applied_migrations: "{{ applied_migrations_result.stdout_lines | last | from_json }}"
+        - name: Apply pending migrations
+          include_tasks: apply_single_migration.yml
+          loop: "{{ sorted_migrations }}"
+          loop_control:
+            loop_var: migration_file
+          vars:
+            migration_name: "{{ migration_file.path | basename }}"
+          when: migration_name not in applied_migrations
 
-    - name: Apply pending migrations
-      include_tasks: apply_single_migration.yml
-      loop: "{{ sorted_migrations }}"
-      loop_control:
-        loop_var: migration_file
-      vars:
-        migration_name: "{{ migration_file.path | basename }}"
-      when: migration_name not in applied_migrations
-
-    - name: Display migration completion
-      debug:
-        msg: |
-          ✅ DATABASE MIGRATIONS COMPLETED ✅
-          Total migration files found: {{ sorted_migrations | length }}
-          Already applied: {{ applied_migrations | length }}
-          Newly applied: {{ (sorted_migrations | length) - (applied_migrations | length) }}
-          =======================================
+        - name: Display fallback migration completion
+          debug:
+            msg: |
+              ✅ INDIVIDUAL MIGRATIONS COMPLETED ✅
+              Total migration files found: {{ sorted_migrations | length }}
+              Already applied: {{ applied_migrations | length }}
+              Newly applied: {{ (sorted_migrations | length) - (applied_migrations | length) }}
+              ==========================================
 
   rescue:
     - name: Migration failure handling
@@ -179,26 +222,52 @@
     db_url = get_database_url()
     conn = psycopg2.connect(resolve_database_url(db_url))
     with conn.cursor() as cursor:
-        # Check critical tables exist
-        critical_tables = ['events', 'mining_participation', 'users', 'guilds']
-        missing_tables = []
+        # Check unified system tables (new schema)
+        unified_tables = ['events', 'participation', 'payrolls', 'uex_prices']
+        legacy_tables = ['mining_participation', 'mining_events']
         
-        for table in critical_tables:
-            cursor.execute('''
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
-                    AND table_name = %s
-                );
-            ''', (table,))
-            if not cursor.fetchone()[0]:
-                missing_tables.append(table)
+        # Check which schema we're using
+        cursor.execute('''
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name IN ('events', 'participation', 'mining_participation')
+        ''')
+        existing_tables = [row[0] for row in cursor.fetchall()]
+        
+        if 'participation' in existing_tables:
+            # Unified schema - check unified tables
+            missing_tables = []
+            for table in unified_tables:
+                cursor.execute('''
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = %s
+                    );
+                ''', (table,))
+                if not cursor.fetchone()[0]:
+                    missing_tables.append(table)
+        else:
+            # Legacy schema - check legacy tables
+            missing_tables = []
+            for table in legacy_tables + ['users', 'guilds']:
+                cursor.execute('''
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = %s
+                    );
+                ''', (table,))
+                if not cursor.fetchone()[0]:
+                    missing_tables.append(table)
         
         if missing_tables:
             print(f'MISSING_TABLES: {missing_tables}')
             exit(1)
         else:
-            print('SCHEMA_VALID')
+            schema_type = 'UNIFIED' if 'participation' in existing_tables else 'LEGACY'
+            print(f'SCHEMA_VALID_{schema_type}')
     conn.close()
     "
   args:
@@ -210,8 +279,8 @@
 - name: Display schema validation result
   debug:
     msg: |
-      {% if schema_validation.stdout == 'SCHEMA_VALID' %}
-      ✅ Database schema validation passed
+      {% if schema_validation.stdout.startswith('SCHEMA_VALID') %}
+      ✅ Database schema validation passed ({{ schema_validation.stdout.split('_')[2] | default('UNKNOWN') }} schema)
       {% else %}
       ⚠️ Database schema validation issues: {{ schema_validation.stdout }}
       {% endif %}

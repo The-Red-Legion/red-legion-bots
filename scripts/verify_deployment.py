@@ -25,23 +25,26 @@ async def verify_bot_commands():
     print()
     
     expected_commands = [
-        ("red-ping", "Basic connectivity test"),
-        ("red-health", "Health check"),
-        ("red-events list", "List events"),
-        ("red-market-list", "List market items"),
+        ("mining start", "Start a mining session"),
+        ("mining stop", "Stop current mining session"), 
+        ("mining status", "Show mining session status"),
+        ("payroll mining", "Calculate mining payroll"),
+        ("payroll salvage", "Calculate salvage payroll"),
+        ("payroll combat", "Calculate combat payroll"),
+        ("payroll status", "Show payroll system status"),
     ]
     
     for cmd, desc in expected_commands:
         print(f"  /{cmd:<20} - {desc}")
     
     print("\n✅ Expected Results:")
-    print("  - All commands should autocomplete when typing /red")
+    print("  - Commands should autocomplete when typing /mining or /payroll")
     print("  - Commands should respond without errors")
-    print("  - No old commands without 'red-' prefix should appear")
+    print("  - New modular command structure should be active")
     
     print("\n🎯 Quick Test:")
-    print("  Type '/red-ping' in Discord")
-    print("  Expected response: '🏓 Pong! Red Legion Bot is responsive.'")
+    print("  Type '/mining start' in Discord")
+    print("  Expected response: Mining session creation UI with event ID like 'sm-a7k2m9'")
     
     return True
 
@@ -52,17 +55,18 @@ def print_verification_summary():
     print("=" * 50)
     print()
     print("✅ Code deployed successfully")
-    print("✅ Bot should be running with new command structure")
+    print("✅ Bot should be running with new modular architecture")
     print("🔄 Commands synced to Discord (may take 1-5 minutes)")
     print()
     print("🧪 Next Steps:")
-    print("1. Test /red-ping in Discord")
-    print("2. Verify autocomplete shows red- commands")
-    print("3. Check that old commands are gone")
+    print("1. Test /mining start in Discord")
+    print("2. Verify autocomplete shows /mining and /payroll commands")
+    print("3. Check that new unified system is active")
     print()
     print("📝 Issues? Check bot logs for:")
-    print("  - '🎉 SUCCESS: All synced commands have red- prefix!'")
-    print("  - Command count: Should show 18 commands synced")
+    print("  - 'Mining commands registered'")
+    print("  - 'Payroll commands registered'")
+    print("  - Database connection success messages")
     print()
 
 if __name__ == "__main__":

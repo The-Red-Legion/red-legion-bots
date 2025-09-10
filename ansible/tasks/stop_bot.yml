@@ -14,7 +14,7 @@
 
 # Stop any manual processes (legacy support)
 - name: Kill any running bot processes
-  shell: pkill -f "python.*participation_bot" || true
+  shell: pkill -f "python.*main" || true
   ignore_errors: true
 
 - name: Wait for processes to terminate
@@ -22,7 +22,7 @@
     seconds: 3
 
 - name: Force kill any remaining bot processes
-  shell: pkill -9 -f "python.*participation_bot" || true
+  shell: pkill -9 -f "python.*main" || true
   ignore_errors: true
 
 # Legacy PID file cleanup

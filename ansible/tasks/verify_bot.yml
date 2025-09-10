@@ -1,40 +1,57 @@
 ---
-- name: Check if bot PID file exists
-  stat:
-    path: "{{ app_dir }}/bot.pid"
-  register: pid_file_check
+- name: Check systemd service status
+  systemd:
+    name: red-legion-bot
+  register: service_status
   when: not ansible_check_mode
 
-- name: Verify bot process is running
-  shell: ps -p $(cat {{ app_dir }}/bot.pid) > /dev/null 2>&1
-  when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
-  register: process_check
-  failed_when: process_check.rc != 0
+- name: Verify bot service is running
+  assert:
+    that:
+      - service_status.status.ActiveState == "active"
+      - service_status.status.SubState == "running"
+    fail_msg: "Bot service is not running. State: {{ service_status.status.ActiveState }}/{{ service_status.status.SubState }}"
+    success_msg: "✅ Bot service is active and running"
+  when: not ansible_check_mode
 
-- name: Check bot log for errors
-  command: tail -20 {{ app_dir }}/bot.log
-  register: log_check
-  when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
+- name: Get recent bot logs from systemd
+  shell: journalctl -u red-legion-bot -n 20 --no-pager
+  register: service_logs
+  when: not ansible_check_mode
 
-- name: Display recent log entries
+- name: Display recent service logs
   debug:
-    msg: "{{ log_check.stdout }}"
-  when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
+    msg: "{{ service_logs.stdout }}"
+  when: not ansible_check_mode and service_logs is defined
 
-- name: Check for error patterns in log
-  shell: grep -i "ERROR\|Exception\|Failed" {{ app_dir }}/bot.log
+- name: Check for error patterns in logs
+  shell: journalctl -u red-legion-bot -n 50 --no-pager | grep -i "ERROR\|Exception\|Failed\|Traceback" || true
   register: error_check
-  failed_when: error_check.rc == 0
-  ignore_errors: true
-  when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
+  when: not ansible_check_mode
 
-- name: Read PID from file
-  slurp:
-    src: "{{ app_dir }}/bot.pid"
-  register: pid_content
-  when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and not ansible_check_mode
+- name: Display error check results
+  debug:
+    msg: |
+      {% if error_check.stdout %}
+      ⚠️ Found potential errors in logs:
+      {{ error_check.stdout }}
+      {% else %}
+      ✅ No obvious errors found in recent logs
+      {% endif %}
+  when: not ansible_check_mode and error_check is defined
+
+- name: Get bot main process PID
+  shell: systemctl show red-legion-bot --property MainPID --value
+  register: main_pid
+  when: not ansible_check_mode
 
 - name: Report successful deployment
   debug:
-    msg: "✅ Bot deployment successful! PID: {{ (pid_content.content | b64decode).strip() }}"
-  when: pid_file_check is defined and pid_file_check.stat is defined and pid_file_check.stat.exists and process_check is defined and (process_check.rc | default(0)) == 0 and pid_content is defined and not ansible_check_mode
+    msg: |
+      ✅ BOT DEPLOYMENT SUCCESSFUL ✅
+      Service Status: {{ service_status.status.ActiveState }}/{{ service_status.status.SubState }}
+      Main PID: {{ main_pid.stdout }}
+      Uptime: {{ service_status.status.ActiveEnterTimestamp }}
+      Memory Usage: {{ service_status.status.MemoryCurrent | default('Unknown') }}
+      ========================================
+  when: not ansible_check_mode and service_status.status.ActiveState == "active"
