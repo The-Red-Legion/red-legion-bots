@@ -62,12 +62,12 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
         self,
         interaction: discord.Interaction,
         event_id: str,
-        quantanium: float = 0,
-        laranite: float = 0,
-        agricium: float = 0, 
-        hadanite: float = 0,
-        beryl: float = 0,
-        donation: int = 10
+        quantanium: float = 0.0,
+        laranite: float = 0.0,
+        agricium: float = 0.0, 
+        hadanite: float = 0.0,
+        beryl: float = 0.0,
+        donation: float = 10.0
     ):
         """Quick mining payroll calculation without modals."""
         await interaction.response.defer()
@@ -86,12 +86,14 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 return
             
             # Validate donation percentage
-            if donation not in [0, 5, 10, 15, 20]:
+            if int(donation) not in [0, 5, 10, 15, 20]:
                 await interaction.followup.send(
                     "❌ Donation percentage must be 0, 5, 10, 15, or 20.",
                     ephemeral=True
                 )
                 return
+            
+            donation = int(donation)  # Convert to int for calculations
             
             # Check if event exists
             guild_id = interaction.guild_id
