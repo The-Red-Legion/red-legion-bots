@@ -86,6 +86,7 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
                 return
             
             # Auto-join the Dispatch/Main channel to indicate mining session is active
+            voice_join_status = "⚠️ Skipped - no dispatch channel configured"
             try:
                 from handlers.voice_tracking import join_voice_channel, set_bot_instance
                 
@@ -99,13 +100,16 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
                     join_success = await join_voice_channel(dispatch_channel_id)
                     
                     if join_success:
+                        voice_join_status = "✅ Bot joined dispatch channel successfully"
                         print(f"✅ Bot joined Dispatch channel for mining event {event_data['event_id']}")
                     else:
+                        voice_join_status = "❌ Bot failed to join dispatch channel"
                         print(f"⚠️ Could not join Dispatch channel for mining event {event_data['event_id']}")
                 else:
                     print("⚠️ No Dispatch channel configured - skipping auto-join")
                     
             except Exception as e:
+                voice_join_status = f"❌ Error joining dispatch channel: {str(e)[:50]}"
                 print(f"❌ Error auto-joining voice channel: {e}")
                 # Don't fail the entire mining start - just log the issue
             
@@ -130,9 +134,9 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
             
             embed.add_field(
                 name="🎤 Voice Tracking & Bot Presence",
-                value="• Bot will track participation in mining voice channels\n"
-                      "• Bot has joined Dispatch channel to indicate active session\n"
-                      "• Join any mining channel to start earning participation time!",
+                value=f"• Bot will track participation in mining voice channels\n"
+                      f"• Dispatch channel: {voice_join_status}\n"
+                      f"• Join any mining channel to start earning participation time!",
                 inline=False
             )
             
@@ -507,6 +511,7 @@ class MiningStartModal(discord.ui.Modal):
                 return
             
             # Auto-join the Dispatch/Main channel to indicate mining session is active
+            voice_join_status = "⚠️ Skipped - no dispatch channel configured"
             try:
                 from handlers.voice_tracking import join_voice_channel, set_bot_instance
                 
@@ -520,13 +525,16 @@ class MiningStartModal(discord.ui.Modal):
                     join_success = await join_voice_channel(dispatch_channel_id)
                     
                     if join_success:
+                        voice_join_status = "✅ Bot joined dispatch channel successfully"
                         print(f"✅ Bot joined Dispatch channel for mining event {event_data['event_id']}")
                     else:
+                        voice_join_status = "❌ Bot failed to join dispatch channel"
                         print(f"⚠️ Could not join Dispatch channel for mining event {event_data['event_id']}")
                 else:
                     print("⚠️ No Dispatch channel configured - skipping auto-join")
                     
             except Exception as e:
+                voice_join_status = f"❌ Error joining dispatch channel: {str(e)[:50]}"
                 print(f"❌ Error auto-joining voice channel: {e}")
                 # Don't fail the entire mining start - just log the issue
             
@@ -551,9 +559,9 @@ class MiningStartModal(discord.ui.Modal):
             
             embed.add_field(
                 name="🎤 Voice Tracking & Bot Presence",
-                value="• Bot will track participation in mining voice channels\n"
-                      "• Bot has joined Dispatch channel to indicate active session\n"
-                      "• Join any mining channel to start earning participation time!",
+                value=f"• Bot will track participation in mining voice channels\n"
+                      f"• Dispatch channel: {voice_join_status}\n"
+                      f"• Join any mining channel to start earning participation time!",
                 inline=False
             )
             
