@@ -1431,7 +1431,7 @@ class NextToQuantitiesButton(ui.Button):
             description=f"**Step 1 of 5: Event Selected** ✅\n"
                        f"**Step 2 of 5: Select Ore Types** ✅\n"
                        f"**Step 3 of 5: Enter Quantities** ⏳\n\n"
-                       f"Enter the SCU amounts for each selected ore type.",
+                       f"Enter ore quantities and review UEX pricing for each selected ore type.",
             color=discord.Color.blue()
         )
         
@@ -1443,8 +1443,8 @@ class NextToQuantitiesButton(ui.Button):
         
         embed.add_field(
             name="🔄 Instructions",
-            value="1. Click 'Enter SCU Amounts' below\n"
-                  "2. Fill in quantities for each ore type\n"
+            value="1. Click 'Enter Ore Quantities' below\n"
+                  "2. Review UEX prices and adjust quantities as needed\n"
                   "3. Submit to proceed to participant selection",
             inline=False
         )
@@ -1477,7 +1477,7 @@ class EnterQuantitiesButton(ui.Button):
     
     def __init__(self, event_data, processor, calculator, selected_ores):
         super().__init__(
-            label="Enter SCU Amounts",
+            label="Enter Ore Quantities",
             style=discord.ButtonStyle.primary,
             emoji="📊"
         )
@@ -1487,9 +1487,15 @@ class EnterQuantitiesButton(ui.Button):
         self.selected_ores = selected_ores
     
     async def callback(self, interaction: discord.Interaction):
-        # Open modal for quantity entry
-        modal = OreQuantityModal(self.event_data, self.processor, self.calculator, self.selected_ores)
-        await interaction.response.send_modal(modal)
+        try:
+            # Open modal for quantity entry
+            modal = OreQuantityModal(self.event_data, self.processor, self.calculator, self.selected_ores)
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error opening quantity modal: {str(e)}", 
+                ephemeral=True
+            )
 
 
 class BackToOreSelectionButton(ui.Button):
@@ -2017,7 +2023,7 @@ class BackToQuantitiesButton(ui.Button):
             description=f"**Step 1 of 5: Event Selected** ✅\n"
                        f"**Step 2 of 5: Select Ore Types** ✅\n"
                        f"**Step 3 of 5: Enter Quantities** ⏳\n\n"
-                       f"Enter the SCU amounts for each selected ore type.",
+                       f"Enter ore quantities and review UEX pricing for each selected ore type.",
             color=discord.Color.blue()
         )
         
