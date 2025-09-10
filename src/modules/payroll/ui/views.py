@@ -50,8 +50,8 @@ class EventSelectionDropdown(ui.Select):
         # Create options for dropdown
         options = []
         for event in events[:25]:  # Discord limit
-            # Format event display
-            duration = event.get('total_duration_minutes', 0)
+            # Format event display  
+            duration = event.get('total_duration_minutes', 0) or 0
             duration_text = f"{duration // 60}h {duration % 60}m" if duration > 60 else f"{duration}m"
             
             # Format start date for display
@@ -140,8 +140,8 @@ class UnifiedEventSelectionDropdown(ui.Select):
             event_type = event['event_type']
             event_emoji = event_emojis.get(event_type, '📋')
             
-            # Format event display
-            duration = event.get('total_duration_minutes', 0)
+            # Format event display  
+            duration = event.get('total_duration_minutes', 0) or 0
             duration_text = f"{duration // 60}h {duration % 60}m" if duration > 60 else f"{duration}m"
             
             # Format start date for display
@@ -182,9 +182,9 @@ class UnifiedEventSelectionDropdown(ui.Select):
         
         # Find selected event
         selected_event = None
-        for events in self.all_events[event_type]:
-            if events['event_id'] == event_id:
-                selected_event = events
+        for event in self.all_events[event_type]:
+            if event['event_id'] == event_id:
+                selected_event = event
                 selected_event['event_type'] = event_type  # Ensure type is set
                 break
         
