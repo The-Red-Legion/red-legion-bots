@@ -87,12 +87,56 @@ def run_migration():
         
         logger.info(f"📝 Migration SQL loaded ({len(migration_sql)} characters)")
         
+        # Check if migration already applied
+        conn = psycopg2.connect(database_url)
+        conn.autocommit = True
+        
+        logger.info("🔍 Checking if migration already applied...")
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT migration_name, applied_at, success 
+                    FROM schema_migrations 
+                    WHERE migration_name = '10_unified_mining_system.sql' 
+                    AND success = true
+                """)
+                existing_migration = cursor.fetchone()
+                
+                if existing_migration:
+                    logger.info(f"✅ Migration already applied successfully at {existing_migration['applied_at']}")
+                    logger.info("🚀 Skipping migration execution - unified schema already exists")
+                    
+                    # Verify tables still exist
+                    cursor.execute("""
+                        SELECT table_name 
+                        FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name IN ('events', 'participation', 'payrolls', 'uex_prices')
+                        ORDER BY table_name
+                    """)
+                    tables = [row['table_name'] for row in cursor.fetchall()]
+                    
+                    conn.close()
+                    
+                    # Return success status
+                    result = {
+                        'status': 'success',
+                        'message': 'Migration already applied - unified schema verified',
+                        'migration_file': '10_unified_mining_system.sql',
+                        'tables_created': tables,
+                        'timestamp': existing_migration['applied_at'].isoformat() if existing_migration['applied_at'] else None
+                    }
+                    
+                    logger.info("🎉 Migration verification completed successfully!")
+                    print(json.dumps(result))
+                    return 0
+        except Exception as e:
+            logger.info(f"Schema migrations table not found or error checking: {e}")
+            logger.info("Proceeding with fresh migration...")
+        
         # Execute migration
         logger.info("⚠️  Executing unified mining system migration...")
         logger.info("⚠️  This will DROP all existing mining-related tables!")
-        
-        conn = psycopg2.connect(database_url)
-        conn.autocommit = True
         
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
