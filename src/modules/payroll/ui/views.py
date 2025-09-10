@@ -101,18 +101,55 @@ class EventSelectionDropdown(ui.Select):
             await interaction.response.send_message("❌ Event not found", ephemeral=True)
             return
         
-        # Show appropriate collection modal
-        from .modals import MiningCollectionModal, SalvageCollectionModal
-        
+        # Show appropriate collection interface
         if self.event_type == 'mining':
-            modal = MiningCollectionModal(selected_event, self.processor, self.calculator)
+            # Use new step-by-step ore selection system
+            from .modals import OreSelectionView
+            view = OreSelectionView(selected_event, self.processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
+                description=f"**Step-by-Step Ore Collection Entry**\n\n"
+                           f"Select each ore type from the dropdown below, then enter the amount.\n"
+                           f"You can add as many different ore types as needed.",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="📋 Event Details",
+                value=f"**Event:** {selected_event['event_name']}\n"
+                      f"**Organizer:** {selected_event['organizer_name']}\n"
+                      f"**Date:** {selected_event.get('started_at', 'Unknown')}",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🔄 How to Use",
+                value="1. Select an ore from the dropdown\n"
+                      "2. Enter the SCU amount in the popup\n"
+                      "3. Repeat for all collected ores\n"
+                      "4. Click 'Finish Collection' when done",
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            
         elif self.event_type == 'salvage':
+            from .modals import SalvageCollectionModal
             modal = SalvageCollectionModal(selected_event, self.processor, self.calculator)
+            await interaction.response.send_modal(modal)
         else:
-            # Default to mining modal for now
-            modal = MiningCollectionModal(selected_event, self.processor, self.calculator)
-        
-        await interaction.response.send_modal(modal)
+            # Default to mining system for combat/other types for now
+            from .modals import OreSelectionView
+            view = OreSelectionView(selected_event, self.processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"📋 {self.event_type.title()} Payroll - {selected_event['event_id']}",
+                description="Using mining collection system as placeholder.\nSelect materials collected during the operation.",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 
 class UnifiedEventSelectionDropdown(ui.Select):
@@ -197,18 +234,55 @@ class UnifiedEventSelectionDropdown(ui.Select):
         # Get the appropriate processor
         processor = self.processors[event_type]
         
-        # Show appropriate collection modal
-        from .modals import MiningCollectionModal, SalvageCollectionModal
-        
+        # Show appropriate collection interface
         if event_type == 'mining':
-            modal = MiningCollectionModal(selected_event, processor, self.calculator)
+            # Use new step-by-step ore selection system
+            from .modals import OreSelectionView
+            view = OreSelectionView(selected_event, processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
+                description=f"**Step-by-Step Ore Collection Entry**\n\n"
+                           f"Select each ore type from the dropdown below, then enter the amount.\n"
+                           f"You can add as many different ore types as needed.",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="📋 Event Details",
+                value=f"**Event:** {selected_event['event_name']}\n"
+                      f"**Organizer:** {selected_event['organizer_name']}\n"
+                      f"**Date:** {selected_event.get('started_at', 'Unknown')}",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🔄 How to Use",
+                value="1. Select an ore from the dropdown\n"
+                      "2. Enter the SCU amount in the popup\n"
+                      "3. Repeat for all collected ores\n"
+                      "4. Click 'Finish Collection' when done",
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            
         elif event_type == 'salvage':
+            from .modals import SalvageCollectionModal
             modal = SalvageCollectionModal(selected_event, processor, self.calculator)
+            await interaction.response.send_modal(modal)
         else:
-            # Default to mining modal for combat/other types for now
-            modal = MiningCollectionModal(selected_event, processor, self.calculator)
-        
-        await interaction.response.send_modal(modal)
+            # Default to mining system for combat/other types for now
+            from .modals import OreSelectionView
+            view = OreSelectionView(selected_event, processor, self.calculator)
+            
+            embed = discord.Embed(
+                title=f"📋 {event_type.title()} Payroll - {selected_event['event_id']}",
+                description="Using mining collection system as placeholder.\nSelect materials collected during the operation.",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 
 class PayrollConfirmationView(ui.View):
