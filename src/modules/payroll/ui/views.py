@@ -118,36 +118,11 @@ class EventSelectionDropdown(ui.Select):
         
         # Show appropriate collection interface
         if self.event_type == 'mining':
-            # Use new two-stage ore selection system  
-            from .modals import TwoStageOreSelectionView
-            view = TwoStageOreSelectionView(selected_event, self.processor, self.calculator)
-            
-            embed = discord.Embed(
-                title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
-                description=f"**Two-Stage Ore Collection Entry**\n\n"
-                           f"**Stage 1:** Select which ore types you collected\n"
-                           f"**Stage 2:** Enter amounts for selected ores only",
-                color=discord.Color.blue()
-            )
-            
-            embed.add_field(
-                name="📋 Event Details",
-                value=f"**Event:** {selected_event['event_name']}\n"
-                      f"**Organizer:** {selected_event['organizer_name']}\n"
-                      f"**Date:** {format_event_date(selected_event.get('started_at'))}",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🔄 How to Use",
-                value="1. Use the dropdowns to select which ore types you collected\n"
-                      "2. Click 'Enter Amounts' to proceed to Stage 2\n"
-                      "3. Fill in SCU amounts for your selected ores\n"
-                      "4. Submit to calculate payroll",
-                inline=False
-            )
-            
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            # Use direct mining collection modal for simplicity
+            from .modals import MiningCollectionModal
+            modal = MiningCollectionModal(selected_event, self.processor, self.calculator)
+            await interaction.response.send_modal(modal)
+            return
             
         elif self.event_type == 'salvage':
             from .modals import SalvageCollectionModal
@@ -155,16 +130,9 @@ class EventSelectionDropdown(ui.Select):
             await interaction.response.send_modal(modal)
         else:
             # Default to mining system for combat/other types for now
-            from .modals import TwoStageOreSelectionView
-            view = TwoStageOreSelectionView(selected_event, self.processor, self.calculator)
-            
-            embed = discord.Embed(
-                title=f"📋 {self.event_type.title()} Payroll - {selected_event['event_id']}",
-                description="Using mining collection system as placeholder.\nSelect materials collected during the operation.",
-                color=discord.Color.blue()
-            )
-            
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            from .modals import MiningCollectionModal
+            modal = MiningCollectionModal(selected_event, self.processor, self.calculator)
+            await interaction.response.send_modal(modal)
 
 
 class UnifiedEventSelectionDropdown(ui.Select):
@@ -251,36 +219,11 @@ class UnifiedEventSelectionDropdown(ui.Select):
         
         # Show appropriate collection interface
         if event_type == 'mining':
-            # Use new two-stage ore selection system
-            from .modals import TwoStageOreSelectionView
-            view = TwoStageOreSelectionView(selected_event, processor, self.calculator)
-            
-            embed = discord.Embed(
-                title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
-                description=f"**Two-Stage Ore Collection Entry**\n\n"
-                           f"**Stage 1:** Select which ore types you collected\n"
-                           f"**Stage 2:** Enter amounts for selected ores only",
-                color=discord.Color.blue()
-            )
-            
-            embed.add_field(
-                name="📋 Event Details",
-                value=f"**Event:** {selected_event['event_name']}\n"
-                      f"**Organizer:** {selected_event['organizer_name']}\n"
-                      f"**Date:** {format_event_date(selected_event.get('started_at'))}",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🔄 How to Use",
-                value="1. Use the dropdowns to select which ore types you collected\n"
-                      "2. Click 'Enter Amounts' to proceed to Stage 2\n"
-                      "3. Fill in SCU amounts for your selected ores\n"
-                      "4. Submit to calculate payroll",
-                inline=False
-            )
-            
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            # Use direct mining collection modal for simplicity
+            from .modals import MiningCollectionModal
+            modal = MiningCollectionModal(selected_event, processor, self.calculator)
+            await interaction.response.send_modal(modal)
+            return
             
         elif event_type == 'salvage':
             from .modals import SalvageCollectionModal
@@ -288,16 +231,9 @@ class UnifiedEventSelectionDropdown(ui.Select):
             await interaction.response.send_modal(modal)
         else:
             # Default to mining system for combat/other types for now
-            from .modals import TwoStageOreSelectionView
-            view = TwoStageOreSelectionView(selected_event, processor, self.calculator)
-            
-            embed = discord.Embed(
-                title=f"📋 {event_type.title()} Payroll - {selected_event['event_id']}",
-                description="Using mining collection system as placeholder.\nSelect materials collected during the operation.",
-                color=discord.Color.blue()
-            )
-            
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            from .modals import MiningCollectionModal
+            modal = MiningCollectionModal(selected_event, processor, self.calculator)
+            await interaction.response.send_modal(modal)
 
 
 class PayrollConfirmationView(ui.View):
