@@ -118,15 +118,15 @@ class EventSelectionDropdown(ui.Select):
         
         # Show appropriate collection interface
         if self.event_type == 'mining':
-            # Use proper 5-step ore selection workflow
-            from .modals import ImprovedOreSelectionView
-            view = ImprovedOreSelectionView(selected_event, self.processor, self.calculator)
+            # Skip ore selection - go directly to Step 2: Enter Quantities
+            from .modals import DirectQuantityEntryView
+            view = DirectQuantityEntryView(selected_event, self.processor, self.calculator)
             
             embed = discord.Embed(
                 title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
-                description=f"**Step 1 of 5: Event Selected** ✅\n"
-                           f"**Step 2 of 5: Select Ore Types** ⏳\n\n"
-                           f"Select which ore types were collected during this mining session.",
+                description=f"**Step 1 of 4: Event Selected** ✅\n"
+                           f"**Step 2 of 4: Enter Quantities** ⏳\n\n"
+                           f"Enter ore quantities collected during this mining session.",
                 color=discord.Color.blue()
             )
             
@@ -140,9 +140,9 @@ class EventSelectionDropdown(ui.Select):
             
             embed.add_field(
                 name="🔄 Instructions",
-                value="1. Select ore types from the dropdown below\n"
-                      "2. Click 'Next: Enter Quantities' to proceed\n"
-                      "3. You can select multiple ore types",
+                value="1. Click 'Enter Ore Quantities' below\n"
+                      "2. Enter SCU amounts for collected ores\n"
+                      "3. Review UEX pricing in Step 3",
                 inline=False
             )
             

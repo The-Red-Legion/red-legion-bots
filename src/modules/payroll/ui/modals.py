@@ -2631,3 +2631,477 @@ class OrePricingModal(ui.Modal):
             embed=embed,
             view=view
         )
+
+
+# =====================================================
+# DIRECT QUANTITY ENTRY FLOW (User's Preferred Flow)
+# =====================================================
+
+class DirectQuantityEntryView(ui.View):
+    """Step 2: Direct quantity entry view - skips ore selection step."""
+    
+    def __init__(self, event_data, processor, calculator):
+        super().__init__(timeout=300)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        
+        # Add quantity entry button
+        self.add_item(DirectQuantityEntryButton(event_data, processor, calculator))
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+
+
+class DirectQuantityEntryButton(ui.Button):
+    """Button to open quantity entry modal for common ores."""
+    
+    def __init__(self, event_data, processor, calculator):
+        super().__init__(
+            label="Enter Ore Quantities",
+            style=discord.ButtonStyle.primary,
+            emoji="📊"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            # Open modal for quantity entry with common ores pre-populated
+            modal = DirectOreQuantityModal(self.event_data, self.processor, self.calculator)
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error opening quantity modal: {str(e)}", 
+                ephemeral=True
+            )
+
+
+class DirectOreQuantityModal(ui.Modal):
+    """Modal for direct ore quantity entry - Step 2 as user requested."""
+    
+    def __init__(self, event_data, processor, calculator):
+        super().__init__(title=f'Enter Ore Quantities - {event_data["event_id"]}')
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        
+        # Pre-populate with most common mining ores (user can enter 0 for unused)
+        common_ores = {
+            'QUAN': 'Quantanium',
+            'LARA': 'Laranite', 
+            'AGRI': 'Agricium',
+            'HADA': 'Hadanite',
+            'BERY': 'Beryl'
+        }
+        
+        self.ore_inputs = {}
+        
+        # Add input fields for common ores
+        for ore_code, ore_name in common_ores.items():
+            ore_input = ui.TextInput(
+                label=f'{ore_name} (SCU)',
+                placeholder=f'Enter SCU amount or 0 if not collected',
+                required=False,
+                max_length=10,
+                default='0'
+            )
+            
+            self.ore_inputs[ore_code] = ore_input
+            self.add_item(ore_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse entered quantities
+            ore_quantities = {}
+            total_scu = 0
+            
+            for ore_code, input_field in self.ore_inputs.items():
+                try:
+                    quantity = float(input_field.value.strip()) if input_field.value.strip() else 0
+                    if quantity < 0:
+                        await interaction.followup.send(
+                            f"❌ Quantity for {ore_code} cannot be negative.",
+                            ephemeral=True
+                        )
+                        return
+                    if quantity > 0:
+                        ore_quantities[ore_code] = quantity
+                        total_scu += quantity
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ Invalid quantity for {ore_code}: '{input_field.value}'",
+                        ephemeral=True
+                    )
+                    return
+            
+            if total_scu == 0:
+                await interaction.followup.send(
+                    "❌ Please enter at least some ore quantities greater than 0.",
+                    ephemeral=True
+                )
+                return
+            
+            # Get current ore prices
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="⏳ Fetching UEX Prices...",
+                    description="Getting current ore prices for Step 3 pricing review...",
+                    color=discord.Color.blue()
+                )
+            )
+            
+            ore_prices = await self.processor.get_current_prices()
+            if not ore_prices:
+                await interaction.followup.send(
+                    "❌ Unable to fetch ore prices. Please try again.",
+                    ephemeral=True
+                )
+                return
+            
+            # Proceed to Step 3: UEX Pricing Review
+            view = DirectPricingReviewView(
+                self.event_data, self.processor, self.calculator, 
+                ore_quantities, ore_prices
+            )
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+                description=f"**Step 1 of 4: Event Selected** ✅\n"
+                           f"**Step 2 of 4: Enter Quantities** ✅\n"
+                           f"**Step 3 of 4: Review UEX Pricing** ⏳\n\n"
+                           f"Review current UEX Corp ore prices.",
+                color=discord.Color.blue()
+            )
+            
+            await interaction.followup.edit_message(
+                interaction.message.id,
+                embed=embed,
+                view=view
+            )
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error processing quantities: {str(e)}",
+                ephemeral=True
+            )
+
+
+class DirectPricingReviewView(ui.View):
+    """Step 3: UEX pricing review view - user's preferred Step 3."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, ore_prices):
+        super().__init__(timeout=300)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.ore_prices = ore_prices
+        
+        # Add UEX pricing review button
+        self.add_item(DirectPricingButton(event_data, processor, calculator, ore_quantities, ore_prices))
+        
+        # Add back button
+        self.add_item(BackToQuantitiesButton(event_data, processor, calculator))
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+
+
+class DirectPricingButton(ui.Button):
+    """Button to open UEX pricing review modal."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, ore_prices):
+        super().__init__(
+            label="Review UEX Prices",
+            style=discord.ButtonStyle.primary,
+            emoji="💰"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.ore_prices = ore_prices
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            # Show UEX pricing modal with title as requested by user
+            modal = DirectUEXPricingModal(
+                self.event_data, self.processor, self.calculator,
+                self.ore_quantities, self.ore_prices
+            )
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error opening pricing modal: {str(e)}", 
+                ephemeral=True
+            )
+
+
+class DirectUEXPricingModal(ui.Modal):
+    """UEX pricing review modal - titled 'Per SCU Price' as user requested."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, ore_prices):
+        super().__init__(title='Per SCU Price')  # User's requested title
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.ore_prices = ore_prices
+        
+        # Show current UEX prices for collected ores
+        self.price_inputs = {}
+        
+        for ore_code, quantity in ore_quantities.items():
+            if quantity > 0:
+                ore_name = self.get_ore_name(ore_code)
+                current_price = ore_prices.get(ore_code, {}).get('price', 0)
+                
+                price_input = ui.TextInput(
+                    label=f'{ore_name} (aUEC/SCU)',
+                    placeholder=f'Current UEX price: {current_price}',
+                    required=True,
+                    max_length=10,
+                    default=str(current_price)
+                )
+                
+                self.price_inputs[ore_code] = price_input
+                self.add_item(price_input)
+    
+    def get_ore_name(self, ore_code):
+        """Get full ore name from code."""
+        ore_names = {
+            'QUAN': 'Quantanium', 'LARA': 'Laranite', 'AGRI': 'Agricium',
+            'HADA': 'Hadanite', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+            'DIAM': 'Diamond', 'GOLD': 'Gold', 'TARA': 'Taranite',
+            'TITA': 'Titanium', 'TUNG': 'Tungsten', 'ALUM': 'Aluminum',
+            'COPP': 'Copper', 'INRT': 'Inert Materials', 'HEPH': 'Hephaestanite',
+            'BORA': 'Borase'
+        }
+        return ore_names.get(ore_code, ore_code)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse updated prices
+            updated_prices = {}
+            for ore_code, input_field in self.price_inputs.items():
+                try:
+                    price = float(input_field.value.strip())
+                    if price < 0:
+                        await interaction.followup.send(
+                            f"❌ Price for {ore_code} cannot be negative.",
+                            ephemeral=True
+                        )
+                        return
+                    updated_prices[ore_code] = {'price': price}
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ Invalid price for {ore_code}: '{input_field.value}'",
+                        ephemeral=True
+                    )
+                    return
+            
+            # Get participants
+            participants = await self.calculator.get_event_participants(self.event_data['event_id'])
+            if not participants:
+                await interaction.followup.send(
+                    "❌ No participants found for this event.",
+                    ephemeral=True
+                )
+                return
+            
+            # Proceed to Step 4: Participant Selection
+            view = DirectParticipantSelectionView(
+                self.event_data, self.processor, self.calculator,
+                self.ore_quantities, participants, updated_prices
+            )
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+                description=f"**Step 1 of 4: Event Selected** ✅\n"
+                           f"**Step 2 of 4: Enter Quantities** ✅\n"
+                           f"**Step 3 of 4: Review UEX Pricing** ✅\n"
+                           f"**Step 4 of 4: Participant Selection** ⏳\n\n"
+                           f"Select participants for payroll calculation.",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="👥 Event Participants",
+                value=f"Found {len(participants)} participants",
+                inline=True
+            )
+            
+            await interaction.followup.edit_message(
+                interaction.message.id,
+                embed=embed,
+                view=view
+            )
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error processing pricing: {str(e)}",
+                ephemeral=True
+            )
+
+
+class DirectParticipantSelectionView(ui.View):
+    """Step 4: Final participant selection for direct flow."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, ore_prices):
+        super().__init__(timeout=300)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.ore_prices = ore_prices
+        
+        # Add participant selection dropdown
+        self.add_item(DirectParticipantSelector(
+            event_data, processor, calculator, ore_quantities, participants, ore_prices
+        ))
+        
+        # Add final calculation button
+        self.add_item(DirectFinalCalculationButton(
+            event_data, processor, calculator, ore_quantities, participants, ore_prices
+        ))
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+
+
+class DirectParticipantSelector(ui.Select):
+    """Participant selection dropdown for direct flow."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, ore_prices):
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.ore_prices = ore_prices
+        
+        # Create options for participants
+        options = []
+        for participant in participants[:25]:  # Discord limit
+            username = participant['username']
+            minutes = int(participant.get('total_minutes', 0))
+            hours = minutes // 60
+            mins = minutes % 60
+            time_str = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
+            
+            options.append(discord.SelectOption(
+                label=username,
+                description=f"Participated for {time_str}",
+                value=str(participant['user_id']),
+                default=True  # Default all to selected
+            ))
+        
+        super().__init__(
+            placeholder="Select participants to include in payroll...",
+            options=options,
+            min_values=1,
+            max_values=len(options)
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Update view with selected participants
+        await interaction.response.defer()
+
+
+class DirectFinalCalculationButton(ui.Button):
+    """Final calculation button for direct flow."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, participants, ore_prices):
+        super().__init__(
+            label="Calculate Final Payroll",
+            style=discord.ButtonStyle.success,
+            emoji="💰"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.participants = participants
+        self.ore_prices = ore_prices
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Calculate total value
+            total_value, breakdown = await self.processor.calculate_total_value(
+                self.ore_quantities, self.ore_prices
+            )
+            
+            # Create final confirmation view
+            from .views import PayrollConfirmationView
+            view = PayrollConfirmationView(
+                self.event_data, self.processor, self.calculator,
+                self.ore_quantities, breakdown, total_value
+            )
+            
+            embed = discord.Embed(
+                title=f"⛏️ Mining Payroll - {self.event_data['event_id']} - READY",
+                description=f"**All Steps Complete** ✅\n\n"
+                           f"Ready to calculate final payroll.",
+                color=discord.Color.green()
+            )
+            
+            embed.add_field(
+                name="💰 Total Value",
+                value=f"{total_value:,.2f} aUEC",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="👥 Participants",
+                value=f"{len(self.participants)} people",
+                inline=True
+            )
+            
+            await interaction.followup.edit_message(
+                interaction.message.id,
+                embed=embed,
+                view=view
+            )
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error calculating payroll: {str(e)}",
+                ephemeral=True
+            )
+
+
+class BackToQuantitiesButton(ui.Button):
+    """Button to go back to quantity entry."""
+    
+    def __init__(self, event_data, processor, calculator):
+        super().__init__(
+            label="← Back: Change Quantities",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Go back to Step 2: quantity entry
+        view = DirectQuantityEntryView(self.event_data, self.processor, self.calculator)
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ⏳\n\n"
+                       f"Enter ore quantities collected during this mining session.",
+            color=discord.Color.blue()
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=view)
