@@ -129,6 +129,9 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
                 inline=False
             )
             
+            # Get current participants in mining voice channels
+            current_participants = await self._get_current_voice_participants(interaction.guild, channels)
+            
             embed.add_field(
                 name="🎤 Voice Tracking & Bot Presence",
                 value="• Bot will track participation in mining voice channels\n"
@@ -136,6 +139,21 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
                       "• Join any mining channel to start earning participation time!",
                 inline=False
             )
+            
+            # Add current participants field if any are present
+            if current_participants:
+                participant_text = []
+                for channel_name, members in current_participants.items():
+                    if members:
+                        member_names = [member.display_name for member in members]
+                        participant_text.append(f"**{channel_name}:** {', '.join(member_names)}")
+                
+                if participant_text:
+                    embed.add_field(
+                        name="👥 Current Participants in Mining Channels",
+                        value="\n".join(participant_text) + f"\n\n**Total:** {sum(len(members) for members in current_participants.values())} members already in channels",
+                        inline=False
+                    )
             
             embed.add_field(
                 name="🔄 Next Steps",
@@ -349,6 +367,41 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
                 ),
                 ephemeral=True
             )
+    
+    async def _get_current_voice_participants(self, guild, channels):
+        """Get current participants in mining voice channels."""
+        try:
+            current_participants = {}
+            
+            # Check each mining channel for current members
+            for channel_key, channel_id_str in channels.items():
+                try:
+                    channel_id = int(channel_id_str)
+                    voice_channel = guild.get_channel(channel_id)
+                    
+                    if voice_channel and hasattr(voice_channel, 'members'):
+                        # Get members in this voice channel (excluding bots)
+                        members_in_channel = [member for member in voice_channel.members if not member.bot]
+                        
+                        if members_in_channel:
+                            # Use a friendly channel name
+                            friendly_name = channel_key.title()
+                            if channel_key == 'dispatch':
+                                friendly_name = 'Dispatch/Main'
+                            elif channel_key.startswith('group') or len(channel_key) <= 2:
+                                friendly_name = f"Group {channel_key.upper()}"
+                            
+                            current_participants[friendly_name] = members_in_channel
+                            
+                except (ValueError, AttributeError) as e:
+                    print(f"Warning: Could not check channel {channel_key}: {e}")
+                    continue
+            
+            return current_participants
+            
+        except Exception as e:
+            print(f"Error getting current voice participants: {e}")
+            return {}
 
 
 async def setup(bot):
