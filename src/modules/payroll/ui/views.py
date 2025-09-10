@@ -11,6 +11,21 @@ from decimal import Decimal
 from datetime import datetime
 
 
+def format_event_date(date_value) -> str:
+    """Format event date to year-month-day hour:minute."""
+    if not date_value:
+        return "Unknown"
+    
+    try:
+        if isinstance(date_value, str):
+            parsed_date = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+        else:
+            parsed_date = date_value
+        return parsed_date.strftime("%Y-%m-%d %H:%M")
+    except:
+        return "Unknown"
+
+
 class EventSelectionView(ui.View):
     """View for selecting which event to calculate payroll for."""
     
@@ -119,7 +134,7 @@ class EventSelectionDropdown(ui.Select):
                 name="📋 Event Details",
                 value=f"**Event:** {selected_event['event_name']}\n"
                       f"**Organizer:** {selected_event['organizer_name']}\n"
-                      f"**Date:** {selected_event.get('started_at', 'Unknown')}",
+                      f"**Date:** {format_event_date(selected_event.get('started_at'))}",
                 inline=False
             )
             
@@ -252,7 +267,7 @@ class UnifiedEventSelectionDropdown(ui.Select):
                 name="📋 Event Details",
                 value=f"**Event:** {selected_event['event_name']}\n"
                       f"**Organizer:** {selected_event['organizer_name']}\n"
-                      f"**Date:** {selected_event.get('started_at', 'Unknown')}",
+                      f"**Date:** {format_event_date(selected_event.get('started_at'))}",
                 inline=False
             )
             
