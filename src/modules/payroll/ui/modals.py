@@ -2822,10 +2822,11 @@ class DirectPricingButton(ui.Button):
         try:
             # Validate that we have prices before opening modal
             if not self.ore_prices:
-                await interaction.response.send_message(
-                    "❌ Error Loading UEX Pricing\nFailed to load UEX pricing: No price data available. Please try again.",
-                    ephemeral=True
-                )
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "❌ Error Loading UEX Pricing\nFailed to load UEX pricing: No price data available. Please try again.",
+                        ephemeral=True
+                    )
                 return
                 
             # Check if any of our collected ores have prices
@@ -2835,30 +2836,47 @@ class DirectPricingButton(ui.Button):
             )
             
             if not has_prices:
-                await interaction.response.send_message(
-                    "❌ Error Loading UEX Pricing\nFailed to load UEX pricing: No prices found for collected ores. Please try again.",
-                    ephemeral=True
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "❌ Error Loading UEX Pricing\nFailed to load UEX pricing: No prices found for collected ores. Please try again.",
+                        ephemeral=True
+                    )
+                return
+            
+            # Try to create the modal first to catch any initialization errors
+            try:
+                modal = DirectUEXPricingModal(
+                    self.event_data, self.processor, self.calculator,
+                    self.ore_quantities, self.ore_prices
                 )
+            except Exception as modal_error:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        f"❌ Error Loading UEX Pricing\nFailed to create pricing modal: {str(modal_error)}", 
+                        ephemeral=True
+                    )
                 return
             
             # Show UEX pricing modal with title as requested by user
-            modal = DirectUEXPricingModal(
-                self.event_data, self.processor, self.calculator,
-                self.ore_quantities, self.ore_prices
-            )
-            await interaction.response.send_modal(modal)
+            if not interaction.response.is_done():
+                await interaction.response.send_modal(modal)
+                
         except Exception as e:
-            # Check if interaction was already responded to
+            # Only respond if we haven't already responded
             if not interaction.response.is_done():
                 await interaction.response.send_message(
                     f"❌ Error Loading UEX Pricing\nFailed to load UEX pricing: {str(e)}", 
                     ephemeral=True
                 )
             else:
-                await interaction.followup.send(
-                    f"❌ Error Loading UEX Pricing\nFailed to load UEX pricing: {str(e)}", 
-                    ephemeral=True
-                )
+                # If we already responded, use followup
+                try:
+                    await interaction.followup.send(
+                        f"❌ Error Loading UEX Pricing\nFailed to load UEX pricing: {str(e)}", 
+                        ephemeral=True
+                    )
+                except:
+                    pass  # Ignore followup errors
 
 
 class DirectUEXPricingModal(ui.Modal):
