@@ -25,13 +25,8 @@ from .processors import MiningProcessor, SalvageProcessor, CombatProcessor
 from .ui.views import EventSelectionView, PayrollConfirmationView
 from .ui.modals import MiningCollectionModal, SalvageCollectionModal
 
-class PayrollCommands(commands.GroupCog, name="payroll"):
-    """
-    Universal payroll command group.
-    
-    Handles payroll calculations for all event types that collect valuable materials.
-    Each event type has a specialized processor for converting materials to aUEC.
-    """
+class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate payouts for mining, salvage, and combat operations"):
+    """Universal payroll command group."""
     
     def __init__(self, bot):
         self.bot = bot

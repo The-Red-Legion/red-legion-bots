@@ -20,15 +20,8 @@ from config.settings import get_sunday_mining_channels, DISCORD_CONFIG
 from .events import MiningEventManager
 from .participation import VoiceTracker
 
-class MiningCommands(commands.GroupCog, name="mining"):
-    """
-    Mining operations command group.
-    
-    Commands:
-    - /mining start - Start a mining session with voice tracking
-    - /mining stop - End the current mining session
-    - /mining status - Show current session information
-    """
+class MiningCommands(commands.GroupCog, name="mining", description="Mining operations and session management"):
+    """Mining operations command group."""
     
     def __init__(self, bot):
         self.bot = bot
