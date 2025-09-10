@@ -34,9 +34,12 @@ def test_command_module_imports():
         assert hasattr(MiningCommands, 'stop_mining'), "Mining module should have stop_mining method" 
         assert hasattr(MiningCommands, 'mining_status'), "Mining module should have mining_status method"
         
-        assert hasattr(PayrollCommands, 'payroll_mining'), "Payroll module should have payroll_mining method"
-        assert hasattr(PayrollCommands, 'payroll_salvage'), "Payroll module should have payroll_salvage method"
-        assert hasattr(PayrollCommands, 'payroll_combat'), "Payroll module should have payroll_combat method"
+        assert hasattr(PayrollCommands, 'payroll_calculate'), "Payroll module should have payroll_calculate method"
+        assert hasattr(PayrollCommands, 'payroll_status'), "Payroll module should have payroll_status method"
+        # Deprecated methods should still exist for backwards compatibility
+        assert hasattr(PayrollCommands, 'payroll_mining_deprecated'), "Payroll module should have deprecated mining method"
+        assert hasattr(PayrollCommands, 'payroll_salvage_deprecated'), "Payroll module should have deprecated salvage method"
+        assert hasattr(PayrollCommands, 'payroll_combat_deprecated'), "Payroll module should have deprecated combat method"
         
         print("✅ Command methods verified")
         
