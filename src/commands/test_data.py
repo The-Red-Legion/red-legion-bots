@@ -167,9 +167,9 @@ class TestDataCreationModal(ui.Modal):
             if not db_url:
                 return {'success': False, 'error': 'Database connection not available'}
             
-            # Generate event ID
+            # Generate event ID with TS- prefix for test data
             random_part = ''.join(random.choices('0123456789', k=5))
-            event_id = f"sm-{random_part}"
+            event_id = f"ts-{random_part}"
             
             # Calculate event times
             event_start = datetime.now() - timedelta(hours=hours_ago)
@@ -218,7 +218,7 @@ class TestDataCreationModal(ui.Modal):
                         # Generate test user ID (numeric for BIGINT field)
                         # Use a safe range starting from 9000000000000000000 to avoid conflicts
                         base_test_id = 9000000000000000000
-                        # Extract numeric part from event_id (e.g., "sm-12345" -> "12345")
+                        # Extract numeric part from event_id (e.g., "ts-12345" -> "12345")
                         try:
                             event_numeric_part = event_id.split('-')[1] if '-' in event_id else event_id
                             event_number = int(event_numeric_part)
@@ -403,15 +403,8 @@ class FinalDeleteConfirmationModal(ui.Modal):
                     try:
                         cursor.execute("""
                             DELETE FROM payrolls 
-                            WHERE event_id LIKE 'sm-%' 
-                            AND event_id IN (
-                                SELECT event_id FROM events 
-                                WHERE organizer_id = %s OR location_notes IN (
-                                    'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
-                                    'Wala', 'Cellin', 'Hurston', 'ArcCorp'
-                                )
-                            )
-                        """, (str(interaction.user.id),))
+                            WHERE event_id LIKE 'ts-%'
+                        """)
                         deleted_counts['payrolls'] = cursor.rowcount
                     except Exception as e:
                         print(f"Error deleting payrolls: {e}")
@@ -421,13 +414,8 @@ class FinalDeleteConfirmationModal(ui.Modal):
                     try:
                         cursor.execute("""
                             DELETE FROM events 
-                            WHERE event_id LIKE 'sm-%' 
-                            AND (organizer_id = %s OR location_notes IN (
-                                'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
-                                'Wala', 'Cellin', 'Hurston', 'ArcCorp'
-                            ))
-                            AND created_at > NOW() - INTERVAL '7 days'
-                        """, (str(interaction.user.id),))
+                            WHERE event_id LIKE 'ts-%'
+                        """)
                         deleted_counts['events'] = cursor.rowcount
                     except Exception as e:
                         print(f"Error deleting events: {e}")
@@ -533,26 +521,123 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
     @app_commands.default_permissions(administrator=True)
     async def delete_test_data(self, interaction: discord.Interaction):
         """Delete all test mining data from the unified database"""
-        # Show deletion confirmation UI
-        embed = discord.Embed(
-            title="⚠️ Delete All Test Data",
-            description="**WARNING: This action cannot be undone!**\n\n"
-                       "This will permanently remove:\n"
-                       "• All test events (sm-xxxxx)\n"
-                       "• All test users (TestMiner###)\n"
-                       "• All participation records for test events\n"
-                       "• Any payroll calculations for test events",
-            color=discord.Color.red()
-        )
+        await interaction.response.defer(ephemeral=True)
         
-        embed.add_field(
-            name="🛑 Confirmation Required",
-            value="Click the deletion button below and confirm to proceed.",
-            inline=False
-        )
-        
-        view = TestDataDeletionView()
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        try:
+            # First, scan for existing test data to show what will be deleted
+            from config.settings import get_database_url
+            from database.connection import resolve_database_url
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            
+            db_url = get_database_url()
+            if not db_url:
+                await interaction.followup.send("❌ Database connection not available", ephemeral=True)
+                return
+            
+            resolved_url = resolve_database_url(db_url)
+            conn = psycopg2.connect(resolved_url, cursor_factory=RealDictCursor)
+            
+            test_data_summary = {
+                'events': [],
+                'users': 0,
+                'participation': 0,
+                'payrolls': 0
+            }
+            
+            try:
+                with conn.cursor() as cursor:
+                    # Get test events to show
+                    cursor.execute("""
+                        SELECT event_id, event_name, location_notes, started_at, status, created_at 
+                        FROM events 
+                        WHERE event_id LIKE 'ts-%'
+                        ORDER BY created_at DESC 
+                        LIMIT 10
+                    """)
+                    test_data_summary['events'] = cursor.fetchall()
+                    
+                    # Count test users
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE user_id >= 9000000000000000000")
+                    result = cursor.fetchone()
+                    test_data_summary['users'] = result[0] if result else 0
+                    
+                    # Count participation records
+                    cursor.execute("SELECT COUNT(*) FROM participation WHERE user_id >= 9000000000000000000")
+                    result = cursor.fetchone()
+                    test_data_summary['participation'] = result[0] if result else 0
+                    
+                    # Count payroll records
+                    cursor.execute("SELECT COUNT(*) FROM payrolls WHERE event_id LIKE 'ts-%'")
+                    result = cursor.fetchone()
+                    test_data_summary['payrolls'] = result[0] if result else 0
+            
+            finally:
+                conn.close()
+            
+            # Create enhanced deletion confirmation UI
+            embed = discord.Embed(
+                title="⚠️ Delete All Test Data",
+                description="**WARNING: This action cannot be undone!**\n\n"
+                           "The following test data will be permanently deleted:",
+                color=discord.Color.red()
+            )
+            
+            # Show test events if any exist
+            if test_data_summary['events']:
+                event_list = []
+                for event in test_data_summary['events'][:5]:  # Show up to 5
+                    status_emoji = "🔴" if event['status'] == 'closed' else "🟢"
+                    event_list.append(f"{status_emoji} `{event['event_id']}` - {event['event_name']}")
+                
+                events_text = "\n".join(event_list)
+                if len(test_data_summary['events']) > 5:
+                    events_text += f"\n... and {len(test_data_summary['events']) - 5} more"
+                
+                embed.add_field(
+                    name=f"🎯 Test Events ({len(test_data_summary['events'])} total)",
+                    value=events_text,
+                    inline=False
+                )
+            
+            # Show counts
+            embed.add_field(
+                name="📊 Data Counts",
+                value=f"**Events:** {len(test_data_summary['events'])}\n"
+                      f"**Test Users:** {test_data_summary['users']}\n" 
+                      f"**Participation Records:** {test_data_summary['participation']}\n"
+                      f"**Payroll Records:** {test_data_summary['payrolls']}",
+                inline=True
+            )
+            
+            total_items = (len(test_data_summary['events']) + test_data_summary['users'] + 
+                          test_data_summary['participation'] + test_data_summary['payrolls'])
+            
+            if total_items == 0:
+                embed.add_field(
+                    name="✅ No Test Data Found",
+                    value="No test data found to delete. Database is already clean.",
+                    inline=False
+                )
+                embed.color = discord.Color.green()
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
+            else:
+                embed.add_field(
+                    name="🛑 Confirmation Required",
+                    value=f"**Total Items:** {total_items}\n"
+                          "Click the deletion button below and type 'DELETE' to confirm.",
+                    inline=False
+                )
+            
+            view = TestDataDeletionView()
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error scanning test data: {str(e)}", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="status", description="Show current test data in database")
     @app_commands.default_permissions(administrator=True)
@@ -590,8 +675,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     try:
                         cursor.execute("""
                             SELECT COUNT(*) FROM events 
-                            WHERE event_id LIKE 'sm-%' 
-                            AND created_at > NOW() - INTERVAL '7 days'
+                            WHERE event_id LIKE 'ts-%' 
                             AND event_type = 'mining'
                         """)
                         result = cursor.fetchone()
@@ -628,8 +712,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                         cursor.execute("""
                             SELECT event_id, location_notes, started_at, ended_at, status, created_at 
                             FROM events 
-                            WHERE event_id LIKE 'sm-%' 
-                            AND created_at > NOW() - INTERVAL '7 days'
+                            WHERE event_id LIKE 'ts-%' 
                             AND event_type = 'mining'
                             ORDER BY created_at DESC 
                             LIMIT 5
