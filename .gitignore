@@ -35,3 +35,6 @@ Thumbs.db
 *.log
 *.bak
 .env  # Environment variables file, if used locally
+
+# Presentations
+presentations/
