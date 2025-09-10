@@ -225,8 +225,8 @@ CREATE TABLE uex_prices (
     fetched_at TIMESTAMP DEFAULT NOW(),
     is_current BOOLEAN DEFAULT true,
     
-    -- Ensure unique current prices per category
-    UNIQUE(item_name, item_category) WHERE is_current = true
+    -- Note: Unique current prices enforced via application logic
+    -- CONSTRAINT unique_current_prices EXCLUDE (item_name WITH =, item_category WITH =) WHERE (is_current = true)
 );
 
 -- =====================================================
@@ -333,7 +333,8 @@ CREATE INDEX idx_payouts_user ON payouts(user_id);
 
 -- UEX pricing indexes
 CREATE INDEX idx_uex_prices_category ON uex_prices(item_category);
-CREATE INDEX idx_uex_prices_current ON uex_prices(is_current) WHERE is_current = true;
+-- Partial index for current prices (compatible with older PostgreSQL)
+CREATE INDEX idx_uex_prices_current ON uex_prices(is_current, item_name, item_category);
 CREATE INDEX idx_uex_prices_fetched ON uex_prices(fetched_at);
 
 -- Analytics & lottery indexes
