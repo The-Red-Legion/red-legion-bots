@@ -223,7 +223,7 @@ CREATE TABLE uex_prices (
     
     -- API Tracking (12-hour refresh cycle)
     fetched_at TIMESTAMP DEFAULT NOW(),
-    is_current BOOLEAN DEFAULT true,
+    is_current BOOLEAN DEFAULT true
     
     -- Note: Unique current prices enforced via application logic
     -- CONSTRAINT unique_current_prices EXCLUDE (item_name WITH =, item_category WITH =) WHERE (is_current = true)
