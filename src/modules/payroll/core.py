@@ -148,7 +148,7 @@ class PayrollCalculator:
                             )
                         ) as total_minutes,
                         COUNT(*) as session_count,
-                        MAX(is_org_member) as is_org_member,
+                        BOOL_OR(is_org_member) as is_org_member,
                         MIN(joined_at) as first_joined,
                         MAX(COALESCE(left_at, joined_at)) as last_active
                     FROM participation 
