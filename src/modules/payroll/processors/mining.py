@@ -164,15 +164,23 @@ class MiningProcessor:
                 'Content-Type': 'application/json'
             }
             
+            logger.info(f"Fetching UEX data from: {url}")
+            logger.info(f"Using bearer token: {UEX_API_CONFIG['bearer_token'][:10]}...")
+            
             timeout = aiohttp.ClientTimeout(total=UEX_API_CONFIG['timeout'])
             
             async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
                 async with session.get(url) as response:
+                    logger.info(f"UEX API response status: {response.status}")
                     if response.status == 200:
                         data = await response.json()
-                        return self._parse_uex_response(data)
+                        logger.info(f"UEX API returned {len(data) if isinstance(data, (list, dict)) else 'unknown'} items")
+                        parsed_data = self._parse_uex_response(data)
+                        logger.info(f"Parsed {len(parsed_data)} ore prices from UEX API")
+                        return parsed_data
                     else:
-                        logger.error(f"UEX API returned status {response.status}")
+                        response_text = await response.text()
+                        logger.error(f"UEX API returned status {response.status}: {response_text[:200]}")
                         return {}
                         
         except asyncio.TimeoutError:

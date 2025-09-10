@@ -16,6 +16,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database.connection import get_cursor
+from config.settings import UEX_API_CONFIG
 
 
 class AdminCommands(commands.GroupCog, name="admin", description="Administrative commands (Admin only)"):
@@ -628,6 +629,86 @@ class EventBulkDeleteConfirmationModal(discord.ui.Modal):
             await interaction.followup.send(
                 embed=discord.Embed(
                     title="❌ Error",
+                    description=f"An unexpected error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+    
+    @app_commands.command(name="test-uex-api", description="Test UEX API connection and bearer token")
+    @app_commands.default_permissions(administrator=True)
+    async def test_uex_api(self, interaction: discord.Interaction):
+        """Test UEX API to verify bearer token and connection."""
+        # Check admin permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ This command requires administrator permissions.",
+                ephemeral=True
+            )
+            return
+        
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            from modules.payroll.processors.mining import MiningProcessor
+            processor = MiningProcessor()
+            
+            # Test UEX API call
+            prices = await processor.get_current_prices(refresh=True)  # Force refresh from API
+            
+            embed = discord.Embed(
+                title="🧪 UEX API Test Results",
+                color=discord.Color.green() if prices else discord.Color.red()
+            )
+            
+            if prices:
+                embed.description = f"✅ **UEX API connection successful!**\n\nRetrieved {len(prices)} ore prices."
+                
+                # Show sample prices
+                sample_ores = list(prices.items())[:5]
+                if sample_ores:
+                    price_text = []
+                    for ore_name, price_data in sample_ores:
+                        price = price_data.get('price', 0)
+                        location = price_data.get('location', 'Unknown')
+                        price_text.append(f"**{ore_name}**: {price:,.0f} aUEC ({location})")
+                    
+                    embed.add_field(
+                        name="📊 Sample Prices",
+                        value="\n".join(price_text),
+                        inline=False
+                    )
+                
+                embed.add_field(
+                    name="🔧 Configuration",
+                    value=f"API URL: `{UEX_API_CONFIG['base_url']}`\n"
+                          f"Bearer Token: `{UEX_API_CONFIG['bearer_token'][:10]}...`\n"
+                          f"Timeout: {UEX_API_CONFIG['timeout']}s",
+                    inline=False
+                )
+            else:
+                embed.description = "❌ **UEX API connection failed!**\n\nNo price data retrieved."
+                embed.add_field(
+                    name="🔧 Configuration",
+                    value=f"API URL: `{UEX_API_CONFIG['base_url']}`\n"
+                          f"Bearer Token: `{UEX_API_CONFIG['bearer_token'][:10]}...`\n"
+                          f"Timeout: {UEX_API_CONFIG['timeout']}s",
+                    inline=False
+                )
+                embed.add_field(
+                    name="🔍 Next Steps",
+                    value="• Check bot logs for detailed error messages\n"
+                          "• Verify bearer token is still valid\n"
+                          "• Check UEX Corp API status",
+                    inline=False
+                )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Testing UEX API",
                     description=f"An unexpected error occurred: {str(e)}",
                     color=discord.Color.red()
                 ),
