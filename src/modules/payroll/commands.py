@@ -48,6 +48,180 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
         """Unified payroll calculation for all event types."""
         await self._handle_unified_payroll_calculation(interaction)
     
+    @app_commands.command(name="quick", description="Quick mining payroll calculation with ore quantities as parameters")
+    @app_commands.describe(
+        event_id="Mining event ID (e.g., sm-abc123)",
+        quantanium="Quantanium SCU amount (default: 0)",
+        laranite="Laranite SCU amount (default: 0)", 
+        agricium="Agricium SCU amount (default: 0)",
+        hadanite="Hadanite SCU amount (default: 0)",
+        beryl="Beryl SCU amount (default: 0)",
+        donation="Donation percentage: 0, 5, 10, 15, or 20 (default: 10)"
+    )
+    async def payroll_quick(
+        self,
+        interaction: discord.Interaction,
+        event_id: str,
+        quantanium: float = 0,
+        laranite: float = 0,
+        agricium: float = 0, 
+        hadanite: float = 0,
+        beryl: float = 0,
+        donation: int = 10
+    ):
+        """Quick mining payroll calculation without modals."""
+        await interaction.response.defer()
+        
+        try:
+            # Check permissions
+            if not await self._check_payroll_permissions(interaction.user):
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ Permission Denied",
+                        description="You need payroll management permissions to use this command.",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+                return
+            
+            # Validate donation percentage
+            if donation not in [0, 5, 10, 15, 20]:
+                await interaction.followup.send(
+                    "❌ Donation percentage must be 0, 5, 10, 15, or 20.",
+                    ephemeral=True
+                )
+                return
+            
+            # Check if event exists
+            guild_id = interaction.guild_id
+            events = await self.calculator.get_completed_events(guild_id, 'mining', include_calculated=False)
+            target_event = None
+            
+            for event in events:
+                if event['event_id'] == event_id:
+                    target_event = event
+                    break
+            
+            if not target_event:
+                await interaction.followup.send(
+                    f"❌ Event `{event_id}` not found or already has payroll calculated.",
+                    ephemeral=True
+                )
+                return
+            
+            # Build ore quantities dict
+            ore_quantities = {}
+            ores = {
+                'QUAN': quantanium,
+                'LARA': laranite, 
+                'AGRI': agricium,
+                'HADA': hadanite,
+                'BERY': beryl
+            }
+            
+            total_scu = 0
+            for ore_code, amount in ores.items():
+                if amount > 0:
+                    ore_quantities[ore_code] = amount
+                    total_scu += amount
+            
+            if total_scu == 0:
+                await interaction.followup.send(
+                    "❌ Please specify at least some ore quantities greater than 0.",
+                    ephemeral=True
+                )
+                return
+            
+            # Get prices and calculate
+            await interaction.followup.send("🔄 Fetching current UEX Corp ore prices...", ephemeral=True)
+            
+            ore_prices = await self.processors['mining'].get_current_prices()
+            if not ore_prices:
+                # Use fallback prices
+                ore_prices = {
+                    'QUAN': {'price': 9000}, 'LARA': {'price': 2500}, 'AGRI': {'price': 2300},
+                    'HADA': {'price': 1800}, 'BERY': {'price': 1600}
+                }
+                await interaction.followup.send("⚠️ Using fallback prices (UEX API unavailable)", ephemeral=True)
+            
+            # Calculate total value
+            total_value, breakdown = await self.processors['mining'].calculate_total_value(
+                ore_quantities, ore_prices
+            )
+            
+            # Get participants
+            participants = await self.calculator.get_participants_for_event(event_id)
+            if not participants:
+                await interaction.followup.send(
+                    f"❌ No participants found for event {event_id}.",
+                    ephemeral=True
+                )
+                return
+            
+            # Calculate final amounts
+            donation_amount = total_value * (donation / 100)
+            payout_amount = total_value - donation_amount
+            per_participant = payout_amount / len(participants) if len(participants) > 0 else 0
+            
+            # Create final payroll summary
+            embed = discord.Embed(
+                title=f"💰 Quick Payroll - {event_id}",
+                description=f"**Payroll calculation complete!**",
+                color=discord.Color.green()
+            )
+            
+            # Add ore breakdown
+            ore_text = []
+            for ore_code, quantity in ore_quantities.items():
+                if ore_code in breakdown:
+                    data = breakdown[ore_code]
+                    ore_name = {'QUAN': 'Quantanium', 'LARA': 'Laranite', 'AGRI': 'Agricium', 'HADA': 'Hadanite', 'BERY': 'Beryl'}.get(ore_code, ore_code)
+                    ore_text.append(f"• **{ore_name}:** {quantity} SCU @ {data['price_per_scu']:,.0f} = {data['total_value']:,.0f} aUEC")
+            
+            embed.add_field(
+                name="⛏️ Ore Collections",
+                value="\n".join(ore_text),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="💰 Financial Summary",
+                value=f"**Total Value:** {total_value:,.0f} aUEC\n"
+                      f"**Donation ({donation}%):** {donation_amount:,.0f} aUEC\n"
+                      f"**Net Payout:** {payout_amount:,.0f} aUEC",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="👥 Distribution",
+                value=f"**{len(participants)} participants** receive equal shares\n"
+                      f"**Per participant:** {per_participant:,.0f} aUEC\n"
+                      f"**Payment method:** Manual distribution",
+                inline=False
+            )
+            
+            # Add participant list (first few)
+            participant_text = []
+            for participant in participants[:5]:
+                participant_text.append(f"• {participant.get('display_name', 'Unknown')}")
+            if len(participants) > 5:
+                participant_text.append(f"... and {len(participants) - 5} more")
+            
+            embed.add_field(
+                name="📋 Participants",
+                value="\n".join(participant_text),
+                inline=False
+            )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error calculating payroll: {str(e)}",
+                ephemeral=True
+            )
+    
     async def _handle_unified_payroll_calculation(
         self,
         interaction: discord.Interaction
