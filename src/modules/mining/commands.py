@@ -250,6 +250,11 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
             # Get final participation stats
             stats = await self.event_manager.get_event_stats(active_event['event_id'])
             
+            # Also get current voice channel participants for a complete picture
+            channels = get_sunday_mining_channels(guild_id)
+            current_voice_participants = await self._get_current_voice_participants(interaction.guild, channels)
+            total_current_voice = sum(len(members) for members in current_voice_participants.values())
+            
             embed = discord.Embed(
                 title="🏁 Mining Session Ended",
                 description=f"Session **{active_event['event_id']}** has been closed",
@@ -257,13 +262,37 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
                 timestamp=datetime.now()
             )
             
+            # Enhanced final stats
+            duration_minutes = stats.get('duration_minutes', 0)
+            total_participants = stats.get('total_participants', 0)
+            max_concurrent = max(stats.get('max_concurrent', 0), total_current_voice)
+            
+            # If no participation records yet but people are in voice, show current count
+            if total_participants == 0 and total_current_voice > 0:
+                total_participants = total_current_voice
+            
             embed.add_field(
                 name="📊 Final Stats",
-                value=f"**Duration:** {stats.get('duration_minutes', 0)} minutes\n"
-                      f"**Total Participants:** {stats.get('total_participants', 0)}\n"
-                      f"**Max Concurrent:** {stats.get('max_concurrent', 0)}",
+                value=f"**Duration:** {duration_minutes} minutes\n"
+                      f"**Total Participants:** {total_participants}\n"
+                      f"**Max Concurrent:** {max_concurrent}",
                 inline=False
             )
+            
+            # Show current voice participants if any
+            if current_voice_participants:
+                participant_text = []
+                for channel_name, members in current_voice_participants.items():
+                    if members:
+                        member_names = [member.display_name for member in members]
+                        participant_text.append(f"**{channel_name}:** {', '.join(member_names)}")
+                
+                if participant_text:
+                    embed.add_field(
+                        name="🎤 Still in Voice Channels",
+                        value="\n".join(participant_text) + f"\n\n*These members were still in channels when session ended*",
+                        inline=False
+                    )
             
             embed.add_field(
                 name="💰 Next Steps",

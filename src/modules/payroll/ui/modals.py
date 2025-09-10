@@ -349,15 +349,16 @@ class HighValueOreSelector(ui.Select):
         for ore_code in self.values:
             self.selected_ores.add(ore_code)
         
-        # Update proceed button
+        # Update proceed button and refresh the view
         self.view.update_proceed_button()
         
-        # Show selection feedback
+        # Show selection feedback and update the view
         if self.values:
             selected_names = [HIGH_VALUE_ORES[code] for code in self.values]
             await interaction.response.send_message(
                 f"✅ Selected high-value ores: **{', '.join(selected_names)}**\n"
-                f"Total selected: **{len(self.selected_ores)} ore types**",
+                f"Total selected: **{len(self.selected_ores)} ore types**\n"
+                f"💡 Click **Enter Amounts** when ready to proceed!",
                 ephemeral=True
             )
         else:
@@ -365,6 +366,12 @@ class HighValueOreSelector(ui.Select):
                 "⭕ Cleared high-value ore selections.",
                 ephemeral=True
             )
+        
+        # Force update the view to refresh button states
+        try:
+            await interaction.edit_original_response(view=self.view)
+        except:
+            pass  # Might fail if this is a followup, that's OK
 
 
 class MidValueOreSelector(ui.Select):
@@ -398,15 +405,16 @@ class MidValueOreSelector(ui.Select):
         for ore_code in self.values:
             self.selected_ores.add(ore_code)
         
-        # Update proceed button
+        # Update proceed button and refresh the view
         self.view.update_proceed_button()
         
-        # Show selection feedback
+        # Show selection feedback and update the view
         if self.values:
             selected_names = [MID_VALUE_ORES[code] for code in self.values]
             await interaction.response.send_message(
                 f"✅ Selected mid-value ores: **{', '.join(selected_names)}**\n"
-                f"Total selected: **{len(self.selected_ores)} ore types**",
+                f"Total selected: **{len(self.selected_ores)} ore types**\n"
+                f"💡 Click **Enter Amounts** when ready to proceed!",
                 ephemeral=True
             )
         else:
@@ -414,6 +422,12 @@ class MidValueOreSelector(ui.Select):
                 "⭕ Cleared mid-value ore selections.",
                 ephemeral=True
             )
+        
+        # Force update the view to refresh button states
+        try:
+            await interaction.edit_original_response(view=self.view)
+        except:
+            pass  # Might fail if this is a followup, that's OK
 
 
 class CommonOreSelector(ui.Select):
@@ -448,15 +462,16 @@ class CommonOreSelector(ui.Select):
         for ore_code in self.values:
             self.selected_ores.add(ore_code)
         
-        # Update proceed button
+        # Update proceed button and refresh the view
         self.view.update_proceed_button()
         
-        # Show selection feedback
+        # Show selection feedback and update the view
         if self.values:
             selected_names = [COMMON_ORES[code] for code in self.values if code in COMMON_ORES]
             await interaction.response.send_message(
                 f"✅ Selected common ores: **{', '.join(selected_names)}**\n"
-                f"Total selected: **{len(self.selected_ores)} ore types**",
+                f"Total selected: **{len(self.selected_ores)} ore types**\n"
+                f"💡 Click **Enter Amounts** when ready to proceed!",
                 ephemeral=True
             )
         else:
@@ -464,6 +479,12 @@ class CommonOreSelector(ui.Select):
                 "⭕ Cleared common ore selections.",
                 ephemeral=True
             )
+        
+        # Force update the view to refresh button states
+        try:
+            await interaction.edit_original_response(view=self.view)
+        except:
+            pass  # Might fail if this is a followup, that's OK
 
 
 class ProceedToAmountsButton(ui.Button):
