@@ -1488,12 +1488,23 @@ class EnterQuantitiesButton(ui.Button):
     
     async def callback(self, interaction: discord.Interaction):
         try:
+            # Debug info
+            print(f"🔍 Selected ores: {self.selected_ores}")
+            print(f"🔍 Event data: {self.event_data.get('event_id', 'Unknown')}")
+            
+            if not self.selected_ores:
+                await interaction.response.send_message(
+                    "❌ No ores selected. Please go back and select ore types first.", 
+                    ephemeral=True
+                )
+                return
+            
             # Open modal for quantity entry
             modal = OreQuantityModal(self.event_data, self.processor, self.calculator, self.selected_ores)
             await interaction.response.send_modal(modal)
         except Exception as e:
             await interaction.response.send_message(
-                f"❌ Error opening quantity modal: {str(e)}", 
+                f"❌ Error opening quantity modal: {str(e)}\nSelected ores: {self.selected_ores}", 
                 ephemeral=True
             )
 
