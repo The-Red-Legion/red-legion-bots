@@ -109,7 +109,13 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                         # Generate test user ID (numeric for BIGINT field)
                         # Use a safe range starting from 9000000000000000000 to avoid conflicts
                         base_test_id = 9000000000000000000
-                        user_id = base_test_id + (int(event_id[-6:], 36) * 1000) + i + 1
+                        # Extract numeric part from event_id (e.g., "sm-12345" -> "12345")
+                        try:
+                            event_numeric_part = event_id.split('-')[1] if '-' in event_id else event_id
+                            event_number = int(event_numeric_part)
+                        except (IndexError, ValueError):
+                            event_number = random.randint(10000, 99999)  # Fallback
+                        user_id = base_test_id + (event_number * 1000) + i + 1
                         username = f"TestMiner{i+1:03d}"
                         is_org_member = random.choice([True, False])
                         
@@ -260,41 +266,57 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             try:
                 with conn.cursor() as cursor:
                     # Delete test participation records (must be first due to foreign keys)
-                    cursor.execute("""
-                        DELETE FROM participation 
-                        WHERE user_id >= 9000000000000000000
-                    """)
-                    deleted_counts['participation'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM participation 
+                            WHERE user_id >= 9000000000000000000
+                        """)
+                        deleted_counts['participation'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting participation records: {e}", ephemeral=True)
+                        return
                     
                     # Delete test payroll records
-                    cursor.execute("""
-                        DELETE FROM payrolls 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND event_id IN (
-                            SELECT event_id FROM events 
-                            WHERE organizer_id = %s OR location_notes LIKE 'Test%'
-                        )
-                    """, (str(interaction.user.id),))
-                    deleted_counts['payrolls'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM payrolls 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND event_id IN (
+                                SELECT event_id FROM events 
+                                WHERE organizer_id = %s OR location_notes LIKE '%Test%'
+                            )
+                        """, (str(interaction.user.id),))
+                        deleted_counts['payrolls'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting payroll records: {e}", ephemeral=True)
+                        return
                     
                     # Delete test events (look for events created by this command or with test characteristics)
-                    cursor.execute("""
-                        DELETE FROM events 
-                        WHERE event_id LIKE 'sm-%' 
-                        AND (organizer_id = %s OR location_notes IN (
-                            'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
-                            'Wala', 'Cellin', 'Hurston', 'ArcCorp'
-                        ))
-                        AND created_at > NOW() - INTERVAL '7 days'
-                    """, (str(interaction.user.id),))
-                    deleted_counts['events'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM events 
+                            WHERE event_id LIKE 'sm-%' 
+                            AND (organizer_id = %s OR location_notes IN (
+                                'Daymar', 'Yela', 'Aberdeen', 'Magda', 'Arial', 'Lyria', 
+                                'Wala', 'Cellin', 'Hurston', 'ArcCorp'
+                            ))
+                            AND created_at > NOW() - INTERVAL '7 days'
+                        """, (str(interaction.user.id),))
+                        deleted_counts['events'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting event records: {e}", ephemeral=True)
+                        return
                     
                     # Delete test users
-                    cursor.execute("""
-                        DELETE FROM users 
-                        WHERE user_id >= 9000000000000000000
-                    """)
-                    deleted_counts['users'] = cursor.rowcount
+                    try:
+                        cursor.execute("""
+                            DELETE FROM users 
+                            WHERE user_id >= 9000000000000000000
+                        """)
+                        deleted_counts['users'] = cursor.rowcount
+                    except Exception as e:
+                        await interaction.followup.send(f"❌ Error deleting user records: {e}", ephemeral=True)
+                        return
                     
                     conn.commit()
             
