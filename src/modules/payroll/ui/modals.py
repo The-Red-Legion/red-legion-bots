@@ -1126,6 +1126,140 @@ class CancelOreSelectionButton(ui.Button):
         await interaction.response.edit_message(embed=embed, view=self.view)
 
 
+class PriceEditModal(ui.Modal):
+    """Modal for editing ore prices in payroll calculation."""
+    
+    def __init__(self, event_data, ore_collections, prices, breakdown, processor, calculator, parent_view):
+        super().__init__(title=f'Edit Prices - {event_data["event_id"]}')
+        self.event_data = event_data
+        self.ore_collections = ore_collections
+        self.prices = prices
+        self.breakdown = breakdown
+        self.processor = processor
+        self.calculator = calculator
+        self.parent_view = parent_view
+        self.price_inputs = {}
+        
+        # Create price input fields for collected ores (max 5 due to Discord modal limit)
+        ore_count = 0
+        for ore_name, data in breakdown.items():
+            if ore_count >= 5:
+                break
+                
+            current_price = data['price_per_scu']
+            price_input = ui.TextInput(
+                label=f'{ore_name} Price per SCU',
+                placeholder=f'Current: {current_price:,.0f} aUEC',
+                default=str(int(current_price)),
+                required=True,
+                max_length=10
+            )
+            
+            self.price_inputs[ore_name] = price_input
+            self.add_item(price_input)
+            ore_count += 1
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse new prices
+            updated_prices = {}
+            for ore_name, input_field in self.price_inputs.items():
+                try:
+                    new_price = float(input_field.value.strip())
+                    if new_price <= 0:
+                        await interaction.followup.send(
+                            f"❌ Price for {ore_name} must be greater than 0.",
+                            ephemeral=True
+                        )
+                        return
+                    updated_prices[ore_name] = new_price
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ Invalid price for {ore_name}: '{input_field.value}'",
+                        ephemeral=True
+                    )
+                    return
+            
+            # Update prices in breakdown
+            new_breakdown = {}
+            total_value = 0
+            
+            for ore_name, data in self.breakdown.items():
+                if ore_name in updated_prices:
+                    new_price = updated_prices[ore_name]
+                    new_total = data['scu_amount'] * new_price
+                    new_breakdown[ore_name] = {
+                        'scu_amount': data['scu_amount'],
+                        'price_per_scu': new_price,
+                        'total_value': new_total
+                    }
+                    total_value += new_total
+                else:
+                    new_breakdown[ore_name] = data
+                    total_value += data['total_value']
+            
+            # Update parent view with new values
+            self.parent_view.breakdown = new_breakdown
+            self.parent_view.total_value = total_value
+            
+            # Update confirm button with new values
+            for item in self.parent_view.children:
+                if hasattr(item, 'total_value'):
+                    item.total_value = total_value
+                    item.breakdown = new_breakdown
+            
+            # Create updated embed
+            embed = discord.Embed(
+                title=f"💰 Payroll Calculation - {self.event_data['event_id']} (Prices Updated)",
+                description=f"**Total Value:** {total_value:,.2f} aUEC",
+                color=discord.Color.green()
+            )
+            
+            # Get participants count
+            participants = await self.calculator.get_event_participants(self.event_data['event_id'])
+            
+            embed.add_field(
+                name="📋 Event Details",
+                value=f"**Event:** {self.event_data['event_name']}\n"
+                      f"**Organizer:** {self.event_data['organizer_name']}\n"
+                      f"**Participants:** {len(participants)}",
+                inline=True
+            )
+            
+            # Show updated ore breakdown
+            ore_text = []
+            for ore_name, data in new_breakdown.items():
+                price_changed = ore_name in updated_prices
+                price_indicator = " ✏️" if price_changed else ""
+                ore_text.append(f"**{ore_name}:** {data['scu_amount']} SCU @ {data['price_per_scu']:,.0f}{price_indicator} = {data['total_value']:,.0f} aUEC")
+            
+            embed.add_field(
+                name="⛏️ Ore Collections",
+                value="\n".join(ore_text[:8]) + (f"\n... and {len(ore_text) - 8} more" if len(ore_text) > 8 else ""),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🔄 Next Step",
+                value="Choose donation percentage and confirm calculation\n✏️ = Price manually edited",
+                inline=False
+            )
+            
+            await interaction.edit_original_response(embed=embed, view=self.parent_view)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Updating Prices",
+                    description=f"An error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
+
 class SalvageCollectionModal(ui.Modal):
     """Modal for inputting salvage collections."""
     

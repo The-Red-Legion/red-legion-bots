@@ -262,6 +262,12 @@ class PayrollConfirmationView(ui.View):
         # Add donation percentage selector
         self.add_item(DonationSelector())
         
+        # Add edit prices button
+        self.add_item(EditPricesButton(
+            event_data, ore_collections, prices, total_value,
+            breakdown, processor, calculator
+        ))
+        
         # Add confirm button
         self.add_item(ConfirmPayrollButton(
             event_data, ore_collections, prices, total_value, 
@@ -455,6 +461,33 @@ class ConfirmPayrollButton(ui.Button):
             item.disabled = True
         
         await interaction.edit_original_response(embed=embed, view=self.view)
+
+
+class EditPricesButton(ui.Button):
+    """Button to edit ore prices before calculating payroll."""
+    
+    def __init__(self, event_data, ore_collections, prices, total_value, breakdown, processor, calculator):
+        super().__init__(
+            label="Edit Prices",
+            style=discord.ButtonStyle.secondary,
+            emoji="✏️"
+        )
+        self.event_data = event_data
+        self.ore_collections = ore_collections
+        self.prices = prices
+        self.total_value = total_value
+        self.breakdown = breakdown
+        self.processor = processor
+        self.calculator = calculator
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Create price editing modal
+        from .modals import PriceEditModal
+        modal = PriceEditModal(
+            self.event_data, self.ore_collections, self.prices, 
+            self.breakdown, self.processor, self.calculator, self.view
+        )
+        await interaction.response.send_modal(modal)
 
 
 class CancelButton(ui.Button):
