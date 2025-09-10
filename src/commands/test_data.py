@@ -166,8 +166,9 @@ class TestDataCreationModal(ui.Modal):
             if not db_url:
                 return {'success': False, 'error': 'Database connection not available'}
             
-            # Generate event ID with SM- prefix for test data (using existing working format)
-            random_part = ''.join(random.choices('0123456789', k=5))
+            # Generate event ID with SM- prefix for test data (using database constraint format)
+            chars = '0123456789abcdefghijklmnopqrstuvwxyz'
+            random_part = ''.join(random.choices(chars, k=6))
             event_id = f"sm-{random_part}"
             
             # Calculate event times
@@ -217,10 +218,11 @@ class TestDataCreationModal(ui.Modal):
                         # Generate test user ID (numeric for BIGINT field)
                         # Use a safe range starting from 9000000000000000000 to avoid conflicts
                         base_test_id = 9000000000000000000
-                        # Extract numeric part from event_id (e.g., "sm-12345" -> "12345")
+                        # Extract suffix from event_id (e.g., "sm-a7k2m9" -> "a7k2m9") and convert to number
                         try:
-                            event_numeric_part = event_id.split('-')[1] if '-' in event_id else event_id
-                            event_number = int(event_numeric_part)
+                            event_suffix = event_id.split('-')[1] if '-' in event_id else event_id
+                            # Convert alphanumeric suffix to number using hash for consistency
+                            event_number = abs(hash(event_suffix)) % 100000  # Keep within reasonable range
                         except (IndexError, ValueError):
                             event_number = random.randint(10000, 99999)  # Fallback
                         user_id = base_test_id + (event_number * 1000) + i + 1

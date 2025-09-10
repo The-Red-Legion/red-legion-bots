@@ -277,10 +277,11 @@ class MiningEventManager:
             return []
     
     def _generate_mining_event_id(self) -> str:
-        """Generate a prefixed mining event ID like 'sm-12345'."""
+        """Generate a prefixed mining event ID like 'sm-a7k2m9'."""
         import random
         
-        # Generate 5 digit random number
-        random_part = ''.join(random.choices('0123456789', k=5))
+        # Generate 6 character alphanumeric string to match database constraint
+        chars = '0123456789abcdefghijklmnopqrstuvwxyz'
+        random_part = ''.join(random.choices(chars, k=6))
         
         return f"sm-{random_part}"
