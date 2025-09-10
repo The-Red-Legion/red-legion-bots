@@ -110,6 +110,17 @@ class PayrollCalculator:
         """Get all participants for an event with their participation time."""
         try:
             with get_cursor() as cursor:
+                # First, check if there are any participation records at all
+                cursor.execute("""
+                    SELECT COUNT(*) as total_records
+                    FROM participation 
+                    WHERE event_id = %s
+                """, (event_id,))
+                
+                record_check = cursor.fetchone()
+                logger.info(f"Found {record_check['total_records']} participation records for event {event_id}")
+                
+                # Get participants with their participation time
                 cursor.execute("""
                     SELECT 
                         user_id, username, display_name,
@@ -121,11 +132,14 @@ class PayrollCalculator:
                     FROM participation 
                     WHERE event_id = %s
                     GROUP BY user_id, username, display_name
-                    HAVING SUM(COALESCE(duration_minutes, 0)) > 0
+                    HAVING SUM(COALESCE(duration_minutes, 0)) >= 0
                     ORDER BY total_minutes DESC
                 """, (event_id,))
                 
-                return [dict(row) for row in cursor.fetchall()]
+                participants = [dict(row) for row in cursor.fetchall()]
+                logger.info(f"Returning {len(participants)} participants for event {event_id}")
+                
+                return participants
                 
         except Exception as e:
             logger.error(f"Error getting participants for event {event_id}: {e}")
