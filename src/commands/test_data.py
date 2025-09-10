@@ -61,8 +61,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                 return
             
             # Generate event ID
-            chars = string.ascii_lowercase + string.digits
-            random_part = ''.join(random.choices(chars, k=6))
+            random_part = ''.join(random.choices('0123456789', k=5))
             event_id = f"sm-{random_part}"
             
             # Calculate event times

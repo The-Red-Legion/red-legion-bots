@@ -277,12 +277,10 @@ class MiningEventManager:
             return []
     
     def _generate_mining_event_id(self) -> str:
-        """Generate a prefixed mining event ID like 'sm-a7k2m9'."""
+        """Generate a prefixed mining event ID like 'sm-12345'."""
         import random
-        import string
         
-        # Generate 6 character random string (letters and numbers)
-        chars = string.ascii_lowercase + string.digits
-        random_part = ''.join(random.choices(chars, k=6))
+        # Generate 5 digit random number
+        random_part = ''.join(random.choices('0123456789', k=5))
         
         return f"sm-{random_part}"
