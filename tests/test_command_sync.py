@@ -36,20 +36,18 @@ def test_command_module_imports():
         
         assert hasattr(PayrollCommands, 'payroll_calculate'), "Payroll module should have payroll_calculate method"
         assert hasattr(PayrollCommands, 'payroll_status'), "Payroll module should have payroll_status method"
-        # Deprecated methods should still exist for backwards compatibility
-        assert hasattr(PayrollCommands, 'payroll_mining_deprecated'), "Payroll module should have deprecated mining method"
-        assert hasattr(PayrollCommands, 'payroll_salvage_deprecated'), "Payroll module should have deprecated salvage method"
-        assert hasattr(PayrollCommands, 'payroll_combat_deprecated'), "Payroll module should have deprecated combat method"
+        # Deprecated methods have been removed as of latest cleanup
+        assert not hasattr(PayrollCommands, 'payroll_mining_deprecated'), "Deprecated mining method should be removed"
+        assert not hasattr(PayrollCommands, 'payroll_salvage_deprecated'), "Deprecated salvage method should be removed"
+        assert not hasattr(PayrollCommands, 'payroll_combat_deprecated'), "Deprecated combat method should be removed"
         
         print("✅ Command methods verified")
-        
-        return True
         
     except Exception as e:
         print(f"❌ Error testing command imports: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        pytest.fail(f"Command module imports failed: {e}")
 
 def test_command_structure():
     """Test the command structure and organization."""
@@ -87,11 +85,10 @@ def test_command_structure():
             print(f"✅ {command_file} exists")
         
         print("✅ Command structure verified")
-        return True
         
     except Exception as e:
         print(f"❌ Error testing command structure: {e}")
-        return False
+        pytest.fail(f"Command structure test failed: {e}")
 
 @patch.dict(os.environ, {
     'DISCORD_TOKEN': 'test_token',
@@ -125,39 +122,28 @@ def test_bot_configuration():
             # This validates that the bot is configured to load the right modules
             print("✅ Bot configured with correct extensions")
             
-        return True
-        
     except Exception as e:
         print(f"❌ Error testing bot configuration: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        pytest.fail(f"Bot configuration test failed: {e}")
 
 def test_command_sync():
     """Main test function that runs all command sync tests."""
     print("🚀 Running Command Sync Tests...")
     
-    # Run all subtests
-    import_test = test_command_module_imports()
-    structure_test = test_command_structure() 
-    config_test = test_bot_configuration()
+    # Run all subtests - these will fail individually if there are issues
+    test_command_module_imports()
+    test_command_structure() 
+    test_bot_configuration()
     
-    # Verify all tests passed
-    all_passed = import_test and structure_test and config_test
-    
-    if all_passed:
-        print("\n🎉 All command sync tests PASSED!")
-        print("✅ Modules architecture is working correctly")
-        print("✅ Command structure is properly organized") 
-        print("✅ Bot configuration is valid")
-    else:
-        print("\n💥 Some command sync tests FAILED!")
-        pytest.fail("Command sync validation failed")
-    
-    return all_passed
+    # If we get here, all tests passed
+    print("\n🎉 All command sync tests PASSED!")
+    print("✅ Modules architecture is working correctly")
+    print("✅ Command structure is properly organized") 
+    print("✅ Bot configuration is valid")
 
 # For pytest compatibility
 def test_command_loading():
     """Pytest entry point for command sync tests."""
-    result = test_command_sync()
-    assert result, "Command sync validation should pass"
+    test_command_sync()
