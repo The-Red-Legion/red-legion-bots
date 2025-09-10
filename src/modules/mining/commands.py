@@ -38,148 +38,6 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
         # Show mining session start modal
         modal = MiningStartModal(self.event_manager, self.voice_tracker, self.bot)
         await interaction.response.send_modal(modal)
-        
-        try:
-            guild_id = interaction.guild_id
-            organizer = interaction.user
-            
-            # Create mining event in database
-            event_result = await self.event_manager.create_event(
-                guild_id=guild_id,
-                organizer_id=organizer.id,
-                organizer_name=organizer.display_name,
-                location=location,
-                notes=notes
-            )
-            
-            if not event_result['success']:
-                await interaction.followup.send(
-                    embed=discord.Embed(
-                        title="❌ Failed to Start Mining Session",
-                        description=event_result['error'],
-                        color=discord.Color.red()
-                    ),
-                    ephemeral=True
-                )
-                return
-            
-            event_data = event_result['event']
-            
-            # Start voice channel tracking
-            channels = get_sunday_mining_channels(guild_id)
-            tracking_result = await self.voice_tracker.start_tracking(
-                event_id=event_data['event_id'],
-                channels=channels
-            )
-            
-            if not tracking_result['success']:
-                # Clean up event if voice tracking fails
-                await self.event_manager.close_event(event_data['event_id'])
-                await interaction.followup.send(
-                    embed=discord.Embed(
-                        title="❌ Failed to Start Voice Tracking",
-                        description=tracking_result['error'],
-                        color=discord.Color.red()
-                    ),
-                    ephemeral=True
-                )
-                return
-            
-            # Auto-join the Dispatch/Main channel to indicate mining session is active
-            voice_join_status = "⚠️ Skipped - no dispatch channel configured"
-            try:
-                from handlers.voice_tracking import join_voice_channel, set_bot_instance
-                
-                # Ensure bot instance is set for voice operations
-                set_bot_instance(self.bot)
-                
-                # Get the Dispatch channel ID
-                dispatch_channel_id = channels.get('dispatch')
-                if dispatch_channel_id:
-                    dispatch_channel_id = int(dispatch_channel_id)
-                    join_success = await join_voice_channel(dispatch_channel_id)
-                    
-                    if join_success:
-                        voice_join_status = "✅ Bot joined dispatch channel successfully"
-                        print(f"✅ Bot joined Dispatch channel for mining event {event_data['event_id']}")
-                    else:
-                        voice_join_status = "❌ Bot failed to join dispatch channel"
-                        print(f"⚠️ Could not join Dispatch channel for mining event {event_data['event_id']}")
-                else:
-                    print("⚠️ No Dispatch channel configured - skipping auto-join")
-                    
-            except Exception as e:
-                voice_join_status = f"❌ Error joining dispatch channel: {str(e)[:50]}"
-                print(f"❌ Error auto-joining voice channel: {e}")
-                # Don't fail the entire mining start - just log the issue
-            
-            # Create success embed
-            embed = discord.Embed(
-                title="⛏️ Mining Session Started",
-                description=f"Session **{event_data['event_id']}** is now active",
-                color=discord.Color.green(),
-                timestamp=datetime.now()
-            )
-            
-            embed.add_field(
-                name="📋 Session Details",
-                value=f"**Organizer:** {organizer.display_name}\n"
-                      f"**Location:** {location or 'Not specified'}\n" 
-                      f"**Started:** <t:{int(datetime.now().timestamp())}:R>",
-                inline=False
-            )
-            
-            # Get current participants in mining voice channels
-            current_participants = await self._get_current_voice_participants(interaction.guild, channels)
-            
-            embed.add_field(
-                name="🎤 Voice Tracking & Bot Presence",
-                value=f"• Bot will track participation in mining voice channels\n"
-                      f"• Dispatch channel: {voice_join_status}\n"
-                      f"• Join any mining channel to start earning participation time!",
-                inline=False
-            )
-            
-            # Add current participants field if any are present
-            if current_participants:
-                participant_text = []
-                for channel_name, members in current_participants.items():
-                    if members:
-                        member_names = [member.display_name for member in members]
-                        participant_text.append(f"**{channel_name}:** {', '.join(member_names)}")
-                
-                if participant_text:
-                    embed.add_field(
-                        name="👥 Current Participants in Mining Channels",
-                        value="\n".join(participant_text) + f"\n\n**Total:** {sum(len(members) for members in current_participants.values())} members already in channels",
-                        inline=False
-                    )
-            
-            embed.add_field(
-                name="🔄 Next Steps",
-                value="1. Join mining voice channels to track participation\n"
-                      "2. Mine ore and collect materials\n"
-                      "3. Use `/mining stop` when session is complete\n"
-                      "4. Payroll officer uses `/payroll mining` to calculate distribution",
-                inline=False
-            )
-            
-            if notes:
-                embed.add_field(name="📝 Notes", value=notes, inline=False)
-            
-            embed.set_footer(text=f"Event ID: {event_data['event_id']}")
-            
-            await interaction.followup.send(embed=embed)
-            
-        except Exception as e:
-            await interaction.followup.send(
-                embed=discord.Embed(
-                    title="❌ Error Starting Mining Session", 
-                    description=f"An unexpected error occurred: {str(e)}",
-                    color=discord.Color.red()
-                ),
-                ephemeral=True
-            )
     
     @app_commands.command(name="stop", description="Stop the current mining session")
     async def stop_mining(self, interaction: discord.Interaction):
@@ -554,9 +412,6 @@ class MiningStartModal(discord.ui.Modal):
                 inline=False
             )
             
-            # Get current participants in mining voice channels
-            current_participants = await self._get_current_voice_participants(interaction.guild, channels)
-            
             embed.add_field(
                 name="🎤 Voice Tracking & Bot Presence",
                 value=f"• Bot will track participation in mining voice channels\n"
@@ -564,35 +419,6 @@ class MiningStartModal(discord.ui.Modal):
                       f"• Join any mining channel to start earning participation time!",
                 inline=False
             )
-            
-            # Add current participants field if any are present
-            if current_participants:
-                participant_text = []
-                for channel_name, members in current_participants.items():
-                    if members:
-                        member_names = [member.display_name for member in members]
-                        participant_text.append(f"**{channel_name}:** {', '.join(member_names)}")
-                
-                if participant_text:
-                    participant_count = sum(len(members) for members in current_participants.values())
-                    embed.add_field(
-                        name=f"👥 Current Mining Participants in Channel ({participant_count} total)",
-                        value="\n".join(participant_text[:10]),  # Limit to prevent embed from getting too large
-                        inline=False
-                    )
-                    
-                    if len(participant_text) > 10:
-                        embed.add_field(
-                            name="👥 Additional Participants",
-                            value=f"... and {len(participant_text) - 10} more members in other channels",
-                            inline=False
-                        )
-            else:
-                embed.add_field(
-                    name="👥 Current Participants",
-                    value="No members currently in mining voice channels",
-                    inline=False
-                )
             
             # Add next steps and notes
             embed.add_field(
