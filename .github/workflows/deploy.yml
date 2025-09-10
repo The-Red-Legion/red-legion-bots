@@ -4,6 +4,16 @@ on:
   pull_request:
     branches: [main]
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for deployment'
+        required: true
+        default: 'Manual deployment'
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
 
 permissions:
   contents: write
@@ -16,13 +26,17 @@ jobs:
   # Phase 1: Infrastructure Preparation
   infrastructure-setup:
     runs-on: ubuntu-latest
-    if: github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'Ready To Deploy')
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'Ready To Deploy')) ||
+      github.event_name == 'workflow_dispatch'
     outputs:
       vm_ip: ${{ steps.vm_info.outputs.vm_ip }}
       ssh_status: ${{ steps.ssh_test.outputs.status }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.head_ref }}
       
       - name: Authenticate with GCP
         uses: google-github-actions/auth@v2
@@ -96,6 +110,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.head_ref }}
       
       - name: Download Ansible Inventory
         uses: actions/download-artifact@v4
