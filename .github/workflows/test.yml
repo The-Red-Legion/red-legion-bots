@@ -302,7 +302,16 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Tests | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| API & Integration Tests | ✅ Passed |\\n\\n🚀 **Ready for deployment!** This PR has been automatically labeled as 'Ready To Deploy'."
+                body: `## ✅ All Tests Passed!
+
+| Test Suite | Result |
+|------------|--------|
+| Code Quality & Validation | ✅ Passed |
+| Database Tests | ✅ Passed |
+| Bot Functionality | ✅ Passed |
+| API & Integration Tests | ✅ Passed |
+
+🚀 **Ready for deployment!** This PR has been automatically labeled as 'Ready To Deploy'.`
               });
             } else {
               // Don't add any success labels for failed tests
@@ -319,7 +328,18 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ❌ Some Tests Failed\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | " + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Database Tests | " + (databaseTests === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Bot Functionality | " + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| API & Integration Tests | " + (apiTests === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n\\n**Failed test suites:** " + failedTests.join(', ') + "\\n\\nPlease review the test results and fix any issues before proceeding."
+                body: `## ❌ Some Tests Failed
+
+| Test Suite | Result |
+|------------|--------|
+| Code Quality & Validation | ${codeQuality === 'success' ? '✅ Passed' : '❌ Failed'} |
+| Database Tests | ${databaseTests === 'success' ? '✅ Passed' : '❌ Failed'} |
+| Bot Functionality | ${botFunctionality === 'success' ? '✅ Passed' : '❌ Failed'} |
+| API & Integration Tests | ${apiTests === 'success' ? '✅ Passed' : '❌ Failed'} |
+
+**Failed test suites:** ${failedTests.join(', ')}
+
+Please review the test results and fix any issues before proceeding.`
               });
             }
 
@@ -399,7 +419,12 @@ jobs:
               owner,
               repo,
               issue_number: pull_number,
-              body: "## 🚀 Auto-Deploy Triggered!\\n\\n✅ All tests passed and auto-deploy label detected\\n🎯 Deploying branch `" + context.payload.pull_request.head.ref + "` to production\\n\\n**Note:** This deploys without merging - the PR remains open for review."
+              body: `## 🚀 Auto-Deploy Triggered!
+
+✅ All tests passed and auto-deploy label detected
+🎯 Deploying branch \`${context.payload.pull_request.head.ref}\` to production
+
+**Note:** This deploys without merging - the PR remains open for review.`
             });
       
       - name: Skip deployment (no label)
@@ -417,5 +442,13 @@ jobs:
               owner,
               repo,
               issue_number: pull_number,
-              body: "## 💡 Auto-Deploy Available\\n\\n✅ All tests passed! Your PR is ready for deployment.\\n\\n**To auto-deploy without merging:**\\n1. Add the `auto-deploy` label to this PR\\n2. The deployment will trigger automatically\\n\\n**Manual deployment:** Use the deployment workflow in Actions tab"
+              body: `## 💡 Auto-Deploy Available
+
+✅ All tests passed! Your PR is ready for deployment.
+
+**To auto-deploy without merging:**
+1. Add the \`auto-deploy\` label to this PR
+2. The deployment will trigger automatically
+
+**Manual deployment:** Use the deployment workflow in Actions tab`
             });
