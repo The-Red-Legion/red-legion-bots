@@ -103,15 +103,15 @@ class EventSelectionDropdown(ui.Select):
         
         # Show appropriate collection interface
         if self.event_type == 'mining':
-            # Use new step-by-step ore selection system
-            from .modals import OreSelectionView
-            view = OreSelectionView(selected_event, self.processor, self.calculator)
+            # Use new two-stage ore selection system  
+            from .modals import TwoStageOreSelectionView
+            view = TwoStageOreSelectionView(selected_event, self.processor, self.calculator)
             
             embed = discord.Embed(
                 title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
-                description=f"**Step-by-Step Ore Collection Entry**\n\n"
-                           f"Select each ore type from the dropdown below, then enter the amount.\n"
-                           f"You can add as many different ore types as needed.",
+                description=f"**Two-Stage Ore Collection Entry**\n\n"
+                           f"**Stage 1:** Select which ore types you collected\n"
+                           f"**Stage 2:** Enter amounts for selected ores only",
                 color=discord.Color.blue()
             )
             
@@ -125,10 +125,10 @@ class EventSelectionDropdown(ui.Select):
             
             embed.add_field(
                 name="🔄 How to Use",
-                value="1. Select an ore from the dropdown\n"
-                      "2. Enter the SCU amount in the popup\n"
-                      "3. Repeat for all collected ores\n"
-                      "4. Click 'Finish Collection' when done",
+                value="1. Use the dropdowns to select which ore types you collected\n"
+                      "2. Click 'Enter Amounts' to proceed to Stage 2\n"
+                      "3. Fill in SCU amounts for your selected ores\n"
+                      "4. Submit to calculate payroll",
                 inline=False
             )
             
@@ -140,8 +140,8 @@ class EventSelectionDropdown(ui.Select):
             await interaction.response.send_modal(modal)
         else:
             # Default to mining system for combat/other types for now
-            from .modals import OreSelectionView
-            view = OreSelectionView(selected_event, self.processor, self.calculator)
+            from .modals import TwoStageOreSelectionView
+            view = TwoStageOreSelectionView(selected_event, self.processor, self.calculator)
             
             embed = discord.Embed(
                 title=f"📋 {self.event_type.title()} Payroll - {selected_event['event_id']}",
@@ -236,15 +236,15 @@ class UnifiedEventSelectionDropdown(ui.Select):
         
         # Show appropriate collection interface
         if event_type == 'mining':
-            # Use new step-by-step ore selection system
-            from .modals import OreSelectionView
-            view = OreSelectionView(selected_event, processor, self.calculator)
+            # Use new two-stage ore selection system
+            from .modals import TwoStageOreSelectionView
+            view = TwoStageOreSelectionView(selected_event, processor, self.calculator)
             
             embed = discord.Embed(
                 title=f"⛏️ Mining Payroll - {selected_event['event_id']}",
-                description=f"**Step-by-Step Ore Collection Entry**\n\n"
-                           f"Select each ore type from the dropdown below, then enter the amount.\n"
-                           f"You can add as many different ore types as needed.",
+                description=f"**Two-Stage Ore Collection Entry**\n\n"
+                           f"**Stage 1:** Select which ore types you collected\n"
+                           f"**Stage 2:** Enter amounts for selected ores only",
                 color=discord.Color.blue()
             )
             
@@ -258,10 +258,10 @@ class UnifiedEventSelectionDropdown(ui.Select):
             
             embed.add_field(
                 name="🔄 How to Use",
-                value="1. Select an ore from the dropdown\n"
-                      "2. Enter the SCU amount in the popup\n"
-                      "3. Repeat for all collected ores\n"
-                      "4. Click 'Finish Collection' when done",
+                value="1. Use the dropdowns to select which ore types you collected\n"
+                      "2. Click 'Enter Amounts' to proceed to Stage 2\n"
+                      "3. Fill in SCU amounts for your selected ores\n"
+                      "4. Submit to calculate payroll",
                 inline=False
             )
             
@@ -273,8 +273,8 @@ class UnifiedEventSelectionDropdown(ui.Select):
             await interaction.response.send_modal(modal)
         else:
             # Default to mining system for combat/other types for now
-            from .modals import OreSelectionView
-            view = OreSelectionView(selected_event, processor, self.calculator)
+            from .modals import TwoStageOreSelectionView
+            view = TwoStageOreSelectionView(selected_event, processor, self.calculator)
             
             embed = discord.Embed(
                 title=f"📋 {event_type.title()} Payroll - {selected_event['event_id']}",
