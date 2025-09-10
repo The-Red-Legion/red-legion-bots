@@ -308,7 +308,13 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                         else:
                             start_date = "Unknown"
                         
-                        event_list.append(f"{event_emoji} `{event['event_id']}` - {start_date}")
+                        # Add location if available
+                        location_info = ""
+                        if event.get('location_notes'):
+                            location_short = event['location_notes'][:20] + "..." if len(event['location_notes']) > 20 else event['location_notes']
+                            location_info = f" @ {location_short}"
+                        
+                        event_list.append(f"{event_emoji} `{event['event_id']}` - {start_date}{location_info}")
                     
                     if len(all_pending_events) > 8:
                         event_list.append(f"... and {len(all_pending_events) - 8} more")

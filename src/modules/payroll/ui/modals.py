@@ -25,7 +25,7 @@ class MiningCollectionModal(ui.Modal):
         self.processor = processor
         self.calculator = calculator
         
-        # Create input fields for common ores
+        # Create input fields for high-value ores
         self.quantainium = ui.TextInput(
             label='Quantainium (SCU)',
             placeholder='0.0',
@@ -42,36 +42,34 @@ class MiningCollectionModal(ui.Modal):
             max_length=10
         )
         
-        self.laranite = ui.TextInput(
-            label='Laranite (SCU)',
-            placeholder='0.0', 
-            default='0',
+        self.high_value_ores = ui.TextInput(
+            label='High Value Ores (Laranite:5.2, Gold:3.1, Taranite:1.5)',
+            placeholder='Laranite:0, Gold:0, Taranite:0, Stileron:0',
             required=False,
-            max_length=10
+            max_length=200
         )
         
-        self.agricium = ui.TextInput(
-            label='Agricium (SCU)',
-            placeholder='0.0',
-            default='0', 
+        self.mid_value_ores = ui.TextInput(
+            label='Mid Value Ores (Agricium:10, Beryl:5, Hephaestanite:8)',
+            placeholder='Agricium:0, Beryl:0, Hephaestanite:0, Borase:0',
             required=False,
-            max_length=10
+            max_length=200
         )
         
-        self.other_ores = ui.TextInput(
-            label='Other Ores (format: "Gold:5.2,Titanium:12.1")',
-            placeholder='OreName:Amount,OreName:Amount',
+        self.common_ores = ui.TextInput(
+            label='Common Ores (Tungsten:20, Titanium:15, Iron:25, Copper:10)',
+            placeholder='Tungsten:0, Titanium:0, Iron:0, Copper:0, Aluminum:0, Silicon:0',
             required=False,
             style=discord.TextStyle.paragraph,
-            max_length=500
+            max_length=400
         )
         
         # Add all inputs to the modal
         self.add_item(self.quantainium)
         self.add_item(self.bexalite)
-        self.add_item(self.laranite) 
-        self.add_item(self.agricium)
-        self.add_item(self.other_ores)
+        self.add_item(self.high_value_ores)
+        self.add_item(self.mid_value_ores)
+        self.add_item(self.common_ores)
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -83,9 +81,7 @@ class MiningCollectionModal(ui.Modal):
             # Parse main ore inputs
             main_ores = {
                 'QUANTAINIUM': self.quantainium.value,
-                'BEXALITE': self.bexalite.value,
-                'LARANITE': self.laranite.value,
-                'AGRICIUM': self.agricium.value
+                'BEXALITE': self.bexalite.value
             }
             
             for ore_name, value in main_ores.items():
@@ -101,23 +97,31 @@ class MiningCollectionModal(ui.Modal):
                         )
                         return
             
-            # Parse other ores field
-            if self.other_ores.value and self.other_ores.value.strip():
-                try:
-                    other_pairs = self.other_ores.value.strip().split(',')
-                    for pair in other_pairs:
-                        if ':' in pair:
-                            ore_name, amount_str = pair.split(':', 1)
-                            ore_name = ore_name.strip().upper()
-                            amount = float(amount_str.strip())
-                            if amount > 0:
-                                ore_collections[ore_name] = amount
-                except ValueError as e:
-                    await interaction.followup.send(
-                        f"❌ Error parsing other ores: {str(e)}\nFormat: 'OreName:Amount,OreName:Amount'",
-                        ephemeral=True
-                    )
-                    return
+            # Parse all ore category fields
+            ore_fields = [
+                self.high_value_ores.value,
+                self.mid_value_ores.value,
+                self.common_ores.value
+            ]
+            
+            for field_value in ore_fields:
+                if field_value and field_value.strip():
+                    try:
+                        # Handle both comma and space separated formats
+                        pairs = field_value.replace(',', ' ').split()
+                        for pair in pairs:
+                            if ':' in pair:
+                                ore_name, amount_str = pair.split(':', 1)
+                                ore_name = ore_name.strip().upper()
+                                amount = float(amount_str.strip())
+                                if amount > 0:
+                                    ore_collections[ore_name] = amount
+                    except ValueError as e:
+                        await interaction.followup.send(
+                            f"❌ Error parsing ore field: {str(e)}\nFormat: 'OreName:Amount, OreName:Amount'",
+                            ephemeral=True
+                        )
+                        return
             
             # Check if any ore was collected
             if not ore_collections:

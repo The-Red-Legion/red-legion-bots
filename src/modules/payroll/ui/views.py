@@ -66,8 +66,9 @@ class EventSelectionDropdown(ui.Select):
                 except:
                     start_date = "Unknown Date"
             
-            # Build description with participants, duration, and location
-            description = f"{start_date} • {event.get('total_participants', 0)} participants • {duration_text}"
+            # Build description with participants, duration, and location 
+            participant_count = event.get('participant_count', event.get('total_participants', 0))
+            description = f"{start_date} • {participant_count} participants • {duration_text}"
             if event.get('location_notes'):
                 # Truncate location to fit in description limit
                 location_short = event['location_notes'][:20] + "..." if len(event['location_notes']) > 20 else event['location_notes']
@@ -157,7 +158,8 @@ class UnifiedEventSelectionDropdown(ui.Select):
                     start_date = "Unknown Date"
             
             # Build description with type, date, participants, duration, and location
-            description = f"{event_type.title()} • {start_date} • {event.get('total_participants', 0)} participants • {duration_text}"
+            participant_count = event.get('participant_count', event.get('total_participants', 0))
+            description = f"{event_type.title()} • {start_date} • {participant_count} participants • {duration_text}"
             if event.get('location_notes'):
                 # Truncate location to fit in description limit
                 location_short = event['location_notes'][:15] + "..." if len(event['location_notes']) > 15 else event['location_notes']

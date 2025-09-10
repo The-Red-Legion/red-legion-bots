@@ -187,7 +187,7 @@ class MiningProcessor:
         try:
             prices = {}
             
-            # Parse UEX data structure - adjust based on actual API response
+            # Parse UEX data structure - based on actual API response
             if 'data' in data:
                 commodities = data['data']
             else:
@@ -197,29 +197,35 @@ class MiningProcessor:
                 # Extract ore information
                 name = item.get('name', '').upper()
                 
-                # Skip non-ore items
-                if name not in ORE_TYPES.values():
+                # Skip non-refined ores (we want refined prices) and non-ore items
+                if '(ORE)' in name or '(RAW)' in name:
+                    continue
+                    
+                # Check if this is a mineable ore we support
+                is_supported_ore = (
+                    name in ORE_TYPES.values() or
+                    any(ore_name.upper() in name for ore_name in ORE_TYPES.values()) or
+                    name in ['QUANTAINIUM', 'BEXALITE', 'LARANITE', 'AGRICIUM', 'GOLD', 
+                            'BERYL', 'HEPHAESTANITE', 'BORASE', 'TUNGSTEN', 'TITANIUM', 
+                            'IRON', 'COPPER', 'ALUMINUM', 'SILICON', 'CORUNDUM', 'QUARTZ',
+                            'TARANITE', 'STILERON', 'RICCITE', 'TIN']
+                )
+                
+                if not is_supported_ore:
                     continue
                 
-                # Find best selling price
-                best_price = 0
-                best_location = 'Unknown'
-                best_system = 'Stanton'
+                # Get sell price from the UEX data structure
+                sell_price = item.get('price_sell', 0)
                 
-                if 'prices' in item:
-                    for price_entry in item['prices']:
-                        if price_entry.get('operation') == 'sell':
-                            price_value = price_entry.get('price', 0)
-                            if price_value > best_price:
-                                best_price = price_value
-                                best_location = price_entry.get('location', 'Unknown')
-                                best_system = price_entry.get('system', 'Stanton')
-                
-                if best_price > 0:
-                    prices[name] = {
-                        'price': best_price,
-                        'location': best_location,
-                        'system': best_system
+                # Only include items with valid sell prices
+                if sell_price > 0:
+                    # Clean up ore name (remove parenthetical descriptions)
+                    clean_name = name.split('(')[0].strip()
+                    
+                    prices[clean_name] = {
+                        'price': float(sell_price),
+                        'location': 'Best Available',  # UEX gives us the best sell price
+                        'system': 'Stanton'
                     }
             
             logger.info(f"Parsed {len(prices)} ore prices from UEX API")
