@@ -166,9 +166,9 @@ class TestDataCreationModal(ui.Modal):
             if not db_url:
                 return {'success': False, 'error': 'Database connection not available'}
             
-            # Generate event ID with TEST- prefix for test data (using a known working format)
+            # Generate event ID with SM- prefix for test data (using existing working format)
             random_part = ''.join(random.choices('0123456789', k=5))
-            event_id = f"test-{random_part}"
+            event_id = f"sm-{random_part}"
             
             # Calculate event times
             event_start = datetime.now() - timedelta(hours=hours_ago)
@@ -217,7 +217,7 @@ class TestDataCreationModal(ui.Modal):
                         # Generate test user ID (numeric for BIGINT field)
                         # Use a safe range starting from 9000000000000000000 to avoid conflicts
                         base_test_id = 9000000000000000000
-                        # Extract numeric part from event_id (e.g., "test-12345" -> "12345")
+                        # Extract numeric part from event_id (e.g., "sm-12345" -> "12345")
                         try:
                             event_numeric_part = event_id.split('-')[1] if '-' in event_id else event_id
                             event_number = int(event_numeric_part)
@@ -400,22 +400,25 @@ class FinalDeleteConfirmationModal(ui.Modal):
                         print(f"Error deleting participation: {e}")
                         deleted_counts['participation'] = 0
                     
-                    # Delete test payroll records (only new test- format)
+                    # Delete test payroll records (SM- events with Test in name)
                     try:
                         cursor.execute("""
                             DELETE FROM payrolls 
-                            WHERE event_id LIKE 'test-%'
+                            WHERE event_id IN (
+                                SELECT event_id FROM events 
+                                WHERE event_id LIKE 'sm-%' AND event_name LIKE '%Test%'
+                            )
                         """)
                         deleted_counts['payrolls'] = cursor.rowcount
                     except Exception as e:
                         print(f"Error deleting payrolls: {e}")
                         deleted_counts['payrolls'] = 0
                     
-                    # Delete test events (only new test- format)
+                    # Delete test events (SM- events with Test in name)
                     try:
                         cursor.execute("""
                             DELETE FROM events 
-                            WHERE event_id LIKE 'test-%'
+                            WHERE event_id LIKE 'sm-%' AND event_name LIKE '%Test%'
                         """)
                         deleted_counts['events'] = cursor.rowcount
                     except Exception as e:
@@ -550,12 +553,12 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             
             try:
                 with conn.cursor() as cursor:
-                    # Get test events to show (only new test- format)
+                    # Get test events to show (SM- events with Test in name)
                     try:
                         cursor.execute("""
                             SELECT event_id, event_name, location_notes, started_at, status, created_at 
                             FROM events 
-                            WHERE event_id LIKE 'test-%'
+                            WHERE event_id LIKE 'sm-%' AND event_name LIKE '%Test%'
                             ORDER BY created_at DESC 
                             LIMIT 10
                         """)
@@ -594,7 +597,13 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     
                     # Count payroll records
                     try:
-                        cursor.execute("SELECT COUNT(*) FROM payrolls WHERE event_id LIKE 'test-%'")
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM payrolls 
+                            WHERE event_id IN (
+                                SELECT event_id FROM events 
+                                WHERE event_id LIKE 'sm-%' AND event_name LIKE '%Test%'
+                            )
+                        """)
                         result = cursor.fetchone()
                         test_data_summary['payrolls'] = result[0] if result else 0
                     except Exception as e:
@@ -715,7 +724,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     try:
                         cursor.execute("""
                             SELECT COUNT(*) FROM events 
-                            WHERE event_id LIKE 'test-%' 
+                            WHERE event_id LIKE 'sm-%' AND event_name LIKE '%Test%' 
                             AND event_type = 'mining'
                         """)
                         result = cursor.fetchone()
@@ -757,7 +766,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                         cursor.execute("""
                             SELECT event_id, location_notes, started_at, ended_at, status, created_at 
                             FROM events 
-                            WHERE event_id LIKE 'test-%' 
+                            WHERE event_id LIKE 'sm-%' AND event_name LIKE '%Test%' 
                             AND event_type = 'mining'
                             ORDER BY created_at DESC 
                             LIMIT 5
