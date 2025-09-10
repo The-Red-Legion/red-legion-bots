@@ -38,7 +38,7 @@
               Message: {{ unified_result.message }}
               Migration File: {{ unified_result.migration_file }}
               Tables Created: {{ unified_result.tables_created | join(', ') }}
-              Applied At: {{ unified_result.applied_at }}
+              Applied At: {{ unified_result.timestamp | default('N/A') }}
               =====================================
           when: unified_result.status == 'success'
 
