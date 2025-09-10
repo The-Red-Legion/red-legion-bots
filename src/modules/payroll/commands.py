@@ -43,16 +43,14 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
     @app_commands.command(name="calculate", description="Calculate payroll - shows selection menu for all event types (mining, salvage, combat)")
     async def payroll_calculate(
         self, 
-        interaction: discord.Interaction,
-        event_id: Optional[str] = None
+        interaction: discord.Interaction
     ):
         """Unified payroll calculation for all event types."""
-        await self._handle_unified_payroll_calculation(interaction, event_id)
+        await self._handle_unified_payroll_calculation(interaction)
     
     async def _handle_unified_payroll_calculation(
         self,
-        interaction: discord.Interaction,
-        event_id: Optional[str] = None
+        interaction: discord.Interaction
     ):
         """Unified handler for payroll calculation across all event types."""
         try:
@@ -69,28 +67,6 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 return
             
             guild_id = interaction.guild_id
-            
-            # If specific event_id provided, handle directly (no defer needed for modals)
-            if event_id:
-                event_data = await self.calculator.get_event_by_id(event_id)
-                if not event_data:
-                    await interaction.response.send_message(
-                        embed=discord.Embed(
-                            title="❌ Event Not Found",
-                            description=f"Event `{event_id}` not found or not accessible.",
-                            color=discord.Color.red()
-                        ),
-                        ephemeral=True
-                    )
-                    return
-                
-                # Get processor for this event type
-                event_type = event_data.get('event_type', 'mining')
-                processor = self.processors.get(event_type, self.processors['mining'])
-                
-                # Skip event selection, go straight to collection input
-                await self._show_collection_modal(interaction, event_data, processor)
-                return
             
             # For dropdown selection, we need to defer since we're doing database queries
             await interaction.response.defer()
