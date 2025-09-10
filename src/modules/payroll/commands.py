@@ -267,7 +267,8 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                         'event_id': event['event_id'], 
                         'type': event_type,
                         'started_at': event.get('started_at'),
-                        'ended_at': event.get('ended_at', 'N/A')
+                        'ended_at': event.get('ended_at', 'N/A'),
+                        'location_notes': event.get('location_notes')
                     })
             
             embed = discord.Embed(
