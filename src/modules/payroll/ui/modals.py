@@ -1612,8 +1612,30 @@ class OreQuantityModal(ui.Modal):
                 await interaction.followup.send_modal(modal)
                 return
             
-            # All quantities collected, move to Step 4: Participant Selection
-            await self._proceed_to_participants(interaction, ore_quantities)
+            # All quantities collected, move to Step 3: Price Review
+            try:
+                # Get UEX prices for the selected ores
+                prices = await self.processor.get_current_prices()
+                
+                # Calculate total value to get breakdown with UEX prices
+                total_value, breakdown = await self.processor.calculate_total_value(ore_quantities, prices)
+                
+                # Create pricing modal with title "Per SCU Price" and UEX prices pre-filled
+                modal = OrePricingModal(
+                    self.event_data, self.processor, self.calculator, 
+                    ore_quantities, breakdown
+                )
+                await interaction.response.send_modal(modal)
+                
+            except Exception as e:
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ Error Loading UEX Pricing",
+                        description=f"Failed to load UEX pricing: {str(e)}",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
             
         except Exception as e:
             await interaction.followup.send(
@@ -2482,4 +2504,129 @@ class SalvageCollectionModal(ui.Modal):
                 color=discord.Color.blue()
             ),
             ephemeral=True
+        )
+
+
+class OrePricingModal(ui.Modal):
+    """Modal for reviewing and adjusting UEX ore prices (Step 3)."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, breakdown):
+        super().__init__(title='Per SCU Price')
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.breakdown = breakdown
+        
+        # Create price input fields for each ore with UEX prices pre-filled
+        all_ores = {
+            'AGRI': 'Agricium', 'ALUM': 'Aluminum', 'BERY': 'Beryl', 'BEXA': 'Bexalite',
+            'BORA': 'Borase', 'COPP': 'Copper', 'DIAM': 'Diamond', 'GOLD': 'Gold',
+            'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'INRT': 'Inert Materials',
+            'LARA': 'Laranite', 'QUAN': 'Quantanium', 'TARA': 'Taranite', 
+            'TITA': 'Titanium', 'TUNG': 'Tungsten'
+        }
+        
+        self.price_inputs = {}
+        
+        # Add price inputs for up to 5 ores (Discord modal limit)
+        ore_count = 0
+        for ore_code, quantity in list(ore_quantities.items())[:5]:
+            if quantity > 0:  # Only show ores with quantities
+                ore_name = all_ores.get(ore_code, ore_code)
+                current_price = breakdown.get(ore_code.upper(), {}).get('price_per_scu', 0)
+                
+                price_input = ui.TextInput(
+                    label=f'{ore_name} Price (per SCU)',
+                    placeholder=f'Current UEX price: {current_price:,.0f} aUEC',
+                    default=str(int(current_price)) if current_price > 0 else '',
+                    required=True,
+                    max_length=10
+                )
+                
+                self.price_inputs[ore_code] = price_input
+                self.add_item(price_input)
+                ore_count += 1
+                
+                if ore_count >= 5:
+                    break
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse entered prices
+            updated_prices = {}
+            for ore_code, input_field in self.price_inputs.items():
+                try:
+                    price = float(input_field.value.strip())
+                    if price < 0:
+                        await interaction.followup.send(
+                            f"❌ Price for {ore_code} must be 0 or greater.",
+                            ephemeral=True
+                        )
+                        return
+                    updated_prices[ore_code] = price
+                except ValueError:
+                    await interaction.followup.send(
+                        f"❌ Invalid price for {ore_code}: '{input_field.value}'",
+                        ephemeral=True
+                    )
+                    return
+            
+            # Now proceed to Step 4: Participant Selection with updated prices
+            await self._proceed_to_participants(interaction, updated_prices)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Processing Prices",
+                    description=f"An error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+    
+    async def _proceed_to_participants(self, interaction, updated_prices):
+        """Move to Step 4: Participant Selection with pricing confirmed."""
+        # Get event participants
+        participants = await self.calculator.get_event_participants(self.event_data['event_id'])
+        
+        if not participants:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ No Participants Found",
+                    description="No participants found for this event.",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+            return
+        
+        # Create new view for participant selection with confirmed pricing
+        view = ParticipantSelectionView(
+            self.event_data, self.processor, self.calculator, 
+            self.ore_quantities, participants, updated_prices
+        )
+        
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
+            description=f"**Step 1 of 5: Event Selected** ✅\n"
+                       f"**Step 2 of 5: Select Ore Types** ✅\n"
+                       f"**Step 3 of 5: Review Pricing** ✅\n"
+                       f"**Step 4 of 5: Participant Selection** ⏳\n\n"
+                       f"Select participants for payroll calculation.",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="👥 Event Participants",
+            value=f"Found {len(participants)} participants",
+            inline=True
+        )
+        
+        await interaction.followup.edit_message(
+            interaction.message.id,
+            embed=embed,
+            view=view
         )
