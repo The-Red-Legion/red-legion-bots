@@ -45,7 +45,8 @@ class RedLegionBot(commands.Bot):
                 'commands.mining',             # Wrapper for mining module (/mining start, /mining stop)
                 'commands.payroll',            # Wrapper for payroll module (/payroll calculate)
                 'commands.test_data',          # Test data generation (/test-data create, /test-data delete)
-                'commands.admin',              # Admin commands (/admin delete-event)
+                'commands.admin',              # Admin commands (/admin delete-event, /admin voice-diagnostic)
+                'commands.diagnostics',        # Diagnostic tools (/diagnostics voice, /diagnostics channels)
             ]
             
             for extension in extensions:
