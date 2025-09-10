@@ -89,6 +89,30 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
                 )
                 return
             
+            # Auto-join the Dispatch/Main channel to indicate mining session is active
+            try:
+                from handlers.voice_tracking import join_voice_channel, set_bot_instance
+                
+                # Ensure bot instance is set for voice operations
+                set_bot_instance(self.bot)
+                
+                # Get the Dispatch channel ID
+                dispatch_channel_id = channels.get('dispatch')
+                if dispatch_channel_id:
+                    dispatch_channel_id = int(dispatch_channel_id)
+                    join_success = await join_voice_channel(dispatch_channel_id)
+                    
+                    if join_success:
+                        print(f"✅ Bot joined Dispatch channel for mining event {event_data['event_id']}")
+                    else:
+                        print(f"⚠️ Could not join Dispatch channel for mining event {event_data['event_id']}")
+                else:
+                    print("⚠️ No Dispatch channel configured - skipping auto-join")
+                    
+            except Exception as e:
+                print(f"❌ Error auto-joining voice channel: {e}")
+                # Don't fail the entire mining start - just log the issue
+            
             # Create success embed
             embed = discord.Embed(
                 title="⛏️ Mining Session Started",
@@ -106,9 +130,10 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
             )
             
             embed.add_field(
-                name="🎤 Voice Tracking",
-                value="Bot will track participation in mining voice channels.\n"
-                      "Join any mining channel to start earning participation time!",
+                name="🎤 Voice Tracking & Bot Presence",
+                value="• Bot will track participation in mining voice channels\n"
+                      "• Bot has joined Dispatch channel to indicate active session\n"
+                      "• Join any mining channel to start earning participation time!",
                 inline=False
             )
             
@@ -164,6 +189,27 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
             
             # Stop voice tracking
             await self.voice_tracker.stop_tracking(active_event['event_id'])
+            
+            # Auto-leave the Dispatch/Main channel when mining session ends
+            try:
+                from handlers.voice_tracking import leave_voice_channel
+                from config.settings import get_sunday_mining_channels
+                
+                # Get the Dispatch channel ID and leave it
+                channels = get_sunday_mining_channels(guild_id)
+                dispatch_channel_id = channels.get('dispatch')
+                if dispatch_channel_id:
+                    dispatch_channel_id = int(dispatch_channel_id)
+                    leave_success = await leave_voice_channel(dispatch_channel_id)
+                    
+                    if leave_success:
+                        print(f"✅ Bot left Dispatch channel after mining event {active_event['event_id']}")
+                    else:
+                        print(f"⚠️ Could not leave Dispatch channel after mining event {active_event['event_id']}")
+                        
+            except Exception as e:
+                print(f"❌ Error auto-leaving voice channel: {e}")
+                # Don't fail the entire mining stop - just log the issue
             
             # Close the event
             close_result = await self.event_manager.close_event(
