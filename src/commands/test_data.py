@@ -83,19 +83,21 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     # Create test event in unified events table
                     cursor.execute("""
                         INSERT INTO events (
-                            event_id, guild_id, event_type, status, location,
-                            start_time, end_time, created_by, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            event_id, guild_id, event_type, event_name, organizer_id, organizer_name,
+                            started_at, ended_at, status, location_notes, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (event_id) DO NOTHING
                     """, (
                         event_id,
                         str(interaction.guild.id),
                         'mining',
-                        'closed',  # Mark as closed so payroll can be calculated
-                        location,
+                        f'Test Mining Event at {location}',
+                        str(interaction.user.id),
+                        interaction.user.display_name,
                         event_start,
                         event_end,
-                        str(interaction.user.id),
+                        'closed',  # Mark as closed so payroll can be calculated
+                        location,
                         datetime.now()
                     ))
                     
