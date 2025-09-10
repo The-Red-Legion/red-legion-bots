@@ -392,7 +392,9 @@ class FinalDeleteConfirmationModal(ui.Modal):
                     try:
                         cursor.execute("""
                             DELETE FROM participation 
-                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                            WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                               OR user_id LIKE 'test_user_%'
+                               OR user_id LIKE 'TestMiner%'
                         """)
                         deleted_counts['participation'] = cursor.rowcount
                     except Exception as e:
@@ -421,11 +423,13 @@ class FinalDeleteConfirmationModal(ui.Modal):
                         print(f"Error deleting events: {e}")
                         deleted_counts['events'] = 0
                     
-                    # Delete test users
+                    # Delete test users (both numeric and legacy string user IDs)
                     try:
                         cursor.execute("""
                             DELETE FROM users 
-                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                            WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                               OR user_id LIKE 'test_user_%'
+                               OR user_id LIKE 'TestMiner%'
                         """)
                         deleted_counts['users'] = cursor.rowcount
                     except Exception as e:
@@ -557,18 +561,22 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     """)
                     test_data_summary['events'] = cursor.fetchall()
                     
-                    # Count test users (using CAST to handle string vs bigint comparison)
+                    # Count test users (both numeric test users and string-based legacy users)
                     cursor.execute("""
                         SELECT COUNT(*) FROM users 
-                        WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                        WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                           OR user_id LIKE 'test_user_%'
+                           OR user_id LIKE 'TestMiner%'
                     """)
                     result = cursor.fetchone()
                     test_data_summary['users'] = result[0] if result else 0
                     
-                    # Count participation records
+                    # Count participation records (both numeric and legacy string user IDs)
                     cursor.execute("""
                         SELECT COUNT(*) FROM participation 
-                        WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                        WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                           OR user_id LIKE 'test_user_%'
+                           OR user_id LIKE 'TestMiner%'
                     """)
                     result = cursor.fetchone()
                     test_data_summary['participation'] = result[0] if result else 0
@@ -668,11 +676,13 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             
             try:
                 with conn.cursor() as cursor:
-                    # Count test users
+                    # Count test users (both numeric and legacy string user IDs)
                     try:
                         cursor.execute("""
                             SELECT COUNT(*) FROM users 
-                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                            WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                               OR user_id LIKE 'test_user_%'
+                               OR user_id LIKE 'TestMiner%'
                         """)
                         result = cursor.fetchone()
                         counts['users'] = result[0] if result else 0
@@ -693,11 +703,13 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                         print(f"Error counting events: {e}")
                         counts['events'] = 0
                     
-                    # Count test participation
+                    # Count test participation (both numeric and legacy string user IDs)
                     try:
                         cursor.execute("""
                             SELECT COUNT(*) FROM participation 
-                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                            WHERE (user_id ~ '^[0-9]+$' AND CAST(user_id AS BIGINT) >= 9000000000000000000)
+                               OR user_id LIKE 'test_user_%'
+                               OR user_id LIKE 'TestMiner%'
                         """)
                         result = cursor.fetchone()
                         counts['participation'] = result[0] if result else 0
