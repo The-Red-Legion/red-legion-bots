@@ -1359,8 +1359,8 @@ class AlphabeticalOreSelector(ui.Select):
             
             embed = discord.Embed(
                 title=f"⛏️ Mining Payroll - {self.parent_view.event_data['event_id']}",
-                description=f"**Step 1 of 5: Event Selected** ✅\n"
-                           f"**Step 2 of 5: Select Ore Types** ✅\n\n"
+                description=f"**Step 1 of 4: Event Selected** ✅\n"
+                           f"**Step 2 of 4: Enter Quantities** ✅\n\n"
                            f"**Selected {len(self.selected_ores)} ore types:**\n"
                            f"{', '.join(sorted(ore_names))}",
                 color=discord.Color.green()
@@ -1368,14 +1368,14 @@ class AlphabeticalOreSelector(ui.Select):
             
             embed.add_field(
                 name="🔄 Next Step",
-                value="Click 'Next: Enter Quantities' to proceed to Step 3",
+                value="Click 'Next: Enter Quantities' to proceed to Step 2",
                 inline=False
             )
         else:
             embed = discord.Embed(
                 title=f"⛏️ Mining Payroll - {self.parent_view.event_data['event_id']}",
-                description=f"**Step 1 of 5: Event Selected** ✅\n"
-                           f"**Step 2 of 5: Select Ore Types** ⏳\n\n"
+                description=f"**Step 1 of 4: Event Selected** ✅\n"
+                           f"**Step 2 of 4: Enter Quantities** ⏳\n\n"
                            f"Select which ore types were collected during this mining session.",
                 color=discord.Color.blue()
             )
@@ -1428,9 +1428,9 @@ class NextToQuantitiesButton(ui.Button):
         
         embed = discord.Embed(
             title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-            description=f"**Step 1 of 5: Event Selected** ✅\n"
-                       f"**Step 2 of 5: Select Ore Types** ✅\n"
-                       f"**Step 3 of 5: Enter Quantities** ⏳\n\n"
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ✅\n"
+                       f"**Step 3 of 4: Review Pricing** ⏳\n\n"
                        f"Enter ore quantities and review UEX pricing for each selected ore type.",
             color=discord.Color.blue()
         )
@@ -1453,7 +1453,7 @@ class NextToQuantitiesButton(ui.Button):
 
 
 class OreQuantityView(ui.View):
-    """Step 3: Enter quantities for selected ores."""
+    """Step 2: Enter quantities for selected ores."""
     
     def __init__(self, event_data, processor, calculator, selected_ores):
         super().__init__(timeout=600)
@@ -1528,8 +1528,8 @@ class BackToOreSelectionButton(ui.Button):
         
         embed = discord.Embed(
             title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-            description=f"**Step 1 of 5: Event Selected** ✅\n"
-                       f"**Step 2 of 5: Select Ore Types** ⏳\n\n"
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ⏳\n\n"
                        f"Select which ore types were collected during this mining session.",
             color=discord.Color.blue()
         )
@@ -1538,7 +1538,7 @@ class BackToOreSelectionButton(ui.Button):
 
 
 class OreQuantityModal(ui.Modal):
-    """Modal for entering ore quantities (Step 3)."""
+    """Modal for entering ore quantities (Step 2)."""
     
     def __init__(self, event_data, processor, calculator, selected_ores):
         super().__init__(title=f'Ore Quantities & Pricing - {event_data["event_id"]}')
@@ -1670,10 +1670,10 @@ class OreQuantityModal(ui.Modal):
         
         embed = discord.Embed(
             title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-            description=f"**Step 1 of 5: Event Selected** ✅\n"
-                       f"**Step 2 of 5: Select Ore Types** ✅\n"
-                       f"**Step 3 of 5: Enter Quantities** ✅\n"
-                       f"**Step 4 of 5: Participant Donations** ⏳\n\n"
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ✅\n"
+                       f"**Step 3 of 4: Review Pricing** ✅\n"
+                       f"**Step 4 of 4: Participant Selection** ⏳\n\n"
                        f"Select which participants want to donate their share.",
             color=discord.Color.blue()
         )
@@ -1801,10 +1801,10 @@ class OreQuantityModal2(ui.Modal):
         
         embed = discord.Embed(
             title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-            description=f"**Step 1 of 5: Event Selected** ✅\n"
-                       f"**Step 2 of 5: Select Ore Types** ✅\n"
-                       f"**Step 3 of 5: Enter Quantities** ✅\n"
-                       f"**Step 4 of 5: Participant Donations** ⏳\n\n"
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ✅\n"
+                       f"**Step 3 of 4: Review Pricing** ✅\n"
+                       f"**Step 4 of 4: Participant Selection** ⏳\n\n"
                        f"Select which participants want to donate their share.",
             color=discord.Color.blue()
         )
@@ -1980,11 +1980,11 @@ class ProceedToPriceReviewButton(ui.Button):
             
             embed = discord.Embed(
                 title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-                description=f"**Step 1 of 5: Event Selected** ✅\n"
-                           f"**Step 2 of 5: Select Ore Types** ✅\n"
-                           f"**Step 3 of 5: Enter Quantities** ✅\n"
-                           f"**Step 4 of 5: Participant Donations** ✅\n"
-                           f"**Step 5 of 5: Review & Calculate** ⏳\n\n"
+                description=f"**Step 1 of 4: Event Selected** ✅\n"
+                           f"**Step 2 of 4: Enter Quantities** ✅\n"
+                           f"**Step 3 of 4: Review Pricing** ✅\n"
+                           f"**Step 4 of 4: Participant Selection** ✅\n"
+                           f"**Step 4 of 4: Review & Calculate** ⏳\n\n"
                            f"Review prices and finalize payroll calculation.",
                 color=discord.Color.green()
             )
@@ -2021,7 +2021,7 @@ class ProceedToPriceReviewButton(ui.Button):
 
 
 class BackToQuantitiesButton(ui.Button):
-    """Button to go back to Step 3: Quantities."""
+    """Button to go back to Step 2: Quantities."""
     
     def __init__(self, event_data, processor, calculator, selected_ores):
         super().__init__(
@@ -2035,7 +2035,7 @@ class BackToQuantitiesButton(ui.Button):
         self.selected_ores = selected_ores
     
     async def callback(self, interaction: discord.Interaction):
-        # Go back to Step 3
+        # Go back to Step 2
         view = OreQuantityView(self.event_data, self.processor, self.calculator, self.selected_ores)
         
         # Create ore names list for display
@@ -2053,9 +2053,9 @@ class BackToQuantitiesButton(ui.Button):
         
         embed = discord.Embed(
             title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-            description=f"**Step 1 of 5: Event Selected** ✅\n"
-                       f"**Step 2 of 5: Select Ore Types** ✅\n"
-                       f"**Step 3 of 5: Enter Quantities** ⏳\n\n"
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ✅\n"
+                       f"**Step 3 of 4: Review Pricing** ⏳\n\n"
                        f"Enter ore quantities and review UEX pricing for each selected ore type.",
             color=discord.Color.blue()
         )
@@ -2237,11 +2237,11 @@ class InlinePriceEditModal(ui.Modal):
             # Create updated embed
             embed = discord.Embed(
                 title=f"⛏️ Mining Payroll - {self.event_data['event_id']} (Prices Updated)",
-                description=f"**Step 1 of 5: Event Selected** ✅\n"
-                           f"**Step 2 of 5: Select Ore Types** ✅\n"
-                           f"**Step 3 of 5: Enter Quantities** ✅\n"
-                           f"**Step 4 of 5: Participant Donations** ✅\n"
-                           f"**Step 5 of 5: Review & Calculate** ⏳\n\n"
+                description=f"**Step 1 of 4: Event Selected** ✅\n"
+                           f"**Step 2 of 4: Enter Quantities** ✅\n"
+                           f"**Step 3 of 4: Review Pricing** ✅\n"
+                           f"**Step 4 of 4: Participant Selection** ✅\n"
+                           f"**Step 4 of 4: Review & Calculate** ⏳\n\n"
                            f"Prices updated! Ready to calculate final payroll.",
                 color=discord.Color.green()
             )
@@ -2421,10 +2421,10 @@ class BackToParticipantsButton(ui.Button):
         
         embed = discord.Embed(
             title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-            description=f"**Step 1 of 5: Event Selected** ✅\n"
-                       f"**Step 2 of 5: Select Ore Types** ✅\n"
-                       f"**Step 3 of 5: Enter Quantities** ✅\n"
-                       f"**Step 4 of 5: Participant Donations** ⏳\n\n"
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ✅\n"
+                       f"**Step 3 of 4: Review Pricing** ✅\n"
+                       f"**Step 4 of 4: Participant Selection** ⏳\n\n"
                        f"Select which participants want to donate their share.",
             color=discord.Color.blue()
         )
@@ -2611,10 +2611,10 @@ class OrePricingModal(ui.Modal):
         
         embed = discord.Embed(
             title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-            description=f"**Step 1 of 5: Event Selected** ✅\n"
-                       f"**Step 2 of 5: Select Ore Types** ✅\n"
+            description=f"**Step 1 of 4: Event Selected** ✅\n"
+                       f"**Step 2 of 4: Enter Quantities** ✅\n"
                        f"**Step 3 of 5: Review Pricing** ✅\n"
-                       f"**Step 4 of 5: Participant Selection** ⏳\n\n"
+                       f"**Step 4 of 4: Participant Selection** ⏳\n\n"
                        f"Select participants for payroll calculation.",
             color=discord.Color.blue()
         )
