@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from .core import PayrollCalculator
 from .processors import MiningProcessor, SalvageProcessor, CombatProcessor
-from .ui.views import EventSelectionView, PayrollConfirmationView
+from .ui.views import EventSelectionView, PayrollConfirmationView, UnifiedEventSelectionView
 from .ui.modals import MiningCollectionModal, SalvageCollectionModal
 
 class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate payouts for mining, salvage, and combat operations"):
@@ -40,49 +40,24 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
         }
         super().__init__()
     
-    @app_commands.command(name="mining", description="Calculate payroll for a completed mining session")
+    @app_commands.command(name="calculate", description="Calculate payroll for any completed event (mining, salvage, combat)")
     @app_commands.describe(
-        event_id="Optional: Specific mining event ID to calculate payroll for"
+        event_id="Optional: Specific event ID to calculate payroll for (if not provided, shows selection menu)"
     )
-    async def payroll_mining(
+    async def payroll_calculate(
         self, 
         interaction: discord.Interaction,
         event_id: Optional[str] = None
     ):
-        """Calculate payroll for mining operations."""
-        await self._handle_payroll_calculation(interaction, 'mining', event_id)
+        """Unified payroll calculation for all event types."""
+        await self._handle_unified_payroll_calculation(interaction, event_id)
     
-    @app_commands.command(name="salvage", description="Calculate payroll for a completed salvage operation") 
-    @app_commands.describe(
-        event_id="Optional: Specific salvage event ID to calculate payroll for"
-    )
-    async def payroll_salvage(
+    async def _handle_unified_payroll_calculation(
         self,
         interaction: discord.Interaction,
         event_id: Optional[str] = None
     ):
-        """Calculate payroll for salvage operations."""
-        await self._handle_payroll_calculation(interaction, 'salvage', event_id)
-    
-    @app_commands.command(name="combat", description="Calculate payroll for a completed combat mission")
-    @app_commands.describe(
-        event_id="Optional: Specific combat event ID to calculate payroll for"
-    )
-    async def payroll_combat(
-        self,
-        interaction: discord.Interaction, 
-        event_id: Optional[str] = None
-    ):
-        """Calculate payroll for combat operations."""
-        await self._handle_payroll_calculation(interaction, 'combat', event_id)
-    
-    async def _handle_payroll_calculation(
-        self, 
-        interaction: discord.Interaction, 
-        event_type: str,
-        event_id: Optional[str] = None
-    ):
-        """Universal payroll calculation handler for all event types."""
+        """Unified handler for payroll calculation across all event types."""
         await interaction.response.defer()
         
         try:
@@ -99,9 +74,8 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 return
             
             guild_id = interaction.guild_id
-            processor = self.processors[event_type]
             
-            # If specific event_id provided, use it directly
+            # If specific event_id provided, handle directly
             if event_id:
                 event_data = await self.calculator.get_event_by_id(event_id)
                 if not event_data:
@@ -114,64 +88,70 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                         ephemeral=True
                     )
                     return
-                    
-                if event_data['event_type'] != event_type:
-                    await interaction.followup.send(
-                        embed=discord.Embed(
-                            title="❌ Wrong Event Type",
-                            description=f"Event `{event_id}` is a {event_data['event_type']} event, not {event_type}.",
-                            color=discord.Color.red()
-                        ),
-                        ephemeral=True
-                    )
-                    return
+                
+                # Get processor for this event type
+                event_type = event_data.get('event_type', 'mining')
+                processor = self.processors.get(event_type, self.processors['mining'])
                 
                 # Skip event selection, go straight to collection input
                 await self._show_collection_modal(interaction, event_data, processor)
                 return
             
-            # Get available completed events for this type
-            events = await self.calculator.get_completed_events(guild_id, event_type)
+            # Get all pending events across all types
+            all_events = {}
+            total_pending = 0
             
-            if not events:
+            for event_type in ['mining', 'salvage', 'combat']:
+                events = await self.calculator.get_completed_events(guild_id, event_type, include_calculated=False)
+                all_events[event_type] = events
+                total_pending += len(events)
+            
+            if total_pending == 0:
                 await interaction.followup.send(
                     embed=discord.Embed(
-                        title=f"ℹ️ No {event_type.title()} Events Found",
-                        description=f"No completed {event_type} events found that need payroll calculation.\n\n"
-                                  f"**To create {event_type} events:**\n"
-                                  f"• Use `/{event_type} start` to begin a session\n"
-                                  f"• Use `/{event_type} stop` to end the session\n"
-                                  f"• Then return here to calculate payroll",
+                        title="ℹ️ No Events Found",
+                        description="No completed events found that need payroll calculation.\n\n"
+                                  "**To create events:**\n"
+                                  "• Use `/mining start` to begin a mining session\n"
+                                  "• Use event commands for salvage and combat operations\n"
+                                  "• Then return here to calculate payroll",
                         color=discord.Color.blue()
                     ),
                     ephemeral=True
                 )
                 return
             
-            # Show event selection view
+            # Show unified event selection view
             embed = discord.Embed(
-                title=f"💰 {event_type.title()} Payroll Calculator",
-                description=f"Select a completed {event_type} event to calculate payroll for:",
+                title="💰 Universal Payroll Calculator",
+                description="Select any completed event to calculate payroll for:",
                 color=discord.Color.green(),
                 timestamp=datetime.now()
             )
             
+            # Add breakdown by event type
+            breakdown_lines = []
+            for event_type, events in all_events.items():
+                if len(events) > 0:
+                    emoji = {'mining': '⛏️', 'salvage': '🔧', 'combat': '⚔️'}.get(event_type, '📋')
+                    breakdown_lines.append(f"{emoji} **{event_type.title()}:** {len(events)} events")
+            
             embed.add_field(
                 name="📋 Available Events",
-                value=f"Found **{len(events)}** completed {event_type} events awaiting payroll calculation.",
+                value="\n".join(breakdown_lines) + f"\n\n**Total:** {total_pending} events awaiting payroll",
                 inline=False
             )
             
             embed.add_field(
                 name="🔄 Process",
-                value=f"1. Select event from dropdown (shows date & participants)\n"
-                      f"2. Enter {processor.get_collection_description()}\n"
-                      f"3. Review and confirm payroll calculation\n"
-                      f"4. Generate final payout summary",
+                value="1. Select any event from dropdown (shows type, date & participants)\n"
+                      "2. Enter collection data specific to that event type\n"
+                      "3. Review and confirm payroll calculation\n"
+                      "4. Generate final payout summary",
                 inline=False
             )
             
-            view = EventSelectionView(events, event_type, processor, self.calculator)
+            view = UnifiedEventSelectionView(all_events, self.processors, self.calculator)
             
             await interaction.followup.send(embed=embed, view=view)
             
@@ -184,6 +164,60 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 ),
                 ephemeral=True
             )
+    
+    # DEPRECATED: Old individual payroll commands - kept for backwards compatibility
+    # Use /payroll calculate instead
+    
+    @app_commands.command(name="mining", description="[DEPRECATED] Calculate payroll for mining - use /payroll calculate instead")
+    @app_commands.describe(event_id="Event ID to calculate payroll for")
+    async def payroll_mining_deprecated(self, interaction: discord.Interaction, event_id: Optional[str] = None):
+        """Deprecated mining payroll command - redirects to unified command."""
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="⚠️ Command Deprecated",
+                description="This command has been replaced with `/payroll calculate` for a better experience.\n\n"
+                          "**New unified payroll:**\n"
+                          "• Use `/payroll calculate` to see all event types\n"
+                          "• Choose from mining, salvage, or combat events\n"
+                          "• Better UI with dates and participant counts",
+                color=discord.Color.orange()
+            ),
+            ephemeral=True
+        )
+    
+    @app_commands.command(name="salvage", description="[DEPRECATED] Calculate payroll for salvage - use /payroll calculate instead")
+    @app_commands.describe(event_id="Event ID to calculate payroll for")
+    async def payroll_salvage_deprecated(self, interaction: discord.Interaction, event_id: Optional[str] = None):
+        """Deprecated salvage payroll command - redirects to unified command."""
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="⚠️ Command Deprecated",
+                description="This command has been replaced with `/payroll calculate` for a better experience.\n\n"
+                          "**New unified payroll:**\n"
+                          "• Use `/payroll calculate` to see all event types\n"
+                          "• Choose from mining, salvage, or combat events\n"
+                          "• Better UI with dates and participant counts",
+                color=discord.Color.orange()
+            ),
+            ephemeral=True
+        )
+    
+    @app_commands.command(name="combat", description="[DEPRECATED] Calculate payroll for combat - use /payroll calculate instead")
+    @app_commands.describe(event_id="Event ID to calculate payroll for")
+    async def payroll_combat_deprecated(self, interaction: discord.Interaction, event_id: Optional[str] = None):
+        """Deprecated combat payroll command - redirects to unified command."""
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title="⚠️ Command Deprecated",
+                description="This command has been replaced with `/payroll calculate` for a better experience.\n\n"
+                          "**New unified payroll:**\n"
+                          "• Use `/payroll calculate` to see all event types\n"
+                          "• Choose from mining, salvage, or combat events\n"
+                          "• Better UI with dates and participant counts",
+                color=discord.Color.orange()
+            ),
+            ephemeral=True
+        )
     
     async def _show_collection_modal(
         self, 

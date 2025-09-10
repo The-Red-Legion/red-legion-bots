@@ -25,6 +25,19 @@ class EventSelectionView(ui.View):
         self.add_item(EventSelectionDropdown(events, event_type, processor, calculator))
 
 
+class UnifiedEventSelectionView(ui.View):
+    """Unified view for selecting any event type for payroll calculation."""
+    
+    def __init__(self, all_events: Dict[str, List[Dict]], processors: Dict, calculator):
+        super().__init__(timeout=300)
+        self.all_events = all_events
+        self.processors = processors
+        self.calculator = calculator
+        
+        # Create unified dropdown with all event types
+        self.add_item(UnifiedEventSelectionDropdown(all_events, processors, calculator))
+
+
 class EventSelectionDropdown(ui.Select):
     """Dropdown for selecting an event."""
     
@@ -97,6 +110,101 @@ class EventSelectionDropdown(ui.Select):
         else:
             # Default to mining modal for now
             modal = MiningCollectionModal(selected_event, self.processor, self.calculator)
+        
+        await interaction.response.send_modal(modal)
+
+
+class UnifiedEventSelectionDropdown(ui.Select):
+    """Unified dropdown for selecting events from all types."""
+    
+    def __init__(self, all_events: Dict[str, List[Dict]], processors: Dict, calculator):
+        self.all_events = all_events
+        self.processors = processors
+        self.calculator = calculator
+        
+        # Create options for dropdown from all event types
+        options = []
+        event_emojis = {'mining': '⛏️', 'salvage': '🔧', 'combat': '⚔️'}
+        
+        # Combine all events and sort by start date (newest first)
+        combined_events = []
+        for event_type, events in all_events.items():
+            for event in events:
+                event['event_type'] = event_type
+                combined_events.append(event)
+        
+        # Sort by start date (newest first)
+        combined_events.sort(key=lambda x: x.get('started_at', ''), reverse=True)
+        
+        for event in combined_events[:25]:  # Discord limit
+            event_type = event['event_type']
+            event_emoji = event_emojis.get(event_type, '📋')
+            
+            # Format event display
+            duration = event.get('total_duration_minutes', 0)
+            duration_text = f"{duration // 60}h {duration % 60}m" if duration > 60 else f"{duration}m"
+            
+            # Format start date for display
+            start_date = "Unknown Date"
+            if event.get('started_at'):
+                try:
+                    if isinstance(event['started_at'], str):
+                        started_at = datetime.fromisoformat(event['started_at'].replace('Z', '+00:00'))
+                    else:
+                        started_at = event['started_at']
+                    start_date = started_at.strftime("%m/%d %H:%M")
+                except:
+                    start_date = "Unknown Date"
+            
+            # Build description with type, date, participants, duration, and location
+            description = f"{event_type.title()} • {start_date} • {event.get('total_participants', 0)} participants • {duration_text}"
+            if event.get('location_notes'):
+                # Truncate location to fit in description limit
+                location_short = event['location_notes'][:15] + "..." if len(event['location_notes']) > 15 else event['location_notes']
+                description += f" • {location_short}"
+            
+            options.append(discord.SelectOption(
+                label=f"{event_emoji} {event['event_id']} - {event['organizer_name']}",
+                description=description[:100],  # Discord limit
+                value=f"{event_type}:{event['event_id']}"  # Include type for processing
+            ))
+        
+        super().__init__(
+            placeholder="Choose any event to calculate payroll for...",
+            options=options,
+            min_values=1,
+            max_values=1
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        selected_value = self.values[0]
+        event_type, event_id = selected_value.split(':', 1)
+        
+        # Find selected event
+        selected_event = None
+        for events in self.all_events[event_type]:
+            if events['event_id'] == event_id:
+                selected_event = events
+                selected_event['event_type'] = event_type  # Ensure type is set
+                break
+        
+        if not selected_event:
+            await interaction.response.send_message("❌ Event not found", ephemeral=True)
+            return
+        
+        # Get the appropriate processor
+        processor = self.processors[event_type]
+        
+        # Show appropriate collection modal
+        from .modals import MiningCollectionModal, SalvageCollectionModal
+        
+        if event_type == 'mining':
+            modal = MiningCollectionModal(selected_event, processor, self.calculator)
+        elif event_type == 'salvage':
+            modal = SalvageCollectionModal(selected_event, processor, self.calculator)
+        else:
+            # Default to mining modal for combat/other types for now
+            modal = MiningCollectionModal(selected_event, processor, self.calculator)
         
         await interaction.response.send_modal(modal)
 
