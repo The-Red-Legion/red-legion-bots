@@ -14,14 +14,14 @@
 
     - name: Check for unified migration system
       stat:
-        path: "{{ app_dir }}/database_migrations/run_unified_migration.py"
+        path: "{{ app_dir }}/database_migrations/deploy_unified_schema.py"
       register: unified_migration_script
 
     - name: Apply unified migration system
       when: unified_migration_script.stat.exists
       block:
         - name: Execute unified migration
-          command: python3 run_unified_migration.py
+          command: python3 deploy_unified_schema.py
           args:
             chdir: "{{ app_dir }}/database_migrations"
           register: unified_migration_result
