@@ -2745,15 +2745,7 @@ class DirectOreQuantityModal(ui.Modal):
                 )
                 return
             
-            # Get current ore prices
-            await interaction.followup.send(
-                embed=discord.Embed(
-                    title="⏳ Fetching UEX Prices...",
-                    description="Getting current ore prices for Step 3 pricing review...",
-                    color=discord.Color.blue()
-                )
-            )
-            
+            # Get current ore prices (no loading message to avoid interaction conflicts)
             ore_prices = await self.processor.get_current_prices()
             if not ore_prices:
                 await interaction.followup.send(
