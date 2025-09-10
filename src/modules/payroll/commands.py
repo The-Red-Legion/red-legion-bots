@@ -206,17 +206,11 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
     
     async def _check_payroll_permissions(self, user: discord.Member) -> bool:
         """Check if user has permissions to manage payroll."""
-        try:
-            # Import utils for permission checking
-            from utils import can_manage_payroll
-            return await can_manage_payroll(user)
-            
-        except ImportError:
-            # Fallback permission check
-            return (
-                user.guild_permissions.administrator or 
-                any(role.name.lower() in ['admin', 'orgleader', 'payroll'] for role in user.roles)
-            )
+        # Check if user has permissions to manage payroll
+        return (
+            user.guild_permissions.administrator or 
+            any(role.name.lower() in ['admin', 'orgleader', 'payroll', 'officer'] for role in user.roles)
+        )
     
     @app_commands.command(name="status", description="Show payroll calculation status and recent activity")
     async def payroll_status(self, interaction: discord.Interaction):
@@ -229,11 +223,19 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
             # Get recent payroll calculations
             recent_payrolls = await self.calculator.get_recent_payrolls(guild_id, limit=5)
             
-            # Get pending events by type
+            # Get pending events by type with details
             pending_stats = {}
+            all_pending_events = []
             for event_type in ['mining', 'salvage', 'combat']:
                 events = await self.calculator.get_completed_events(guild_id, event_type, include_calculated=False)
                 pending_stats[event_type] = len(events)
+                # Store events with their details for display
+                for event in events:
+                    all_pending_events.append({
+                        'event_id': event['event_id'], 
+                        'type': event_type,
+                        'ended_at': event.get('ended_at', 'N/A')
+                    })
             
             embed = discord.Embed(
                 title="💰 Payroll System Status",
@@ -242,7 +244,7 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 timestamp=datetime.now()
             )
             
-            # Pending calculations
+            # Pending calculations summary
             pending_total = sum(pending_stats.values())
             if pending_total > 0:
                 pending_text = []
@@ -255,6 +257,22 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                     value="\n".join(pending_text) if pending_text else "None",
                     inline=True
                 )
+                
+                # Show pending event IDs (up to 8 events to avoid embed limits)
+                if all_pending_events:
+                    event_list = []
+                    for event in all_pending_events[:8]:
+                        event_emoji = {'mining': '⛏️', 'salvage': '🔧', 'combat': '⚔️'}.get(event['type'], '📋')
+                        event_list.append(f"{event_emoji} `{event['event_id']}`")
+                    
+                    if len(all_pending_events) > 8:
+                        event_list.append(f"... and {len(all_pending_events) - 8} more")
+                    
+                    embed.add_field(
+                        name="📋 Pending Event IDs",
+                        value="\n".join(event_list),
+                        inline=False
+                    )
             else:
                 embed.add_field(
                     name="✅ All Caught Up",
