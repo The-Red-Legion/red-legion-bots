@@ -396,6 +396,11 @@ class MiningStartModal(discord.ui.Modal):
                 print(f"❌ Error auto-joining voice channel: {e}")
                 # Don't fail the entire mining start - just log the issue
             
+            # Get current voice participants for initial display
+            guild = interaction.guild
+            current_voice_participants = await self._get_current_voice_participants(guild, channels)
+            total_current_voice = sum(len(members) for members in current_voice_participants.values())
+            
             # Create success embed
             embed = discord.Embed(
                 title="⛏️ Mining Session Started",
@@ -412,6 +417,27 @@ class MiningStartModal(discord.ui.Modal):
                 inline=False
             )
             
+            # Add tracked channels information
+            tracked_channels_info = []
+            voice_channel_names = []
+            if channels:
+                for channel_name, channel_id_str in channels.items():
+                    if channel_name == 'dispatch':
+                        continue  # Skip dispatch channel in voice tracking list
+                    
+                    try:
+                        vc = guild.get_channel(int(channel_id_str))
+                        if vc:
+                            voice_channel_names.append(f"`{vc.name}`")
+                            # Show current participants in this channel
+                            if channel_name in current_voice_participants and current_voice_participants[channel_name]:
+                                member_count = len(current_voice_participants[channel_name])
+                                tracked_channels_info.append(f"🎤 **{vc.name}**: {member_count} active")
+                            else:
+                                tracked_channels_info.append(f"🎤 **{vc.name}**: Empty")
+                    except (ValueError, AttributeError):
+                        continue  # Skip invalid channel IDs
+            
             embed.add_field(
                 name="🎤 Voice Tracking & Bot Presence",
                 value=f"• Bot will track participation in mining voice channels\n"
@@ -419,6 +445,40 @@ class MiningStartModal(discord.ui.Modal):
                       f"• Join any mining channel to start earning participation time!",
                 inline=False
             )
+            
+            # Add tracked channels and current participants
+            if tracked_channels_info:
+                embed.add_field(
+                    name="📡 Tracked Voice Channels",
+                    value="\n".join(tracked_channels_info),
+                    inline=True
+                )
+            
+            # Show current active participants
+            if total_current_voice > 0:
+                # Get all current participants across channels
+                all_current_participants = set()
+                for members in current_voice_participants.values():
+                    for member in members:
+                        all_current_participants.add(member.display_name)
+                
+                participants_list = sorted(list(all_current_participants))
+                if len(participants_list) <= 8:
+                    participants_text = ", ".join(participants_list)
+                else:
+                    participants_text = ", ".join(participants_list[:8]) + f" (+{len(participants_list)-8} more)"
+                
+                embed.add_field(
+                    name="👥 Currently in Voice",
+                    value=f"**{total_current_voice} participants active**\n{participants_text}",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="👥 Currently in Voice",
+                    value="No participants currently in tracked channels",
+                    inline=True
+                )
             
             # Add next steps and notes
             embed.add_field(
