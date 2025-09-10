@@ -166,28 +166,41 @@ class MiningEventManager:
                         'error': 'Event not found or already closed'
                     }
                 
-                # Calculate and update final participation metrics
+                # Calculate final participation metrics
                 cursor.execute("""
-                    SELECT 
-                        COUNT(DISTINCT user_id) as total_participants,
-                        EXTRACT(EPOCH FROM (MAX(COALESCE(left_at, NOW())) - MIN(joined_at)))/60 as total_duration_minutes
+                    SELECT COUNT(DISTINCT user_id) as total_participants
                     FROM participation 
                     WHERE event_id = %s
                 """, (event_id,))
                 
-                stats = cursor.fetchone()
+                participation_stats = cursor.fetchone()
+                total_participants = participation_stats['total_participants'] if participation_stats else 0
                 
-                if stats:
-                    cursor.execute("""
-                        UPDATE events 
-                        SET total_participants = %s,
-                            total_duration_minutes = %s
-                        WHERE event_id = %s
-                    """, (
-                        stats['total_participants'],
-                        int(stats['total_duration_minutes']) if stats['total_duration_minutes'] else 0,
-                        event_id
-                    ))
+                # Calculate event duration based on actual start/end times
+                cursor.execute("""
+                    SELECT started_at, ended_at
+                    FROM events
+                    WHERE event_id = %s
+                """, (event_id,))
+                
+                event_times = cursor.fetchone()
+                total_duration_minutes = 0
+                
+                if event_times and event_times['started_at'] and event_times['ended_at']:
+                    duration_seconds = (event_times['ended_at'] - event_times['started_at']).total_seconds()
+                    total_duration_minutes = int(duration_seconds / 60)
+                
+                # Update the event with final stats
+                cursor.execute("""
+                    UPDATE events 
+                    SET total_participants = %s,
+                        total_duration_minutes = %s
+                    WHERE event_id = %s
+                """, (
+                    total_participants,
+                    total_duration_minutes,
+                    event_id
+                ))
                 
                 logger.info(f"Closed mining event {event_id} by {closed_by_name}")
                 
@@ -275,6 +288,56 @@ class MiningEventManager:
         except Exception as e:
             logger.error(f"Error getting completed mining events: {e}")
             return []
+    
+    async def fix_event_durations(self, guild_id: int = None) -> Dict:
+        """Fix duration calculations for events that have zero duration but should have duration."""
+        try:
+            fixed_count = 0
+            with get_cursor() as cursor:
+                # Find events with zero duration but valid start/end times
+                where_clause = "WHERE ended_at IS NOT NULL AND started_at IS NOT NULL AND (total_duration_minutes = 0 OR total_duration_minutes IS NULL)"
+                params = []
+                
+                if guild_id:
+                    where_clause += " AND guild_id = %s"
+                    params.append(guild_id)
+                
+                cursor.execute(f"""
+                    SELECT event_id, started_at, ended_at
+                    FROM events 
+                    {where_clause}
+                """, params)
+                
+                events_to_fix = cursor.fetchall()
+                
+                for event in events_to_fix:
+                    # Calculate correct duration
+                    duration_seconds = (event['ended_at'] - event['started_at']).total_seconds()
+                    duration_minutes = int(duration_seconds / 60)
+                    
+                    # Update the event
+                    cursor.execute("""
+                        UPDATE events 
+                        SET total_duration_minutes = %s
+                        WHERE event_id = %s
+                    """, (duration_minutes, event['event_id']))
+                    
+                    if cursor.rowcount > 0:
+                        fixed_count += 1
+                        logger.info(f"Fixed duration for event {event['event_id']}: {duration_minutes} minutes")
+                
+                return {
+                    'success': True,
+                    'fixed_count': fixed_count,
+                    'message': f"Fixed duration for {fixed_count} events"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error fixing event durations: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     def _generate_mining_event_id(self) -> str:
         """Generate a prefixed mining event ID like 'sm-a7k2m9'."""

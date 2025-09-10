@@ -569,6 +569,70 @@ class EventBulkDeleteConfirmationModal(discord.ui.Modal):
                 f"❌ Diagnostic failed: {str(e)}",
                 ephemeral=True
             )
+    
+    @app_commands.command(name="fix-event-durations", description="Fix duration calculations for events showing 0 minutes")
+    @app_commands.default_permissions(administrator=True)
+    async def fix_event_durations(self, interaction: discord.Interaction):
+        """Fix duration calculations for events that show 0 minutes in payroll dropdown."""
+        # Check admin permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ This command requires administrator permissions.",
+                ephemeral=True
+            )
+            return
+        
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            from modules.mining.events import MiningEventManager
+            event_manager = MiningEventManager()
+            
+            # Fix durations for this guild
+            result = await event_manager.fix_event_durations(guild_id=interaction.guild_id)
+            
+            if result['success']:
+                embed = discord.Embed(
+                    title="✅ Event Durations Fixed",
+                    description=f"Successfully recalculated durations for events in this server.",
+                    color=discord.Color.green()
+                )
+                
+                embed.add_field(
+                    name="📊 Results",
+                    value=f"**Fixed:** {result['fixed_count']} events\n"
+                          f"**Status:** {result['message']}",
+                    inline=False
+                )
+                
+                if result['fixed_count'] > 0:
+                    embed.add_field(
+                        name="💡 What was fixed?",
+                        value="Events that had zero duration but valid start/end times\n"
+                              "now show correct duration in payroll dropdown.",
+                        inline=False
+                    )
+                
+                embed.set_footer(text="Duration is calculated from event start to end time")
+                
+            else:
+                embed = discord.Embed(
+                    title="❌ Error Fixing Durations",
+                    description=f"An error occurred: {result.get('error', 'Unknown error')}",
+                    color=discord.Color.red()
+                )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error",
+                    description=f"An unexpected error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
 
 
 async def setup(bot):
