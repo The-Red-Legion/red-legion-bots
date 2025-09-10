@@ -30,18 +30,14 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
         super().__init__()
         
     @app_commands.command(name="start", description="Start a mining session with voice channel tracking")
-    @app_commands.describe(
-        location="Mining location (e.g., 'Daymar', 'Lyria', 'Aaron Halo')",
-        notes="Optional notes about this mining session"
-    )
     async def start_mining(
         self, 
-        interaction: discord.Interaction,
-        location: Optional[str] = None,
-        notes: Optional[str] = None
+        interaction: discord.Interaction
     ):
         """Start a new mining session."""
-        await interaction.response.defer()
+        # Show mining session start modal
+        modal = MiningStartModal(self.event_manager, self.voice_tracker, self.bot)
+        await interaction.response.send_modal(modal)
         
         try:
             guild_id = interaction.guild_id
@@ -399,6 +395,227 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
     
     async def _get_current_voice_participants(self, guild, channels):
         """Get current participants in mining voice channels."""
+        try:
+            current_participants = {}
+            
+            # Check each mining channel for current members
+            for channel_key, channel_id_str in channels.items():
+                try:
+                    channel_id = int(channel_id_str)
+                    voice_channel = guild.get_channel(channel_id)
+                    
+                    if voice_channel and hasattr(voice_channel, 'members'):
+                        # Get members in this voice channel (excluding bots)
+                        members_in_channel = [member for member in voice_channel.members if not member.bot]
+                        
+                        if members_in_channel:
+                            # Use a friendly channel name
+                            friendly_name = channel_key.title()
+                            if channel_key == 'dispatch':
+                                friendly_name = 'Dispatch/Main'
+                            elif channel_key.startswith('group') or len(channel_key) <= 2:
+                                friendly_name = f"Group {channel_key.upper()}"
+                            
+                            current_participants[friendly_name] = members_in_channel
+                            
+                except (ValueError, AttributeError) as e:
+                    print(f"Warning: Could not check channel {channel_key}: {e}")
+                    continue
+            
+            return current_participants
+            
+        except Exception as e:
+            print(f"Error getting current voice participants: {e}")
+            return {}
+
+
+class MiningStartModal(discord.ui.Modal):
+    """Modal for mining session startup information."""
+    
+    def __init__(self, event_manager, voice_tracker, bot):
+        super().__init__(title='Start Mining Session')
+        self.event_manager = event_manager
+        self.voice_tracker = voice_tracker
+        self.bot = bot
+        
+        # Location input
+        self.location = discord.ui.TextInput(
+            label='Mining Location',
+            placeholder='e.g., Daymar, Lyria, Aaron Halo',
+            required=False,
+            max_length=100
+        )
+        self.add_item(self.location)
+        
+        # Notes input
+        self.notes = discord.ui.TextInput(
+            label='Session Notes',
+            placeholder='Optional notes about this mining session',
+            required=False,
+            style=discord.TextStyle.paragraph,
+            max_length=500
+        )
+        self.add_item(self.notes)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            guild_id = interaction.guild_id
+            organizer = interaction.user
+            
+            # Create mining event in database
+            event_result = await self.event_manager.create_event(
+                guild_id=guild_id,
+                organizer_id=organizer.id,
+                organizer_name=organizer.display_name,
+                location=self.location.value if self.location.value else None,
+                notes=self.notes.value if self.notes.value else None
+            )
+            
+            if not event_result['success']:
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ Failed to Start Mining Session",
+                        description=event_result['error'],
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+                return
+            
+            event_data = event_result['event']
+            
+            # Start voice channel tracking
+            channels = get_sunday_mining_channels(guild_id)
+            tracking_result = await self.voice_tracker.start_tracking(
+                event_id=event_data['event_id'],
+                channels=channels
+            )
+            
+            if not tracking_result['success']:
+                # Clean up event if voice tracking fails
+                await self.event_manager.close_event(event_data['event_id'])
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ Failed to Start Voice Tracking",
+                        description=tracking_result['error'],
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+                return
+            
+            # Auto-join the Dispatch/Main channel to indicate mining session is active
+            try:
+                from handlers.voice_tracking import join_voice_channel, set_bot_instance
+                
+                # Ensure bot instance is set for voice operations
+                set_bot_instance(self.bot)
+                
+                # Get the Dispatch channel ID
+                dispatch_channel_id = channels.get('dispatch')
+                if dispatch_channel_id:
+                    dispatch_channel_id = int(dispatch_channel_id)
+                    join_success = await join_voice_channel(dispatch_channel_id)
+                    
+                    if join_success:
+                        print(f"✅ Bot joined Dispatch channel for mining event {event_data['event_id']}")
+                    else:
+                        print(f"⚠️ Could not join Dispatch channel for mining event {event_data['event_id']}")
+                else:
+                    print("⚠️ No Dispatch channel configured - skipping auto-join")
+                    
+            except Exception as e:
+                print(f"❌ Error auto-joining voice channel: {e}")
+                # Don't fail the entire mining start - just log the issue
+            
+            # Create success embed
+            embed = discord.Embed(
+                title="⛏️ Mining Session Started",
+                description=f"Session **{event_data['event_id']}** is now active",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+            
+            embed.add_field(
+                name="📋 Session Details",
+                value=f"**Organizer:** {organizer.display_name}\n"
+                      f"**Location:** {self.location.value or 'Not specified'}\n" 
+                      f"**Started:** <t:{int(datetime.now().timestamp())}:R>",
+                inline=False
+            )
+            
+            # Get current participants in mining voice channels
+            current_participants = await self._get_current_voice_participants(interaction.guild, channels)
+            
+            embed.add_field(
+                name="🎤 Voice Tracking & Bot Presence",
+                value="• Bot will track participation in mining voice channels\n"
+                      "• Bot has joined Dispatch channel to indicate active session\n"
+                      "• Join any mining channel to start earning participation time!",
+                inline=False
+            )
+            
+            # Add current participants field if any are present
+            if current_participants:
+                participant_text = []
+                for channel_name, members in current_participants.items():
+                    if members:
+                        member_names = [member.display_name for member in members]
+                        participant_text.append(f"**{channel_name}:** {', '.join(member_names)}")
+                
+                if participant_text:
+                    participant_count = sum(len(members) for members in current_participants.values())
+                    embed.add_field(
+                        name=f"👥 Current Mining Participants in Channel ({participant_count} total)",
+                        value="\n".join(participant_text[:10]),  # Limit to prevent embed from getting too large
+                        inline=False
+                    )
+                    
+                    if len(participant_text) > 10:
+                        embed.add_field(
+                            name="👥 Additional Participants",
+                            value=f"... and {len(participant_text) - 10} more members in other channels",
+                            inline=False
+                        )
+            else:
+                embed.add_field(
+                    name="👥 Current Participants",
+                    value="No members currently in mining voice channels",
+                    inline=False
+                )
+            
+            # Add next steps and notes
+            embed.add_field(
+                name="🚀 Next Steps",
+                value="• Join voice channels to participate and earn time\n"
+                      "• Use `/mining stop` when the session ends\n"
+                      "• Use `/payroll status` to see upcoming payroll calculations",
+                inline=False
+            )
+            
+            if self.notes.value:
+                embed.add_field(
+                    name="📝 Session Notes",
+                    value=self.notes.value[:1000],  # Limit notes length
+                    inline=False
+                )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Starting Mining Session", 
+                    description=f"An unexpected error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+    
+    async def _get_current_voice_participants(self, guild, channels):
+        """Helper method to get current voice participants - moved from main class."""
         try:
             current_participants = {}
             
