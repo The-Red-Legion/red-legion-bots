@@ -41,9 +41,24 @@ class EventSelectionDropdown(ui.Select):
             duration = event.get('total_duration_minutes', 0)
             duration_text = f"{duration // 60}h {duration % 60}m" if duration > 60 else f"{duration}m"
             
-            description = f"{event['participant_count']} participants • {duration_text}"
+            # Format start date for display
+            start_date = "Unknown Date"
+            if event.get('started_at'):
+                try:
+                    if isinstance(event['started_at'], str):
+                        started_at = datetime.fromisoformat(event['started_at'].replace('Z', '+00:00'))
+                    else:
+                        started_at = event['started_at']
+                    start_date = started_at.strftime("%m/%d %H:%M")
+                except:
+                    start_date = "Unknown Date"
+            
+            # Build description with participants, duration, and location
+            description = f"{start_date} • {event.get('total_participants', 0)} participants • {duration_text}"
             if event.get('location_notes'):
-                description += f" • {event['location_notes'][:30]}..."
+                # Truncate location to fit in description limit
+                location_short = event['location_notes'][:20] + "..." if len(event['location_notes']) > 20 else event['location_notes']
+                description += f" • {location_short}"
             
             options.append(discord.SelectOption(
                 label=f"{event['event_id']} - {event['organizer_name']}",

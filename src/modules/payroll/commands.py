@@ -164,7 +164,7 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
             
             embed.add_field(
                 name="🔄 Process",
-                value=f"1. Select event from dropdown\n"
+                value=f"1. Select event from dropdown (shows date & participants)\n"
                       f"2. Enter {processor.get_collection_description()}\n"
                       f"3. Review and confirm payroll calculation\n"
                       f"4. Generate final payout summary",
@@ -234,6 +234,7 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                     all_pending_events.append({
                         'event_id': event['event_id'], 
                         'type': event_type,
+                        'started_at': event.get('started_at'),
                         'ended_at': event.get('ended_at', 'N/A')
                     })
             
@@ -258,12 +259,25 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                     inline=True
                 )
                 
-                # Show pending event IDs (up to 8 events to avoid embed limits)
+                # Show pending event IDs with start dates (up to 8 events to avoid embed limits)
                 if all_pending_events:
                     event_list = []
                     for event in all_pending_events[:8]:
                         event_emoji = {'mining': '⛏️', 'salvage': '🔧', 'combat': '⚔️'}.get(event['type'], '📋')
-                        event_list.append(f"{event_emoji} `{event['event_id']}`")
+                        
+                        # Format start date
+                        if event['started_at']:
+                            # Convert to timestamp for Discord formatting
+                            if isinstance(event['started_at'], str):
+                                from datetime import datetime
+                                started_at = datetime.fromisoformat(event['started_at'].replace('Z', '+00:00'))
+                            else:
+                                started_at = event['started_at']
+                            start_date = f"<t:{int(started_at.timestamp())}:d>"
+                        else:
+                            start_date = "Unknown"
+                        
+                        event_list.append(f"{event_emoji} `{event['event_id']}` - {start_date}")
                     
                     if len(all_pending_events) > 8:
                         event_list.append(f"... and {len(all_pending_events) - 8} more")
