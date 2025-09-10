@@ -414,12 +414,10 @@ jobs:
               owner,
               repo,
               issue_number: pull_number,
-              body: `## 🚀 Auto-Deploy Triggered!
-
-✅ All tests passed and auto-deploy label detected
-🎯 Deploying branch \`${context.payload.pull_request.head.ref}\` to production
-
-**Note:** This deploys without merging - the PR remains open for review.`
+              body: '## 🚀 Auto-Deploy Triggered!\n\n' +
+                    '✅ All tests passed and auto-deploy label detected\n' +
+                    '🎯 Deploying branch `' + context.payload.pull_request.head.ref + '` to production\n\n' +
+                    '**Note:** This deploys without merging - the PR remains open for review.'
             });
       
       - name: Skip deployment (no label)
@@ -437,13 +435,10 @@ jobs:
               owner,
               repo,
               issue_number: pull_number,
-              body: `## 💡 Auto-Deploy Available
-
-✅ All tests passed! Your PR is ready for deployment.
-
-**To auto-deploy without merging:**
-1. Add the \`auto-deploy\` label to this PR
-2. The deployment will trigger automatically
-
-**Manual deployment:** Use the deployment workflow in Actions tab`
+              body: '## 💡 Auto-Deploy Available\n\n' +
+                    '✅ All tests passed! Your PR is ready for deployment.\n\n' +
+                    '**To auto-deploy without merging:**\n' +
+                    '1. Add the `auto-deploy` label to this PR\n' +
+                    '2. The deployment will trigger automatically\n\n' +
+                    '**Manual deployment:** Use the deployment workflow in Actions tab'
             });

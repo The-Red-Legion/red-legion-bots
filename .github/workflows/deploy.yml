@@ -432,12 +432,19 @@ jobs:
               if ('${{ needs.full-codebase-deployment.result }}' === 'failure') failureDetails.push('Full Codebase Deployment');
               if ('${{ needs.health-verification.result }}' === 'failure') failureDetails.push('Health Verification');
               
+              const infraStatus = '${{ needs.infrastructure-setup.result }}' === 'success' ? '✅ Success' : '❌ Failed';
+              const deployStatus = '${{ needs.full-codebase-deployment.result }}' === 'success' ? '✅ Success' : '❌ Failed';
+              const healthStatus = '${{ needs.health-verification.result }}' === 'success' ? '✅ Success' : '❌ Failed';
+              const vmIp = '${{ needs.infrastructure-setup.outputs.vm_ip }}' || 'Not available';
+              const deploymentStatus = '${{ needs.full-codebase-deployment.outputs.deployment_status }}' || 'Failed';
+              const processStatus = '${{ needs.health-verification.outputs.process_status }}' || 'Unknown';
+              
               const failureSummary = '## ❌ Full Deployment Failed\n\n' +
                                       '| Phase | Status | Details |\n' +
                                       '|-------|--------|---------|\n' +
-                                      '| Infrastructure Setup | ${{ needs.infrastructure-setup.result == \'success\' && \'✅ Success\' || \'❌ Failed\' }} | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip || \'Not available\' }} |\n' +
-                                      '| Full Codebase Deployment | ${{ needs.full-codebase-deployment.result == \'success\' && \'✅ Success\' || \'❌ Failed\' }} | ${{ needs.full-codebase-deployment.outputs.deployment_status || \'Failed\' }} |\n' +
-                                      '| Health Verification | ${{ needs.health-verification.result == \'success\' && \'✅ Success\' || \'❌ Failed\' }} | Process: ${{ needs.health-verification.outputs.process_status || \'Unknown\' }} |\n\n' +
+                                      '| Infrastructure Setup | ' + infraStatus + ' | VM IP: ' + vmIp + ' |\n' +
+                                      '| Full Codebase Deployment | ' + deployStatus + ' | ' + deploymentStatus + ' |\n' +
+                                      '| Health Verification | ' + healthStatus + ' | Process: ' + processStatus + ' |\n\n' +
                                       '**Failed phases:** ' + (failureDetails.join(', ') || 'Multiple phases failed') + '\n\n' +
                                       '**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.';
               
