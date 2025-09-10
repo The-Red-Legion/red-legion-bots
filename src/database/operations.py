@@ -29,22 +29,21 @@ EVENT_ID_PREFIXES = {
     'test': 'test'         # Test Events
 }
 
-def generate_prefixed_event_id(event_type: str = 'mining', length: int = 6) -> str:
+def generate_prefixed_event_id(event_type: str = 'mining', length: int = 5) -> str:
     """
     Generate a prefixed event ID based on event type.
     
     Args:
         event_type: Type of event ('mining', 'operation', 'training', etc.)
-        length: Length of random suffix (default: 6)
+        length: Length of random suffix (default: 5)
         
     Returns:
-        Prefixed event ID (e.g., 'sm-a7k2m9', 'op-b3x8n4')
+        Prefixed event ID (e.g., 'sm-12345', 'op-67890')
     """
     prefix = EVENT_ID_PREFIXES.get(event_type, 'ev')  # Default to 'ev' if unknown
     
-    # Generate random alphanumeric suffix (excluding confusing characters)
-    chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    chars = chars.replace('o', '').replace('0', '').replace('l', '').replace('1', '')  # Remove confusing chars
+    # Generate random numeric suffix (5 digits)
+    chars = '0123456789'
     
     suffix = ''.join(random.choice(chars) for _ in range(length))
     
