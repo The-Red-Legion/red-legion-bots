@@ -392,7 +392,7 @@ VALUES ('10_unified_mining_system.sql', TRUE, CURRENT_TIMESTAMP);
 
 -- Add helpful initial data comment
 INSERT INTO events (event_id, guild_id, event_type, event_name, organizer_id, organizer_name, started_at, status)
-VALUES ('setup-000000', 0, 'system', 'Database Setup Complete', 0, 'System', NOW(), 'closed')
+VALUES ('sys-a00000', 0, 'system', 'Database Setup Complete', 0, 'System', NOW(), 'closed')
 ON CONFLICT (event_id) DO NOTHING;
 
 COMMIT;
