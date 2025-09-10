@@ -68,15 +68,12 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
             
             # Auto-leave the Dispatch/Main channel when mining session ends
             try:
-                from handlers.voice_tracking import leave_voice_channel
-                from config.settings import get_sunday_mining_channels
-                
                 # Get the Dispatch channel ID and leave it
                 channels = get_sunday_mining_channels(guild_id)
                 dispatch_channel_id = channels.get('dispatch')
                 if dispatch_channel_id:
                     dispatch_channel_id = int(dispatch_channel_id)
-                    leave_success = await leave_voice_channel(dispatch_channel_id)
+                    leave_success = await self.voice_tracker.leave_voice_channel(dispatch_channel_id)
                     
                     if leave_success:
                         print(f"✅ Bot left Dispatch channel after mining event {active_event['event_id']}")
@@ -371,16 +368,11 @@ class MiningStartModal(discord.ui.Modal):
             # Auto-join the Dispatch/Main channel to indicate mining session is active
             voice_join_status = "⚠️ Skipped - no dispatch channel configured"
             try:
-                from handlers.voice_tracking import join_voice_channel, set_bot_instance
-                
-                # Ensure bot instance is set for voice operations
-                set_bot_instance(self.bot)
-                
                 # Get the Dispatch channel ID
                 dispatch_channel_id = channels.get('dispatch')
                 if dispatch_channel_id:
                     dispatch_channel_id = int(dispatch_channel_id)
-                    join_success = await join_voice_channel(dispatch_channel_id)
+                    join_success = await self.voice_tracker.join_voice_channel(dispatch_channel_id)
                     
                     if join_success:
                         voice_join_status = "✅ Bot joined dispatch channel successfully"
