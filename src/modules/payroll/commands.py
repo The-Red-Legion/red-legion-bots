@@ -40,10 +40,7 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
         }
         super().__init__()
     
-    @app_commands.command(name="calculate", description="Calculate payroll for any completed event (mining, salvage, combat)")
-    @app_commands.describe(
-        event_id="Optional: Specific event ID to calculate payroll for (if not provided, shows selection menu)"
-    )
+    @app_commands.command(name="calculate", description="Calculate payroll - shows selection menu for all event types (mining, salvage, combat)")
     async def payroll_calculate(
         self, 
         interaction: discord.Interaction,
@@ -303,7 +300,6 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                         if event['started_at']:
                             # Convert to timestamp for Discord formatting
                             if isinstance(event['started_at'], str):
-                                from datetime import datetime
                                 started_at = datetime.fromisoformat(event['started_at'].replace('Z', '+00:00'))
                             else:
                                 started_at = event['started_at']
