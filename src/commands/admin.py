@@ -714,6 +714,65 @@ class EventBulkDeleteConfirmationModal(discord.ui.Modal):
                 ),
                 ephemeral=True
             )
+    
+    @app_commands.command(name="restart", description="Restart the Red Legion bot service (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def restart_bot(self, interaction: discord.Interaction):
+        """Restart the bot service (admin only)."""
+        try:
+            # Check admin permissions
+            if not interaction.user.guild_permissions.administrator:
+                await interaction.response.send_message(
+                    "❌ This command requires administrator permissions.",
+                    ephemeral=True
+                )
+                return
+            
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="🔄 Restarting Bot",
+                    description="Bot restart initiated by admin. The bot will be back online shortly.",
+                    color=discord.Color.orange()
+                ),
+                ephemeral=False  # Let everyone see the restart notification
+            )
+            
+            # Import here to avoid circular imports
+            import os
+            import sys
+            
+            # Attempt to restart via systemctl if on Linux/VM
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["sudo", "systemctl", "restart", "red-legion-bot"], 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    # This message likely won't be sent since bot is restarting
+                    await interaction.followup.send("✅ Bot restart command sent to system service.")
+                else:
+                    # Fall back to Python exit restart
+                    await interaction.followup.send("⚠️ System restart failed, attempting Python restart...")
+                    await self.bot.close()
+                    os.execv(sys.executable, ['python'] + sys.argv)
+            except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
+                # Fall back to Python restart if systemctl is not available
+                await interaction.followup.send("🔄 Performing Python restart...")
+                await self.bot.close()
+                os.execv(sys.executable, ['python'] + sys.argv)
+                
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Restart Failed",
+                    description=f"Failed to restart bot: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
 
 
 async def setup(bot):
