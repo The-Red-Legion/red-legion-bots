@@ -133,12 +133,21 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                         user_total_time = 0
                         
                         for session in range(num_sessions):
-                            # Random participation duration (15 minutes to 3 hours)
-                            duration_minutes = random.randint(15, 180)
+                            # Calculate available event duration
+                            event_duration_minutes = int((event_end - event_start).total_seconds() / 60)
                             
-                            # Calculate session times within event window
-                            max_start_offset = max(0, int((event_end - event_start).total_seconds() / 60) - duration_minutes)
-                            start_offset = random.randint(session * 30, max_start_offset) if max_start_offset > 0 else 0
+                            # Random participation duration (15 minutes to min of 180 or event duration)
+                            max_session_duration = min(180, event_duration_minutes - 5)  # Leave 5 min buffer
+                            duration_minutes = random.randint(15, max(15, max_session_duration))
+                            
+                            # Calculate session times within event window  
+                            max_start_offset = max(0, event_duration_minutes - duration_minutes)
+                            min_start_offset = min(session * 30, max_start_offset)  # Don't exceed max
+                            
+                            if max_start_offset > min_start_offset:
+                                start_offset = random.randint(min_start_offset, max_start_offset)
+                            else:
+                                start_offset = min_start_offset
                             
                             join_time = event_start + timedelta(minutes=start_offset)
                             leave_time = join_time + timedelta(minutes=duration_minutes)
