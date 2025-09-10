@@ -1541,7 +1541,7 @@ class OreQuantityModal(ui.Modal):
     """Modal for entering ore quantities (Step 3)."""
     
     def __init__(self, event_data, processor, calculator, selected_ores):
-        super().__init__(title=f'Enter Ore Quantities - {event_data["event_id"]}')
+        super().__init__(title=f'Ore Quantities & Pricing - {event_data["event_id"]}')
         self.event_data = event_data
         self.processor = processor
         self.calculator = calculator
@@ -1565,8 +1565,8 @@ class OreQuantityModal(ui.Modal):
             ore_name = all_ores.get(ore_code, ore_code)
             
             ore_input = ui.TextInput(
-                label=f'{ore_name} (SCU)',
-                placeholder=f'Enter SCU amount for {ore_name}',
+                label=f'{ore_name} Quantity (SCU)',
+                placeholder=f'Enter SCU amount (UEX pricing shown next)',
                 required=True,
                 max_length=10
             )
