@@ -107,8 +107,8 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     total_participation_time = 0
                     
                     for i in range(participants):
-                        # Generate test user
-                        user_id = f"test_user_{i+1:03d}_{event_id}"
+                        # Generate test user (keep within 20 char limit for user_id)
+                        user_id = f"tuser_{i+1:03d}_{event_id[-6:]}"
                         username = f"TestMiner{i+1:03d}"
                         is_org_member = random.choice([True, False])
                         
@@ -250,7 +250,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     # Delete test participation records (must be first due to foreign keys)
                     cursor.execute("""
                         DELETE FROM participation 
-                        WHERE user_id LIKE 'test_user_%'
+                        WHERE user_id LIKE 'tuser_%'
                     """)
                     deleted_counts['participation'] = cursor.rowcount
                     
@@ -280,7 +280,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     # Delete test users
                     cursor.execute("""
                         DELETE FROM users 
-                        WHERE user_id LIKE 'test_user_%'
+                        WHERE user_id LIKE 'tuser_%'
                     """)
                     deleted_counts['users'] = cursor.rowcount
                     
@@ -350,7 +350,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             try:
                 with conn.cursor() as cursor:
                     # Count test users
-                    cursor.execute("SELECT COUNT(*) FROM users WHERE user_id LIKE 'test_user_%'")
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE user_id LIKE 'tuser_%'")
                     counts['users'] = cursor.fetchone()[0]
                     
                     # Count test events (recent ones created by this command)
@@ -363,7 +363,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     counts['events'] = cursor.fetchone()[0]
                     
                     # Count test participation
-                    cursor.execute("SELECT COUNT(*) FROM participation WHERE user_id LIKE 'test_user_%'")
+                    cursor.execute("SELECT COUNT(*) FROM participation WHERE user_id LIKE 'tuser_%'")
                     counts['participation'] = cursor.fetchone()[0]
                     
                     # Count test payrolls
