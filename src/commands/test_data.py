@@ -150,12 +150,14 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                                 # Insert participation record
                                 cursor.execute("""
                                     INSERT INTO participation (
-                                        event_id, user_id, join_time, leave_time, 
-                                        duration_minutes, is_org_member
-                                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                                        event_id, user_id, username, display_name, 
+                                        joined_at, left_at, duration_minutes, is_org_member
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                 """, (
                                     event_id,
                                     user_id,
+                                    username,
+                                    username,
                                     join_time,
                                     leave_time,
                                     duration_minutes,

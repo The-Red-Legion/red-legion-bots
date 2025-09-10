@@ -370,7 +370,18 @@ jobs:
               console.log('Ready to Merge label added successfully');
               
               // Add success comment with job details
-              const deploymentSummary = "## ✅ Full Deployment Successful\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ✅ Success | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip }} |\n| Full Codebase Deployment | ✅ Success | ${{ needs.full-codebase-deployment.outputs.deployment_status }} |\n| Health Verification | ✅ Success | Process: ${{ needs.health-verification.outputs.process_status }} |\n| Log Collection | ✅ Success | Logs captured successfully |\n\n🚀 **Bot Status:** Complete codebase has been deployed and bot is responding to Discord.\n\n**Next Steps:** Add the `merge` label to trigger the merge workflow.";
+              const deploymentSummary = `## ✅ Full Deployment Successful
+
+| Phase | Status | Details |
+|-------|--------|---------|
+| Infrastructure Setup | ✅ Success | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip }} |
+| Full Codebase Deployment | ✅ Success | ${{ needs.full-codebase-deployment.outputs.deployment_status }} |
+| Health Verification | ✅ Success | Process: ${{ needs.health-verification.outputs.process_status }} |
+| Log Collection | ✅ Success | Logs captured successfully |
+
+🚀 **Bot Status:** Complete codebase has been deployed and bot is responding to Discord.
+
+**Next Steps:** Add the \`merge\` label to trigger the merge workflow.`;
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -424,7 +435,17 @@ jobs:
               if ('${{ needs.full-codebase-deployment.result }}' === 'failure') failureDetails.push('Full Codebase Deployment');
               if ('${{ needs.health-verification.result }}' === 'failure') failureDetails.push('Health Verification');
               
-              const failureSummary = "## ❌ Full Deployment Failed\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ${{ needs.infrastructure-setup.result == 'success' && '✅ Success' || '❌ Failed' }} | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip || 'Not available' }} |\n| Full Codebase Deployment | ${{ needs.full-codebase-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} | ${{ needs.full-codebase-deployment.outputs.deployment_status || 'Failed' }} |\n| Health Verification | ${{ needs.health-verification.result == 'success' && '✅ Success' || '❌ Failed' }} | Process: ${{ needs.health-verification.outputs.process_status || 'Unknown' }} |\n\n**Failed phases:** " + (failureDetails.join(', ') || 'Multiple phases failed') + "\n\n**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.";
+              const failureSummary = `## ❌ Full Deployment Failed
+
+| Phase | Status | Details |
+|-------|--------|---------|
+| Infrastructure Setup | ${{ needs.infrastructure-setup.result == 'success' && '✅ Success' || '❌ Failed' }} | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip || 'Not available' }} |
+| Full Codebase Deployment | ${{ needs.full-codebase-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} | ${{ needs.full-codebase-deployment.outputs.deployment_status || 'Failed' }} |
+| Health Verification | ${{ needs.health-verification.result == 'success' && '✅ Success' || '❌ Failed' }} | Process: ${{ needs.health-verification.outputs.process_status || 'Unknown' }} |
+
+**Failed phases:** ${failureDetails.join(', ') || 'Multiple phases failed'}
+
+**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.`;
               
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
