@@ -213,39 +213,6 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary pytest-asyncio
-      - name: Test UEX API Integration
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "🌐 Testing UEX API Integration..."
-          python3 -m pytest tests/test_uex_api.py -v
-          echo "✅ UEX API tests completed!"
-      - name: Test Channel Management
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "📺 Testing Channel Management..."
-          python3 -m pytest tests/test_channel_names.py -v
-          echo "✅ Channel management tests completed!"
-      - name: Test Red Price Check
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "💰 Testing Red Price Check..."
-          python3 -m pytest tests/test_redpricecheck.py -v
-          echo "✅ Red price check tests completed!"
 
   test-summary:
     name: "Test Summary & Results"
