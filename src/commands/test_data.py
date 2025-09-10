@@ -392,14 +392,14 @@ class FinalDeleteConfirmationModal(ui.Modal):
                     try:
                         cursor.execute("""
                             DELETE FROM participation 
-                            WHERE user_id >= 9000000000000000000
+                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
                         """)
                         deleted_counts['participation'] = cursor.rowcount
                     except Exception as e:
                         print(f"Error deleting participation: {e}")
                         deleted_counts['participation'] = 0
                     
-                    # Delete test payroll records
+                    # Delete test payroll records (only new ts- format)
                     try:
                         cursor.execute("""
                             DELETE FROM payrolls 
@@ -410,7 +410,7 @@ class FinalDeleteConfirmationModal(ui.Modal):
                         print(f"Error deleting payrolls: {e}")
                         deleted_counts['payrolls'] = 0
                     
-                    # Delete test events
+                    # Delete test events (only new ts- format)
                     try:
                         cursor.execute("""
                             DELETE FROM events 
@@ -425,7 +425,7 @@ class FinalDeleteConfirmationModal(ui.Modal):
                     try:
                         cursor.execute("""
                             DELETE FROM users 
-                            WHERE user_id >= 9000000000000000000
+                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
                         """)
                         deleted_counts['users'] = cursor.rowcount
                     except Exception as e:
@@ -547,7 +547,7 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
             
             try:
                 with conn.cursor() as cursor:
-                    # Get test events to show
+                    # Get test events to show (only new ts- format)
                     cursor.execute("""
                         SELECT event_id, event_name, location_notes, started_at, status, created_at 
                         FROM events 
@@ -557,13 +557,19 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     """)
                     test_data_summary['events'] = cursor.fetchall()
                     
-                    # Count test users
-                    cursor.execute("SELECT COUNT(*) FROM users WHERE user_id >= 9000000000000000000")
+                    # Count test users (using CAST to handle string vs bigint comparison)
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM users 
+                        WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                    """)
                     result = cursor.fetchone()
                     test_data_summary['users'] = result[0] if result else 0
                     
                     # Count participation records
-                    cursor.execute("SELECT COUNT(*) FROM participation WHERE user_id >= 9000000000000000000")
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM participation 
+                        WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                    """)
                     result = cursor.fetchone()
                     test_data_summary['participation'] = result[0] if result else 0
                     
@@ -664,7 +670,10 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                 with conn.cursor() as cursor:
                     # Count test users
                     try:
-                        cursor.execute("SELECT COUNT(*) FROM users WHERE user_id >= 9000000000000000000")
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM users 
+                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                        """)
                         result = cursor.fetchone()
                         counts['users'] = result[0] if result else 0
                     except Exception as e:
@@ -686,7 +695,10 @@ class TestDataCommands(commands.GroupCog, name="test-data"):
                     
                     # Count test participation
                     try:
-                        cursor.execute("SELECT COUNT(*) FROM participation WHERE user_id >= 9000000000000000000")
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM participation 
+                            WHERE CAST(user_id AS BIGINT) >= 9000000000000000000
+                        """)
                         result = cursor.fetchone()
                         counts['participation'] = result[0] if result else 0
                     except Exception as e:

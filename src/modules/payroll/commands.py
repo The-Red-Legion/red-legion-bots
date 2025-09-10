@@ -139,60 +139,6 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 ephemeral=True
             )
     
-    # DEPRECATED: Old individual payroll commands - kept for backwards compatibility
-    # Use /payroll calculate instead
-    
-    @app_commands.command(name="mining", description="[DEPRECATED] Calculate payroll for mining - use /payroll calculate instead")
-    @app_commands.describe(event_id="Event ID to calculate payroll for")
-    async def payroll_mining_deprecated(self, interaction: discord.Interaction, event_id: Optional[str] = None):
-        """Deprecated mining payroll command - redirects to unified command."""
-        await interaction.response.send_message(
-            embed=discord.Embed(
-                title="⚠️ Command Deprecated",
-                description="This command has been replaced with `/payroll calculate` for a better experience.\n\n"
-                          "**New unified payroll:**\n"
-                          "• Use `/payroll calculate` to see all event types\n"
-                          "• Choose from mining, salvage, or combat events\n"
-                          "• Better UI with dates and participant counts",
-                color=discord.Color.orange()
-            ),
-            ephemeral=True
-        )
-    
-    @app_commands.command(name="salvage", description="[DEPRECATED] Calculate payroll for salvage - use /payroll calculate instead")
-    @app_commands.describe(event_id="Event ID to calculate payroll for")
-    async def payroll_salvage_deprecated(self, interaction: discord.Interaction, event_id: Optional[str] = None):
-        """Deprecated salvage payroll command - redirects to unified command."""
-        await interaction.response.send_message(
-            embed=discord.Embed(
-                title="⚠️ Command Deprecated",
-                description="This command has been replaced with `/payroll calculate` for a better experience.\n\n"
-                          "**New unified payroll:**\n"
-                          "• Use `/payroll calculate` to see all event types\n"
-                          "• Choose from mining, salvage, or combat events\n"
-                          "• Better UI with dates and participant counts",
-                color=discord.Color.orange()
-            ),
-            ephemeral=True
-        )
-    
-    @app_commands.command(name="combat", description="[DEPRECATED] Calculate payroll for combat - use /payroll calculate instead")
-    @app_commands.describe(event_id="Event ID to calculate payroll for")
-    async def payroll_combat_deprecated(self, interaction: discord.Interaction, event_id: Optional[str] = None):
-        """Deprecated combat payroll command - redirects to unified command."""
-        await interaction.response.send_message(
-            embed=discord.Embed(
-                title="⚠️ Command Deprecated",
-                description="This command has been replaced with `/payroll calculate` for a better experience.\n\n"
-                          "**New unified payroll:**\n"
-                          "• Use `/payroll calculate` to see all event types\n"
-                          "• Choose from mining, salvage, or combat events\n"
-                          "• Better UI with dates and participant counts",
-                color=discord.Color.orange()
-            ),
-            ephemeral=True
-        )
-    
     async def _show_collection_modal(
         self, 
         interaction: discord.Interaction,
