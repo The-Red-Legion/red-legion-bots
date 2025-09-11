@@ -512,12 +512,42 @@ class PayoutManagementView(ui.View):
         super().__init__(timeout=1800)  # 30 minutes
         self.session_id = session_id
         self.donation_states = {}  # Track donation states for participants
+        self._donation_states_loaded = False  # Track if we've loaded states
         
         # Add participant buttons dynamically in create_embed
+        
+    async def ensure_donation_states_loaded(self):
+        """Ensure donation states are loaded from session before using them."""
+        if self._donation_states_loaded:
+            return
+            
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if session:
+                session_donation_states = session.get('donation_states', {})
+                logger.info(f"Loading donation states in ensure_loaded - session has: {session_donation_states}")
+                if session_donation_states:
+                    self.donation_states = session_donation_states
+                    logger.info(f"Loaded donation states from session in ensure_loaded: {self.donation_states}")
+                else:
+                    # Fall back to calculation data for initial state
+                    calculation_data = session.get('calculation_data', {})
+                    if calculation_data:
+                        for payout in calculation_data.get('payouts', []):
+                            user_id = str(payout['user_id'])
+                            self.donation_states[user_id] = payout.get('is_donor', False)
+                        logger.info(f"Initialized donation states from calculation data in ensure_loaded: {self.donation_states}")
+                
+                self._donation_states_loaded = True
+        except Exception as e:
+            logger.error(f"Error loading donation states: {e}")
         
     async def create_embed(self):
         """Create the payout management embed with participant list."""
         try:
+            # Ensure donation states are loaded first
+            await self.ensure_donation_states_loaded()
+            
             session = await session_manager.get_session(self.session_id)
             if not session:
                 return self.create_error_embed("Session not found")
@@ -525,19 +555,6 @@ class PayoutManagementView(ui.View):
             calculation_data = session.get('calculation_data', {})
             if not calculation_data:
                 return self.create_error_embed("No calculation data found")
-            
-            # Initialize donation states - prioritize session data over calculation data
-            session_donation_states = session.get('donation_states', {})
-            logger.info(f"Loading donation states - session has: {session_donation_states}")
-            if session_donation_states:
-                self.donation_states = session_donation_states
-                logger.info(f"Loaded donation states from session: {self.donation_states}")
-            else:
-                # Fall back to calculation data for initial state
-                for payout in calculation_data.get('payouts', []):
-                    user_id = str(payout['user_id'])
-                    self.donation_states[user_id] = payout.get('is_donor', False)
-                logger.info(f"Initialized donation states from calculation data: {self.donation_states}")
             
             # Create embed with enhanced formatting and wider layout
             embed = discord.Embed(
@@ -719,8 +736,9 @@ class ParticipantDonationButton(ui.Button):
             })
             logger.info(f"Updated session donation states: {old_view.donation_states}")
             
-            # Create a completely new view - it will load the updated donation states from the session
+            # Create a completely new view and ensure it loads the updated donation states from the session
             new_view = PayoutManagementView(old_view.session_id)
+            await new_view.ensure_donation_states_loaded()  # Force load states before creating embed
             embed = await new_view.create_embed()
             
             # Debug: verify new view loaded correct states
