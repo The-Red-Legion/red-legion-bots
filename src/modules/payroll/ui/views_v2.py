@@ -859,7 +859,7 @@ class FinalizePayrollButton(ui.Button):
                     if payout.get('is_donor', False):
                         left_entry = f"💝 {username:<12} DONATED    {participation_minutes:>3.0f}min"
                     else:
-                        left_entry = f"💰 {username:<12} {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
+                        left_entry = f"💰 {username:<12} Is Owed {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
                 
                 # Right column entry
                 if i < len(right_column):
@@ -871,7 +871,7 @@ class FinalizePayrollButton(ui.Button):
                     if payout.get('is_donor', False):
                         right_entry = f"💝 {username:<12} DONATED    {participation_minutes:>3.0f}min"
                     else:
-                        right_entry = f"💰 {username:<12} {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
+                        right_entry = f"💰 {username:<12} Is Owed {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
                 
                 # Combine columns with proper spacing for max width
                 if right_entry:
