@@ -39,6 +39,7 @@ class PayrollStep:
     EVENT_SELECTION = "event_selection"
     ORE_SELECTION = "ore_selection" 
     QUANTITY_ENTRY = "quantity_entry"
+    CUSTOM_PRICING = "custom_pricing"
     PRICING_REVIEW = "pricing_review"
     CALCULATION_REVIEW = "calculation_review"
     PAYOUT_MANAGEMENT = "payout_management"
@@ -198,6 +199,13 @@ class PayrollSessionManager:
             'ore': ore,
             'quantity': quantity,
             'total_ores': len(ore_quantities)
+        })
+    
+    async def set_custom_pricing_data(self, session_id: str, custom_prices: Dict):
+        """Set custom pricing overrides for session."""
+        await self.update_session(session_id, {'custom_prices': custom_prices})
+        await self.emit_event(PayrollEvent.PRICING_LOADED, session_id, {
+            'custom_ore_count': len(custom_prices)
         })
     
     async def set_pricing_data(self, session_id: str, pricing_data: Dict):

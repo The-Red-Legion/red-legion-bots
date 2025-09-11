@@ -174,7 +174,7 @@ class OreQuantityEntryView(EventDrivenPayrollView):
                 self.add_item(button)
         
         # Add navigation buttons
-        continue_button = ContinueToPricingButton(self.session_id)
+        continue_button = ContinueToCustomPricingButton(self.session_id)
         continue_button.disabled = len([q for q in ore_quantities.values() if q > 0]) == 0
         self.add_item(continue_button)
         
@@ -250,12 +250,12 @@ class SingleOreQuantityModal(ui.Modal):
                 f"❌ Error updating quantity: {str(e)}", ephemeral=True
             )
 
-class ContinueToPricingButton(ui.Button):
-    """Button to continue to pricing review."""
+class ContinueToCustomPricingButton(ui.Button):
+    """Button to continue to custom pricing step."""
     
     def __init__(self, session_id: str):
         super().__init__(
-            label="Continue to Pricing Review",
+            label="Review/Set Pricing",
             style=discord.ButtonStyle.success,
             emoji="💰"
         )
@@ -265,17 +265,17 @@ class ContinueToPricingButton(ui.Button):
         await interaction.response.defer()
         
         try:
-            # Advance to pricing review step
-            await session_manager.advance_step(self.session_id, PayrollStep.PRICING_REVIEW)
+            # Advance to custom pricing step
+            await session_manager.advance_step(self.session_id, PayrollStep.CUSTOM_PRICING)
             
-            # Show pricing review view
-            view = PricingReviewView(self.session_id)
-            embed, pricing_view = await view.build_current_view()
+            # Show custom pricing view
+            view = CustomPricingView(self.session_id)
+            embed = await view.create_embed()
             
-            await interaction.edit_original_response(embed=embed, view=pricing_view)
+            await interaction.edit_original_response(embed=embed, view=view)
             
         except Exception as e:
-            logger.error(f"Error advancing to pricing review: {e}")
+            logger.error(f"Error advancing to custom pricing: {e}")
             await interaction.followup.send(
                 f"❌ Error advancing to pricing review: {str(e)}", ephemeral=True
             )
@@ -307,6 +307,15 @@ class PricingReviewView(EventDrivenPayrollView):
         
         # Get current pricing - allow API calls during pricing review step as it's not during immediate Discord interaction
         prices = await self.processor.get_current_prices(refresh=True, allow_api_calls=True)
+        
+        # Apply custom pricing overrides if they exist
+        custom_prices = self.session_data.get('custom_prices', {})
+        if custom_prices:
+            for ore_name, custom_price in custom_prices.items():
+                ore_key = ore_name.upper()
+                if ore_key in prices:
+                    prices[ore_key]['price'] = custom_price
+        
         total_value, breakdown = await self.processor.calculate_total_value(ore_quantities, prices)
         
         # Update session with pricing data
@@ -797,3 +806,226 @@ class BackToCalculationButton(ui.Button):
         embed = await view.create_embed()
         
         await interaction.response.edit_message(embed=embed, view=view)
+
+
+class CustomPricingView(ui.View):
+    """Step 2.5: Custom Pricing - Allow modification of imported per-SCU prices."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(timeout=1800)  # 30 minutes
+        self.session_id = session_id
+        
+    async def create_embed(self):
+        """Create the custom pricing embed with ore price options."""
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                return self.create_error_embed("Session not found")
+            
+            ore_quantities = session.get('ore_quantities', {})
+            custom_prices = session.get('custom_prices', {})
+            
+            # Get current UEX prices for comparison
+            processor = MiningProcessor()
+            try:
+                uex_prices = await processor.get_current_prices(refresh=True, allow_api_calls=True)
+            except:
+                uex_prices = {}
+            
+            # Create embed
+            embed = discord.Embed(
+                title="💎 Step 2.5: Custom Pricing (Optional)",
+                description=f"**Event:** {session['event_id']}\n\n"
+                          "Review and optionally override ore prices. "
+                          "Default prices are from UEX Corp API.",
+                color=discord.Color.purple()
+            )
+            
+            # Show price options for ores with quantities > 0
+            pricing_text = ""
+            for ore_name, quantity in ore_quantities.items():
+                if quantity > 0:
+                    uex_price = uex_prices.get(ore_name.upper(), {}).get('price', 0)
+                    custom_price = custom_prices.get(ore_name, uex_price)
+                    
+                    if custom_price != uex_price:
+                        pricing_text += f"🔧 **{ore_name}:** {custom_price:,.1f} aUEC/SCU (Custom)\n"
+                    else:
+                        pricing_text += f"📊 **{ore_name}:** {uex_price:,.1f} aUEC/SCU (UEX API)\n"
+            
+            embed.add_field(
+                name="💰 Current Pricing",
+                value=pricing_text if pricing_text else "No ores selected",
+                inline=False
+            )
+            
+            # Add control buttons
+            self.clear_items()
+            self.add_ore_pricing_buttons(ore_quantities, custom_prices, uex_prices)
+            self.add_navigation_buttons()
+            
+            return embed
+            
+        except Exception as e:
+            logger.error(f"Error creating custom pricing embed: {e}")
+            return self.create_error_embed(f"Error: {str(e)}")
+    
+    def add_ore_pricing_buttons(self, ore_quantities: Dict, custom_prices: Dict, uex_prices: Dict):
+        """Add buttons for each ore with quantity > 0."""
+        ore_count = 0
+        for ore_name, quantity in ore_quantities.items():
+            if quantity > 0 and ore_count < 20:  # Discord button limit
+                button = OrePriceButton(
+                    ore_name=ore_name,
+                    current_price=custom_prices.get(ore_name, uex_prices.get(ore_name.upper(), {}).get('price', 0)),
+                    session_id=self.session_id
+                )
+                self.add_item(button)
+                ore_count += 1
+    
+    def add_navigation_buttons(self):
+        """Add main navigation buttons."""
+        self.add_item(ContinueToPricingReviewButton(self.session_id))
+        self.add_item(BackToQuantitiesFromPricingButton(self.session_id))
+        self.add_item(CancelSessionButton(self.session_id))
+    
+    def create_error_embed(self, message: str):
+        """Create an error embed."""
+        return discord.Embed(
+            title="❌ Custom Pricing Error",
+            description=message,
+            color=discord.Color.red()
+        )
+
+
+class OrePriceButton(ui.Button):
+    """Button to set custom price for a specific ore."""
+    
+    def __init__(self, ore_name: str, current_price: float, session_id: str):
+        self.ore_name = ore_name
+        self.current_price = current_price
+        self.session_id = session_id
+        
+        super().__init__(
+            label=f"{ore_name}: {current_price:,.0f}",
+            style=discord.ButtonStyle.secondary,
+            emoji="💎",
+            custom_id=f"price_{ore_name}"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Show modal for custom price input
+        modal = OrePriceModal(
+            ore_name=self.ore_name,
+            current_price=self.current_price,
+            session_id=self.session_id
+        )
+        await interaction.response.send_modal(modal)
+
+
+class OrePriceModal(ui.Modal):
+    """Modal for entering custom ore price."""
+    
+    def __init__(self, ore_name: str, current_price: float, session_id: str):
+        self.ore_name = ore_name
+        self.session_id = session_id
+        
+        super().__init__(title=f"Set Price for {ore_name}")
+        
+        self.price_input = ui.TextInput(
+            label="Price per SCU (aUEC)",
+            placeholder=f"Current: {current_price:,.1f}",
+            default=str(current_price),
+            max_length=10,
+            required=True
+        )
+        self.add_item(self.price_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse price
+            new_price = float(self.price_input.value.replace(',', ''))
+            if new_price < 0:
+                await interaction.followup.send("❌ Price cannot be negative", ephemeral=True)
+                return
+            
+            # Update session with custom price
+            session = await session_manager.get_session(self.session_id)
+            custom_prices = session.get('custom_prices', {})
+            custom_prices[self.ore_name] = new_price
+            
+            await session_manager.set_custom_pricing_data(self.session_id, custom_prices)
+            
+            # Refresh the view
+            view = CustomPricingView(self.session_id)
+            embed = await view.create_embed()
+            
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except ValueError:
+            await interaction.followup.send("❌ Invalid price format. Please enter a valid number.", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error setting custom price for {self.ore_name}: {e}")
+            await interaction.followup.send("❌ Error setting custom price", ephemeral=True)
+
+
+class ContinueToPricingReviewButton(ui.Button):
+    """Button to continue to final pricing review."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="Continue to Pricing Review",
+            style=discord.ButtonStyle.success,
+            emoji="📊"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Advance to pricing review step
+            await session_manager.advance_step(self.session_id, PayrollStep.PRICING_REVIEW)
+            
+            # Show pricing review view
+            view = PricingReviewView(self.session_id)
+            embed, pricing_view = await view.build_current_view()
+            
+            await interaction.edit_original_response(embed=embed, view=pricing_view)
+            
+        except Exception as e:
+            logger.error(f"Error advancing to pricing review: {e}")
+            await interaction.followup.send(
+                f"❌ Error advancing to pricing review: {str(e)}", ephemeral=True
+            )
+
+
+class BackToQuantitiesFromPricingButton(ui.Button):
+    """Button to go back to quantity entry from custom pricing."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="⬅️ Back to Quantities",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Update session step back to quantity entry
+        await session_manager.update_session(self.session_id, {
+            'current_step': PayrollStep.QUANTITY_ENTRY
+        })
+        
+        # Show quantity entry view
+        session = await session_manager.get_session(self.session_id)
+        event_type = session['event_type']
+        
+        # Import the appropriate processor
+        processor = MiningProcessor()
+        view = OreQuantityEntryView(self.session_id, processor)
+        embed, quantity_view = await view.build_current_view()
+        
+        await interaction.response.edit_message(embed=embed, view=quantity_view)

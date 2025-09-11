@@ -288,6 +288,14 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 
                 await interaction.edit_original_response(embed=embed, view=quantity_view)
                 
+            elif current_step == 'custom_pricing':
+                # Resume custom pricing
+                from .ui.views_v2 import CustomPricingView
+                view = CustomPricingView(session_id)
+                embed = await view.create_embed()
+                
+                await interaction.edit_original_response(embed=embed, view=view)
+                
             elif current_step == 'pricing_review':
                 # Resume pricing review
                 from .ui.views_v2 import PricingReviewView
