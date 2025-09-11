@@ -311,9 +311,9 @@ class MiningProcessor:
             'LARANITE': {'price': 28.0, 'location': 'Area18', 'system': 'Stanton'},
             'QUANTAINIUM': {'price': 8.5, 'location': 'Area18', 'system': 'Stanton'},
             'QUARTZ': {'price': 1.3, 'location': 'Area18', 'system': 'Stanton'},
-            'RICCITE': {'price': 3.2, 'location': 'Pyro-System', 'system': 'Pyro'},
+            'RICCITE': {'price': 45.0, 'location': 'Pyro-System', 'system': 'Pyro'},
             'SILICON': {'price': 1.5, 'location': 'Area18', 'system': 'Stanton'},
-            'STILERON': {'price': 2.8, 'location': 'Pyro-System', 'system': 'Pyro'},
+            'STILERON': {'price': 42.0, 'location': 'Pyro-System', 'system': 'Pyro'},
             'TITANIUM': {'price': 8.0, 'location': 'Area18', 'system': 'Stanton'},
             'TUNGSTEN': {'price': 4.5, 'location': 'Area18', 'system': 'Stanton'},
         }

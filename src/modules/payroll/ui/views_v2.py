@@ -110,7 +110,7 @@ class OreQuantityEntryView(EventDrivenPayrollView):
             
             if quantity > 0:
                 quantity_lines.append(
-                    f"**{ore_name}:** {quantity:,.0f} SCU @ {price_per_scu:,.0f} = {ore_value:,.0f} aUEC"
+                    f"**{ore_name}:** {quantity:,.0f} SCU @ {price_per_scu:,.1f} = {ore_value:,.0f} aUEC"
                 )
             else:
                 quantity_lines.append(f"{ore_name}: *Not collected*")
