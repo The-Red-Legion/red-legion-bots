@@ -526,10 +526,15 @@ class PayoutManagementView(ui.View):
             if not calculation_data:
                 return self.create_error_embed("No calculation data found")
             
-            # Initialize donation states from calculation data
-            for payout in calculation_data.get('payouts', []):
-                user_id = str(payout['user_id'])
-                self.donation_states[user_id] = payout.get('is_donor', False)
+            # Initialize donation states - prioritize session data over calculation data
+            session_donation_states = session.get('donation_states', {})
+            if session_donation_states:
+                self.donation_states = session_donation_states
+            else:
+                # Fall back to calculation data for initial state
+                for payout in calculation_data.get('payouts', []):
+                    user_id = str(payout['user_id'])
+                    self.donation_states[user_id] = payout.get('is_donor', False)
             
             # Create embed with enhanced formatting and wider layout
             embed = discord.Embed(
@@ -697,18 +702,19 @@ class ParticipantDonationButton(ui.Button):
         
         try:
             # Get parent view and toggle donation state
-            view = self.view
-            current_state = view.donation_states.get(self.user_id, False)
-            view.donation_states[self.user_id] = not current_state
+            old_view = self.view
+            current_state = old_view.donation_states.get(self.user_id, False)
+            old_view.donation_states[self.user_id] = not current_state
             
             # Update session with new donation state
-            await session_manager.update_session(view.session_id, {
-                'donation_states': view.donation_states
+            await session_manager.update_session(old_view.session_id, {
+                'donation_states': old_view.donation_states
             })
             
-            # Recreate embed with updated states (this will recreate buttons)
-            embed = await view.create_embed()
-            await interaction.edit_original_response(embed=embed, view=view)
+            # Create a completely new view - it will load the updated donation states from the session
+            new_view = PayoutManagementView(old_view.session_id)
+            embed = await new_view.create_embed()
+            await interaction.edit_original_response(embed=embed, view=new_view)
             
         except Exception as e:
             logger.error(f"Error toggling donation for {self.user_id}: {e}")
