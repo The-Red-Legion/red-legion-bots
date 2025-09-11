@@ -928,10 +928,10 @@ class FinalizePayrollButton(ui.Button):
                 if payout.get('is_donor', False):
                     total_donated_final += payout['base_payout_auec']
             
-            # Create 2-column layout for better space utilization with max width
+            # Create optimized layout for maximum Discord embed width utilization
             payout_lines = []
             payout_lines.append("Participation Summary")
-            payout_lines.append("═" * 90)  # Wider separator for max width
+            payout_lines.append("═" * 110)  # Maximum embed width utilization
             
             # Split participants into two columns for better layout
             participants = list(updated_payouts)
@@ -939,40 +939,40 @@ class FinalizePayrollButton(ui.Button):
             left_column = participants[:mid_point]
             right_column = participants[mid_point:] if len(participants) > mid_point else []
             
-            # Create side-by-side layout
+            # Create side-by-side layout with full width optimization
             max_rows = max(len(left_column), len(right_column))
             
             for i in range(max_rows):
                 left_entry = ""
                 right_entry = ""
                 
-                # Left column entry
+                # Left column entry with optimized spacing
                 if i < len(left_column):
                     payout = left_column[i]
                     final_amount = payout['final_payout_auec']
                     participation_minutes = payout['participation_minutes']
-                    username = payout['username'][:12]  # Shorter for 2-column layout
+                    username = payout['username'][:14]  # Slightly longer names for better readability
                     
                     if payout.get('is_donor', False):
-                        left_entry = f"💝 {username:<12} DONATED      {participation_minutes:>3.0f}min"
+                        left_entry = f"💝 {username:<14} DONATED        {participation_minutes:>3.0f}min"
                     else:
-                        left_entry = f"💰 {username:<12} {final_amount:>9,.0f} aUEC {participation_minutes:>3.0f}min"
+                        left_entry = f"💰 {username:<14} {final_amount:>10,.0f} aUEC {participation_minutes:>3.0f}min"
                 
-                # Right column entry
+                # Right column entry with optimized spacing
                 if i < len(right_column):
                     payout = right_column[i]
                     final_amount = payout['final_payout_auec']
                     participation_minutes = payout['participation_minutes']
-                    username = payout['username'][:12]  # Shorter for 2-column layout
+                    username = payout['username'][:14]  # Slightly longer names for better readability
                     
                     if payout.get('is_donor', False):
-                        right_entry = f"💝 {username:<12} DONATED      {participation_minutes:>3.0f}min"
+                        right_entry = f"💝 {username:<14} DONATED        {participation_minutes:>3.0f}min"
                     else:
-                        right_entry = f"💰 {username:<12} {final_amount:>9,.0f} aUEC {participation_minutes:>3.0f}min"
+                        right_entry = f"💰 {username:<14} {final_amount:>10,.0f} aUEC {participation_minutes:>3.0f}min"
                 
-                # Combine columns with proper spacing for max width  
+                # Combine columns with optimized spacing for maximum embed width
                 if right_entry:
-                    payout_lines.append(f"{left_entry:<42} │ {right_entry}")
+                    payout_lines.append(f"{left_entry:<50} │ {right_entry}")
                 else:
                     payout_lines.append(f"{left_entry}")
             
