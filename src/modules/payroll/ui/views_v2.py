@@ -336,23 +336,24 @@ class PricingReviewView(EventDrivenPayrollView):
             'total_value': str(total_value)
         })
         
-        # Build embed
+        # Build embed with enhanced formatting
         embed = discord.Embed(
-            title=f"⛏️ Mining Payroll - {self.session_data['event_id']}",
-            description="**Step 3 of 4: Review Pricing** 💰\n\n"
-                       "Review ore prices and total value calculation.",
+            title=f"# ⛏️ Mining Payroll - {self.session_data['event_id']}",
+            description="## **Step 3 of 4: Review Pricing** 💰\n\n"
+                       "📋 **Review ore prices and total value calculation**\n"
+                       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             color=discord.Color.green(),
             timestamp=datetime.now()
         )
         
-        # Ore breakdown
+        # Ore breakdown with better spacing
         breakdown_lines = []
         for ore_code, quantity in ore_quantities.items():
             if quantity > 0 and ore_code in breakdown:
                 data = breakdown[ore_code]
                 ore_name = self._get_ore_name(ore_code)
                 breakdown_lines.append(
-                    f"**{ore_name}:** {quantity:,.0f} SCU × {data['price_per_scu']:,.0f} = {data['total_value']:,.0f} aUEC"
+                    f"```\n{ore_name:12} │ {quantity:>8,.0f} SCU  ×  {data['price_per_scu']:>6,.0f}  =  {data['total_value']:>12,.0f} aUEC```"
                 )
         
         embed.add_field(
@@ -362,9 +363,9 @@ class PricingReviewView(EventDrivenPayrollView):
         )
         
         embed.add_field(
-            name="💰 Total Value",
-            value=f"**{total_value:,.0f} aUEC**",
-            inline=True
+            name="💰 **TOTAL VALUE**",
+            value=f"```ansi\n[1;32m{total_value:>15,.0f} aUEC[0m```",
+            inline=False
         )
         
         # Build view
@@ -530,12 +531,16 @@ class PayoutManagementView(ui.View):
                 user_id = str(payout['user_id'])
                 self.donation_states[user_id] = payout.get('is_donor', False)
             
-            # Create embed
+            # Create embed with enhanced formatting
             embed = discord.Embed(
-                title="💰 Step 4: Payout Management",
-                description=f"**Event:** {calculation_data['event_data']['event_id']}\n"
-                          f"**Total Value:** {calculation_data['total_value_auec']:,.0f} aUEC\n"
-                          f"**Participants:** {calculation_data['total_participants']}",
+                title="# 💰 Step 4: Payout Management",
+                description=f"## **Event Management Dashboard**\n\n"
+                          f"```yaml\n"
+                          f"Event ID:      {calculation_data['event_data']['event_id']}\n"
+                          f"Total Value:   {calculation_data['total_value_auec']:>12,.0f} aUEC\n"
+                          f"Participants:  {calculation_data['total_participants']:>12}\n"
+                          f"```\n"
+                          f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
                 color=discord.Color.gold()
             )
             
@@ -563,15 +568,17 @@ class PayoutManagementView(ui.View):
                     payout_text += f"    💰 Receiving: {final_payout:,.0f} aUEC + bonus\n\n"
                     total_recipients += 1
             
-            # Calculate bonus distribution
+            # Calculate bonus distribution with enhanced formatting
             if total_donated > 0 and total_recipients > 0:
                 bonus_per_person = total_donated / total_recipients
-                payout_text += f"📊 **Distribution Summary:**\n"
-                payout_text += f"Donated Re-distribution Amount: {total_donated:,.0f} aUEC\n"
-                payout_text += f"Bonus per Recipient: {bonus_per_person:,.0f} aUEC\n"
+                payout_text += f"\n```yaml\n"
+                payout_text += f"Distribution Summary:\n"
+                payout_text += f"  Donated Re-distribution: {total_donated:>12,.0f} aUEC\n"
+                payout_text += f"  Bonus per Recipient:     {bonus_per_person:>12,.0f} aUEC\n"
+                payout_text += f"```"
             
             embed.add_field(
-                name="👥 Participant Payouts",
+                name="# 👥 **PARTICIPANT PAYOUTS**",
                 value=payout_text[:1024] if payout_text else "No participants found",
                 inline=False
             )
