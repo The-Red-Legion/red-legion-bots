@@ -660,7 +660,7 @@ class PayoutManagementView(ui.View):
         return updated_payouts
     
     def add_participant_buttons(self, payouts):
-        """Add toggle buttons for each participant."""
+        """Add donation confirmation buttons for each participant."""
         for i, payout in enumerate(payouts):
             if i >= 20:  # Discord limit on buttons
                 break
@@ -668,18 +668,19 @@ class PayoutManagementView(ui.View):
             user_id = str(payout['user_id'])
             username = payout['username']
             is_donating = self.donation_states.get(user_id, False)
+            payout_amount = float(payout['base_payout_auec'])  # Get the payout amount
             
             button = ParticipantDonationButton(
                 user_id=user_id,
                 username=username,
                 is_donating=is_donating,
+                payout_amount=payout_amount,  # Pass the payout amount
                 session_id=self.session_id
             )
             self.add_item(button)
     
     def add_control_buttons(self):
         """Add main control buttons."""
-        self.add_item(RecalculatePayoutsButton(self.session_id))
         self.add_item(FinalizePayrollButton(self.session_id))
         self.add_item(BackToCalculationButton(self.session_id))
         self.add_item(CancelSessionButton(self.session_id))
@@ -693,87 +694,183 @@ class PayoutManagementView(ui.View):
         )
 
 
-class ParticipantDonationButton(ui.Button):
-    """Button to toggle donation status for a participant."""
+class DonationConfirmationModal(ui.Modal):
+    """Modal to confirm participant donation with clear amount display."""
     
-    def __init__(self, user_id: str, username: str, is_donating: bool, session_id: str):
+    def __init__(self, user_id: str, username: str, donation_amount: float, session_id: str, parent_view):
         self.user_id = user_id
         self.username = username
+        self.donation_amount = donation_amount
         self.session_id = session_id
+        self.parent_view = parent_view
         
-        # Set button appearance with clear visual feedback like custom pricing buttons
+        super().__init__(
+            title=f"Confirm Donation - {username}",
+            timeout=300
+        )
+        
+        # Add confirmation text
+        self.confirmation = ui.TextInput(
+            label=f"{username} wishes to donate their share",
+            placeholder="Type 'CONFIRM' to proceed with donation",
+            default=f"Donating {donation_amount:,.0f} aUEC",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        self.add_item(self.confirmation)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Validate confirmation
+            if self.confirmation.value.upper() != "CONFIRM":
+                await interaction.followup.send(
+                    "❌ Donation cancelled. You must type 'CONFIRM' to proceed.", 
+                    ephemeral=True
+                )
+                return
+            
+            # Update donation state in parent view
+            self.parent_view.donation_states[self.user_id] = True
+            
+            # Update session with new donation state
+            await session_manager.update_session(self.session_id, {
+                'donation_states': self.parent_view.donation_states
+            })
+            
+            logger.info(f"Confirmed donation for {self.username} ({self.user_id}): {self.donation_amount:,.0f} aUEC")
+            
+            # Create fresh view with updated states and auto-refresh
+            new_view = PayoutManagementView(self.session_id)
+            await new_view.ensure_donation_states_loaded()
+            embed = await new_view.create_embed()
+            
+            await interaction.edit_original_response(
+                embed=embed, 
+                view=new_view
+            )
+            
+        except Exception as e:
+            logger.error(f"Error confirming donation: {e}")
+            await interaction.followup.send(f"❌ Error confirming donation: {str(e)}", ephemeral=True)
+
+class UndoDonationConfirmationModal(ui.Modal):
+    """Modal to confirm undoing a participant donation."""
+    
+    def __init__(self, user_id: str, username: str, session_id: str, parent_view):
+        self.user_id = user_id
+        self.username = username 
+        self.session_id = session_id
+        self.parent_view = parent_view
+        
+        super().__init__(
+            title=f"Undo Donation - {username}",
+            timeout=300
+        )
+        
+        # Add confirmation text
+        self.confirmation = ui.TextInput(
+            label=f"Undo {username}'s donation",
+            placeholder="Type 'UNDO' to cancel donation and return to receiving",
+            default=f"Return {username} to receiving payouts",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        self.add_item(self.confirmation)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Validate confirmation
+            if self.confirmation.value.upper() != "UNDO":
+                await interaction.followup.send(
+                    "❌ Undo cancelled. You must type 'UNDO' to proceed.", 
+                    ephemeral=True
+                )
+                return
+            
+            # Update donation state in parent view
+            self.parent_view.donation_states[self.user_id] = False
+            
+            # Update session with new donation state
+            await session_manager.update_session(self.session_id, {
+                'donation_states': self.parent_view.donation_states
+            })
+            
+            logger.info(f"Undid donation for {self.username} ({self.user_id})")
+            
+            # Create fresh view with updated states and auto-refresh
+            new_view = PayoutManagementView(self.session_id)
+            await new_view.ensure_donation_states_loaded()
+            embed = await new_view.create_embed()
+            
+            await interaction.edit_original_response(
+                embed=embed, 
+                view=new_view
+            )
+            
+        except Exception as e:
+            logger.error(f"Error undoing donation: {e}")
+            await interaction.followup.send(f"❌ Error undoing donation: {str(e)}", ephemeral=True)
+
+class ParticipantDonationButton(ui.Button):
+    """Button to open donation confirmation modal for a participant."""
+    
+    def __init__(self, user_id: str, username: str, is_donating: bool, payout_amount: float, session_id: str):
+        self.user_id = user_id
+        self.username = username
+        self.payout_amount = payout_amount
+        self.session_id = session_id
+        self.is_donating = is_donating
+        
+        # Set button appearance with clear visual feedback
         if is_donating:
             super().__init__(
-                label=f"{username[:15]} (Donating)",
+                label=f"{username[:12]} (Donating)",
                 style=discord.ButtonStyle.success,  # Green for donating
                 custom_id=f"donate_{user_id}",
                 emoji="💝"
             )
         else:
             super().__init__(
-                label=f"{username[:15]} (Receiving)",
+                label=f"{username[:12]} (Receiving)",
                 style=discord.ButtonStyle.secondary,   # Gray for receiving
                 custom_id=f"receive_{user_id}",
                 emoji="💰"
             )
     
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        
         try:
-            # Get parent view and toggle donation state
-            old_view = self.view
-            current_state = old_view.donation_states.get(self.user_id, False)
-            new_state = not current_state
-            old_view.donation_states[self.user_id] = new_state
+            parent_view = self.view
             
-            # Debug logging
-            logger.info(f"Donation button clicked for {self.user_id} ({self.username}): {current_state} -> {new_state}")
+            if self.is_donating:
+                # Open undo donation modal
+                modal = UndoDonationConfirmationModal(
+                    user_id=self.user_id,
+                    username=self.username,
+                    session_id=self.session_id,
+                    parent_view=parent_view
+                )
+            else:
+                # Open donation confirmation modal
+                modal = DonationConfirmationModal(
+                    user_id=self.user_id,
+                    username=self.username,
+                    donation_amount=self.payout_amount,
+                    session_id=self.session_id,
+                    parent_view=parent_view
+                )
             
-            # Update session with new donation state
-            await session_manager.update_session(old_view.session_id, {
-                'donation_states': old_view.donation_states
-            })
-            logger.info(f"Updated session donation states: {old_view.donation_states}")
-            
-            # Create a completely new view and ensure it loads the updated donation states from the session
-            new_view = PayoutManagementView(old_view.session_id)
-            await new_view.ensure_donation_states_loaded()  # Force load states before creating embed
-            embed = await new_view.create_embed()
-            
-            # Debug: verify new view loaded correct states
-            logger.info(f"New view donation states: {new_view.donation_states}")
-            
-            await interaction.edit_original_response(embed=embed, view=new_view)
-            logger.info(f"Successfully updated view for donation toggle")
+            await interaction.response.send_modal(modal)
             
         except Exception as e:
-            logger.error(f"Error toggling donation for {self.user_id}: {e}")
-            await interaction.followup.send(f"❌ Error updating donation status", ephemeral=True)
+            logger.error(f"Error opening donation modal for {self.user_id}: {e}")
+            await interaction.response.send_message(f"❌ Error opening donation modal", ephemeral=True)
 
-
-class RecalculatePayoutsButton(ui.Button):
-    """Button to recalculate payouts with current donation settings."""
-    
-    def __init__(self, session_id: str):
-        super().__init__(
-            label="🔄 Update Distribution",
-            style=discord.ButtonStyle.secondary,
-            emoji="🔄"
-        )
-        self.session_id = session_id
-    
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        
-        try:
-            view = self.view
-            embed = await view.create_embed()
-            await interaction.edit_original_response(embed=embed, view=view)
-            
-        except Exception as e:
-            logger.error(f"Error recalculating payouts: {e}")
-            await interaction.followup.send("❌ Error updating distribution", ephemeral=True)
 
 
 class FinalizePayrollButton(ui.Button):
