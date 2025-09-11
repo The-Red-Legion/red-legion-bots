@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+import json
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -148,7 +149,7 @@ class PayrollCalculator:
                             )
                         ) as total_minutes,
                         COUNT(*) as session_count,
-                        BOOL_OR(is_org_member) as is_org_member,
+                        BOOL_OR(COALESCE(is_org_member, false)) as is_org_member,
                         MIN(joined_at) as first_joined,
                         MAX(COALESCE(left_at, joined_at)) as last_active
                     FROM participation 
@@ -349,8 +350,8 @@ class PayrollCalculator:
                     event_id,
                     collection_data.get('total_scu', 0),
                     total_value_auec,
-                    price_data,  # JSON snapshot of prices used
-                    collection_data,  # JSON of what was collected
+                    json.dumps(price_data),  # JSON snapshot of prices used
+                    json.dumps(collection_data),  # JSON of what was collected
                     total_donated_auec,
                     calculated_by_id,
                     calculated_by_name,

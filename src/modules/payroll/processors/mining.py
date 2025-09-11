@@ -296,24 +296,26 @@ class MiningProcessor:
     def _get_default_prices(self) -> Dict[str, Dict]:
         """Get default fallback prices when no data is available."""
         # These are conservative estimates to prevent the UI from breaking
-        # when no price data is available
+        # when no price data is available (alphabetical order)
         default_prices = {
-            'QUANTAINIUM': {'price': 8.5, 'location': 'Area18', 'system': 'Stanton'},
-            'BEXALITE': {'price': 4.2, 'location': 'Area18', 'system': 'Stanton'},
-            'LARANITE': {'price': 28.0, 'location': 'Area18', 'system': 'Stanton'},
             'AGRICIUM': {'price': 24.8, 'location': 'Area18', 'system': 'Stanton'},
-            'GOLD': {'price': 6.1, 'location': 'Area18', 'system': 'Stanton'},
-            'BERYL': {'price': 2.8, 'location': 'Area18', 'system': 'Stanton'},
-            'HEPHAESTANITE': {'price': 2.5, 'location': 'Area18', 'system': 'Stanton'},
-            'BORASE': {'price': 2.3, 'location': 'Area18', 'system': 'Stanton'},
-            'TUNGSTEN': {'price': 4.5, 'location': 'Area18', 'system': 'Stanton'},
-            'TITANIUM': {'price': 8.0, 'location': 'Area18', 'system': 'Stanton'},
-            'IRON': {'price': 1.8, 'location': 'Area18', 'system': 'Stanton'},
-            'COPPER': {'price': 1.5, 'location': 'Area18', 'system': 'Stanton'},
             'ALUMINUM': {'price': 1.2, 'location': 'Area18', 'system': 'Stanton'},
-            'SILICON': {'price': 1.5, 'location': 'Area18', 'system': 'Stanton'},
+            'BERYL': {'price': 2.8, 'location': 'Area18', 'system': 'Stanton'},
+            'BEXALITE': {'price': 4.2, 'location': 'Area18', 'system': 'Stanton'},
+            'BORASE': {'price': 2.3, 'location': 'Area18', 'system': 'Stanton'},
+            'COPPER': {'price': 1.5, 'location': 'Area18', 'system': 'Stanton'},
             'CORUNDUM': {'price': 1.8, 'location': 'Area18', 'system': 'Stanton'},
+            'GOLD': {'price': 6.1, 'location': 'Area18', 'system': 'Stanton'},
+            'HEPHAESTANITE': {'price': 2.5, 'location': 'Area18', 'system': 'Stanton'},
+            'IRON': {'price': 1.8, 'location': 'Area18', 'system': 'Stanton'},
+            'LARANITE': {'price': 28.0, 'location': 'Area18', 'system': 'Stanton'},
+            'QUANTAINIUM': {'price': 8.5, 'location': 'Area18', 'system': 'Stanton'},
             'QUARTZ': {'price': 1.3, 'location': 'Area18', 'system': 'Stanton'},
+            'RICCITE': {'price': 3.2, 'location': 'Pyro-System', 'system': 'Pyro'},
+            'SILICON': {'price': 1.5, 'location': 'Area18', 'system': 'Stanton'},
+            'STILERON': {'price': 2.8, 'location': 'Pyro-System', 'system': 'Pyro'},
+            'TITANIUM': {'price': 8.0, 'location': 'Area18', 'system': 'Stanton'},
+            'TUNGSTEN': {'price': 4.5, 'location': 'Area18', 'system': 'Stanton'},
         }
         
         logger.info("Using default fallback ore prices")
