@@ -823,31 +823,67 @@ class FinalizePayrollButton(ui.Button):
                 timestamp=datetime.now()
             )
             
-            # Add final payout summary with enhanced formatting for multiple rows
-            payout_lines = []
+            # Add final payout summary with enhanced formatting for multiple rows and 2-column layout
             total_donated_final = Decimal('0')
             
-            # Create formatted table of payouts with better spacing and columns
-            payout_lines.append("PARTICIPANT       STATUS            AMOUNT         TIME")
-            payout_lines.append("─" * 58)
-            
+            # Calculate total donated amount first
             for payout in updated_payouts:
-                final_amount = payout['final_payout_auec']
-                participation_minutes = payout['participation_minutes']
-                username = payout['username'][:15]  # Limit username length for table alignment
-                
-                # Calculate total donated from updated payouts
                 if payout.get('is_donor', False):
                     total_donated_final += payout['base_payout_auec']
-                    payout_lines.append(f"{username:<16}  💝 DONATED       {'─':<13}  {participation_minutes:>3.0f} min")
-                else:
-                    payout_lines.append(f"{username:<16}  💰 RECEIVED      {final_amount:>10,.0f} aUEC  {participation_minutes:>3.0f} min")
             
-            # Format payouts in code block for better alignment
+            # Create 2-column layout for better space utilization with max width
+            payout_lines = []
+            payout_lines.append("Participation Summary")
+            payout_lines.append("═" * 90)  # Wider separator for max width
+            
+            # Split participants into two columns for better layout
+            participants = list(updated_payouts)
+            mid_point = (len(participants) + 1) // 2
+            left_column = participants[:mid_point]
+            right_column = participants[mid_point:] if len(participants) > mid_point else []
+            
+            # Create side-by-side layout
+            max_rows = max(len(left_column), len(right_column))
+            
+            for i in range(max_rows):
+                left_entry = ""
+                right_entry = ""
+                
+                # Left column entry
+                if i < len(left_column):
+                    payout = left_column[i]
+                    final_amount = payout['final_payout_auec']
+                    participation_minutes = payout['participation_minutes']
+                    username = payout['username'][:12]  # Shorter for 2-column layout
+                    
+                    if payout.get('is_donor', False):
+                        left_entry = f"💝 {username:<12} DONATED    {participation_minutes:>3.0f}min"
+                    else:
+                        left_entry = f"💰 {username:<12} {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
+                
+                # Right column entry
+                if i < len(right_column):
+                    payout = right_column[i]
+                    final_amount = payout['final_payout_auec']
+                    participation_minutes = payout['participation_minutes']
+                    username = payout['username'][:12]  # Shorter for 2-column layout
+                    
+                    if payout.get('is_donor', False):
+                        right_entry = f"💝 {username:<12} DONATED    {participation_minutes:>3.0f}min"
+                    else:
+                        right_entry = f"💰 {username:<12} {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
+                
+                # Combine columns with proper spacing for max width
+                if right_entry:
+                    payout_lines.append(f"{left_entry:<44} │ {right_entry}")
+                else:
+                    payout_lines.append(f"{left_entry}")
+            
+            # Format payouts in code block for better alignment with max width
             payout_summary = "```\n" + "\n".join(payout_lines) + "\n```"
             
             embed.add_field(
-                name="💰 Final Payouts",
+                name="🎯 **Final Distribution**",
                 value=payout_summary[:1024] if payout_summary else "No payouts",
                 inline=False
             )
