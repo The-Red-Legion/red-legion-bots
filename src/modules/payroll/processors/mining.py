@@ -12,6 +12,7 @@ from decimal import Decimal
 import aiohttp
 import asyncio
 import logging
+import ssl
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -169,9 +170,15 @@ class MiningProcessor:
             logger.info(f"Fetching UEX data from: {url}")
             logger.info(f"Using bearer token: {UEX_API_CONFIG['bearer_token'][:10]}...")
             
-            timeout = aiohttp.ClientTimeout(total=UEX_API_CONFIG['timeout'])
+            # Create SSL context to handle certificate issues
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
             
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+            timeout = aiohttp.ClientTimeout(total=UEX_API_CONFIG['timeout'])
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
                 async with session.get(url) as response:
                     logger.info(f"UEX API response status: {response.status}")
                     if response.status == 200:
