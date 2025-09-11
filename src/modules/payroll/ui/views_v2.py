@@ -571,8 +571,7 @@ class PayoutManagementView(ui.View):
                 color=discord.Color.gold()
             )
             
-            # Add participant payout details with live calculations
-            payout_text = ""
+            # Add participant payout details with live calculations in code block format
             
             # First, recalculate all payouts with current donation states
             logger.info(f"PAYOUT DISPLAY: Current donation states: {self.donation_states}")
@@ -587,28 +586,69 @@ class PayoutManagementView(ui.View):
             total_donated = 0
             total_recipients = 0
             
+            # Create formatted lines for code block display with 2-column layout
+            payout_lines = []
+            participants = list(updated_payouts)
+            mid_point = (len(participants) + 1) // 2
+            left_column = participants[:mid_point]
+            right_column = participants[mid_point:] if len(participants) > mid_point else []
+            
+            # Process participants for totals calculation
             for payout in updated_payouts:
-                username = payout['username']
-                minutes = payout['participation_minutes']
-                percentage = payout['participation_percentage']
-                final_amount = float(payout['final_payout_auec'])
-                is_donating = payout['is_donor']
-                
-                if is_donating:
-                    payout_text += f"💝 **{username[:18]}** - {minutes:.0f}min ({percentage:.1f}%) → **DONATED**\n"
+                if payout['is_donor']:
                     total_donated += float(payout['base_payout_auec'])
                 else:
-                    payout_text += f"💰 **{username[:18]}** - {minutes:.0f}min ({percentage:.1f}%) → **{final_amount:,.0f} aUEC**\n"
                     total_recipients += 1
             
-            # Calculate bonus distribution with enhanced formatting
+            # Create side-by-side layout with proper formatting
+            max_rows = max(len(left_column), len(right_column))
+            
+            for i in range(max_rows):
+                left_entry = ""
+                right_entry = ""
+                
+                # Left column entry
+                if i < len(left_column):
+                    payout = left_column[i]
+                    username = payout['username'][:13]  # Truncate for 2-column layout
+                    minutes = payout['participation_minutes']
+                    percentage = payout['participation_percentage']
+                    final_amount = float(payout['final_payout_auec'])
+                    
+                    if payout['is_donor']:
+                        left_entry = f"💝 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
+                    else:
+                        left_entry = f"💰 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>9,.0f}"
+                
+                # Right column entry
+                if i < len(right_column):
+                    payout = right_column[i]
+                    username = payout['username'][:13]  # Truncate for 2-column layout
+                    minutes = payout['participation_minutes']
+                    percentage = payout['participation_percentage']
+                    final_amount = float(payout['final_payout_auec'])
+                    
+                    if payout['is_donor']:
+                        right_entry = f"💝 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
+                    else:
+                        right_entry = f"💰 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>9,.0f}"
+                
+                # Combine columns with separator
+                if right_entry:
+                    payout_lines.append(f"{left_entry:<48} │ {right_entry}")
+                else:
+                    payout_lines.append(f"{left_entry}")
+            
+            # Add distribution summary if there are donations
             if total_donated > 0 and total_recipients > 0:
                 bonus_per_person = total_donated / total_recipients
-                payout_text += f"\n```yaml\n"
-                payout_text += f"Distribution Summary:\n"
-                payout_text += f"  Donated Re-distribution: {total_donated:>12,.0f} aUEC\n"
-                payout_text += f"  Bonus per Recipient:     {bonus_per_person:>12,.0f} aUEC\n"
-                payout_text += f"```"
+                payout_lines.append("─" * 100)  # Separator line
+                payout_lines.append(f"Distribution Summary:")
+                payout_lines.append(f"  Donated Re-distribution: {total_donated:>12,.0f} aUEC")
+                payout_lines.append(f"  Bonus per Recipient:     {bonus_per_person:>12,.0f} aUEC")
+            
+            # Format in code block
+            payout_text = "```\n" + "\n".join(payout_lines) + "\n```"
             
             embed.add_field(
                 name="# 👥 **PARTICIPANT PAYOUTS**",
