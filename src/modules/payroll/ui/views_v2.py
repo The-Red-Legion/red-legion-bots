@@ -311,10 +311,21 @@ class PricingReviewView(EventDrivenPayrollView):
         # Apply custom pricing overrides if they exist
         custom_prices = self.session_data.get('custom_prices', {})
         if custom_prices:
-            for ore_name, custom_price in custom_prices.items():
-                ore_key = ore_name.upper()
-                if ore_key in prices:
-                    prices[ore_key]['price'] = custom_price
+            # Create reverse lookup to match display names to ore codes
+            ore_name_to_code = {
+                'Agricium': 'AGRICIUM', 'Aluminum': 'ALUMINUM', 'Beryl': 'BERYL',
+                'Bexalite': 'BEXALITE', 'Borase': 'BORASE', 'Copper': 'COPPER',
+                'Corundum': 'CORUNDUM', 'Diamond': 'DIAMOND', 'Gold': 'GOLD',
+                'Hadanite': 'HADANITE', 'Hephaestanite': 'HEPHAESTANITE', 'Iron': 'IRON',
+                'Laranite': 'LARANITE', 'Quantanium': 'QUANTAINIUM', 'Quartz': 'QUARTZ',
+                'Riccite': 'RICCITE', 'Silicon': 'SILICON', 'Stileron': 'STILERON',
+                'Taranite': 'TARANITE', 'Titanium': 'TITANIUM', 'Tungsten': 'TUNGSTEN'
+            }
+            
+            for ore_display_name, custom_price in custom_prices.items():
+                ore_code = ore_name_to_code.get(ore_display_name, ore_display_name.upper())
+                if ore_code in prices:
+                    prices[ore_code]['price'] = custom_price
         
         total_value, breakdown = await self.processor.calculate_total_value(ore_quantities, prices)
         
