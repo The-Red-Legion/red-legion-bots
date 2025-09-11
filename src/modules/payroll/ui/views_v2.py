@@ -536,7 +536,13 @@ class PayoutManagementView(ui.View):
                     if calculation_data:
                         for payout in calculation_data.get('payouts', []):
                             user_id = str(payout['user_id'])
-                            self.donation_states[user_id] = payout.get('is_donor', False)
+                            # Store base amount instead of boolean donation status
+                            base_amount = float(payout['base_payout_auec'])
+                            # If they were a donor, set amount to 0, otherwise use base amount
+                            if payout.get('is_donor', False):
+                                self.donation_states[user_id] = 0
+                            else:
+                                self.donation_states[user_id] = base_amount
                         logger.info(f"Initialized donation states from calculation data in ensure_loaded: {self.donation_states}")
                 
                 self._donation_states_loaded = True
@@ -647,7 +653,15 @@ class PayoutManagementView(ui.View):
             user_id = str(payout['user_id'])
             base_payout = Decimal(str(payout['base_payout_auec']))
             override_amount = amount_overrides.get(user_id, base_payout)
-            final_amount = Decimal(str(override_amount))
+            
+            # Handle legacy boolean values from old sessions
+            if isinstance(override_amount, bool):
+                if override_amount == False:  # False means donation (0 amount)
+                    final_amount = Decimal('0')
+                else:  # True would mean... unclear, default to base
+                    final_amount = base_payout
+            else:
+                final_amount = Decimal(str(override_amount))
             
             logger.info(f"RECALCULATE: Processing {payout['username']} (ID: {user_id}) - base: {base_payout}, override: {final_amount}")
             
@@ -803,8 +817,8 @@ class UndoDonationConfirmationModal(ui.Modal):
         await interaction.response.defer()
         
         try:
-            # Update donation state in parent view
-            self.parent_view.donation_states[self.user_id] = False
+            # Update donation state in parent view (set to 0 for donation)
+            self.parent_view.donation_states[self.user_id] = 0
             
             # Update session with new donation state
             await session_manager.update_session(self.session_id, {
