@@ -1,4 +1,4 @@
-# Red Legion Bot Commands Reference v2.0.0
+# Red Legion Bot Commands Reference v3.0.0
 
 Complete reference guide for all available Discord slash commands in the Red Legion Bot system.
 
@@ -29,32 +29,73 @@ Complete reference guide for all available Discord slash commands in the Red Leg
 - Session duration statistics
 - Preparation for payroll calculation
 
-#### `/redpayroll calculate`
-**Description**: Enhanced payroll calculation with donation system and editable UEX prices  
+## 💰 Payroll System Commands
+
+### Core Payroll Commands
+
+#### `/payroll calculate`
+**Description**: Modern event-driven payroll calculation with enhanced UI and custom pricing  
 **Permissions**: Admin, OrgLeaders  
 **Features**:
-- Interactive event selection from recent mining sessions
-- Voluntary donation system for participants
-- Real-time UEX price integration with manual editing
-- SCU quantity input with automatic value calculation
-- PDF report generation with donation transparency
+- Interactive event selection from completed mining/salvage/combat sessions
+- **Step 1**: Event Selection - Choose from completed events with participant preview
+- **Step 2**: Ore Quantities - Enter collected quantities with continuation support  
+- **Step 2.5**: Custom Pricing - Override UEX Corp prices with custom values per ore
+- **Step 3**: Pricing Review - Verify calculations with custom price integration
+- **Step 4**: Payout Management - Individual donation controls with visual feedback
+- **Enhanced UI**: Improved spacing, larger text, and better readability
+- **Donation System**: "Donated Re-distribution Amount" terminology for equal distribution
 
-**Workflow**:
-1. Select mining event from list
-2. View current UEX ore prices with location data
-3. Edit ore quantities and prices as needed
-4. Select participants who wish to donate earnings
-5. Choose donation recipients (prioritizes non-org members)
-6. Generate final payroll with donation bonuses
+**Enhanced Workflow**:
+1. Select completed event from dropdown menu
+2. Enter ore quantities with improved UI and continuation support
+3. Optional custom pricing with per-ore override buttons showing status
+4. Review pricing with custom price integration and enhanced formatting  
+5. Manage individual payouts with improved button text and color feedback
+6. Generate final payroll with participation time display
 
-#### `/redpayroll summary`
-**Description**: View real-time participation summary without calculation  
+#### `/payroll resume`
+**Description**: Resume your active payroll calculation session  
 **Permissions**: Admin, OrgLeaders  
 **Features**:
-- Current session participant list
-- Real-time voice channel status
-- Participation time tracking
-- Organization member identification
+- Automatically detects and resumes interrupted sessions
+- Preserves all entered data and custom pricing
+- Returns to the exact step where you left off
+- Session timeout protection (30 minutes)
+
+#### `/payroll status`
+**Description**: View payroll system status and recent activity  
+**Permissions**: Admin, OrgLeaders  
+**Features**:
+- Recent payroll calculations summary
+- Pending events by type (mining, salvage, combat)
+- System health overview
+- Quick action shortcuts
+
+#### `/payroll lookup`
+**Description**: **NEW** - Look up detailed information for past payroll events  
+**Permissions**: Admin, OrgLeaders  
+**Parameters**: `event_id` - Event ID to look up (e.g., sm-abc123)
+**Features**:
+- Complete event summary with date, time, duration
+- Event organizer and location information
+- Full participant list with participation time
+- Ore collection breakdown and quantities
+- Individual payout distributions with donation status
+- Financial summary and calculation details
+- Works with both calculated and uncalculated events
+
+#### `/payroll quick`
+**Description**: Quick mining payroll calculation with command parameters  
+**Permissions**: Admin, OrgLeaders  
+**Parameters**:
+- `event_id`: Mining event ID (e.g., sm-abc123)
+- `quantanium`, `laranite`, `agricium`, `hadanite`, `beryl`: SCU amounts
+- `donation`: Donation percentage (0, 5, 10, 15, 20 - default: 10)
+**Features**:
+- Bypass UI for rapid calculations
+- Direct parameter input for known quantities
+- Automatic UEX price integration
 
 ### Price and Market Commands
 
