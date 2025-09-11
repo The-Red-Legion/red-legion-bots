@@ -488,7 +488,7 @@ class ConfirmPayrollButton(ui.Button):
         embed.add_field(
             name="📊 Distribution Summary",
             value=f"**Session Duration:** {result['total_minutes']} minutes\n"
-                  f"**Total Donated:** {result['total_donated_auec']:,.2f} aUEC\n"
+                  f"**Donated Re-distribution Amount:** {result['total_donated_auec']:,.2f} aUEC\n"
                   f"**Payroll ID:** `{result['payroll_id']}`",
             inline=False
         )

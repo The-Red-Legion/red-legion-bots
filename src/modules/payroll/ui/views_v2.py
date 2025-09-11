@@ -567,7 +567,7 @@ class PayoutManagementView(ui.View):
             if total_donated > 0 and total_recipients > 0:
                 bonus_per_person = total_donated / total_recipients
                 payout_text += f"📊 **Distribution Summary:**\n"
-                payout_text += f"Total Donated: {total_donated:,.0f} aUEC\n"
+                payout_text += f"Donated Re-distribution Amount: {total_donated:,.0f} aUEC\n"
                 payout_text += f"Bonus per Recipient: {bonus_per_person:,.0f} aUEC\n"
             
             embed.add_field(
@@ -754,7 +754,7 @@ class FinalizePayrollButton(ui.Button):
                 name="📊 Summary",
                 value=f"**Payroll ID:** `{calculation_data['payroll_id']}`\n"
                       f"**Session Duration:** {calculation_data['total_minutes']} minutes\n"
-                      f"**Total Donated:** {total_donated_final:,.0f} aUEC",
+                      f"**Donated Re-distribution Amount:** {total_donated_final:,.0f} aUEC",
                 inline=False
             )
             
