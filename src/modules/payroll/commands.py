@@ -16,14 +16,19 @@ from datetime import datetime
 from typing import Optional, List, Dict
 import sys
 from pathlib import Path
+import logging
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+logger = logging.getLogger(__name__)
 
 from .core import PayrollCalculator
 from .processors import MiningProcessor, SalvageProcessor, CombatProcessor
 from .ui.views import EventSelectionView, PayrollConfirmationView, UnifiedEventSelectionView
 from .ui.modals import MiningCollectionModal, SalvageCollectionModal
+from .ui.event_selection_v2 import EventDrivenEventSelectionView
+from .session import session_manager
 
 class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate payouts for mining, salvage, and combat operations"):
     """Universal payroll command group."""
@@ -46,7 +51,38 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
         interaction: discord.Interaction
     ):
         """Unified payroll calculation for all event types."""
-        await self._handle_unified_payroll_calculation(interaction)
+        # Check for existing active session first
+        existing_session_id = await session_manager.get_user_active_session(
+            interaction.user.id, interaction.guild_id
+        )
+        
+        if existing_session_id:
+            await self._handle_resume_session(interaction, existing_session_id)
+        else:
+            await self._handle_unified_payroll_calculation(interaction)
+    
+    @app_commands.command(name="resume", description="Resume your active payroll calculation session")
+    async def payroll_resume(
+        self,
+        interaction: discord.Interaction
+    ):
+        """Resume an active payroll session."""
+        existing_session_id = await session_manager.get_user_active_session(
+            interaction.user.id, interaction.guild_id
+        )
+        
+        if existing_session_id:
+            await self._handle_resume_session(interaction, existing_session_id)
+        else:
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="ℹ️ No Active Session",
+                    description="You don't have any active payroll calculation sessions.\n"
+                               "Use `/payroll calculate` to start a new calculation.",
+                    color=discord.Color.blue()
+                ),
+                ephemeral=True
+            )
     
     @app_commands.command(name="quick", description="Quick mining payroll calculation with ore quantities as parameters")
     @app_commands.describe(
@@ -224,6 +260,52 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 ephemeral=True
             )
     
+    async def _handle_resume_session(
+        self,
+        interaction: discord.Interaction,
+        session_id: str
+    ):
+        """Resume an existing payroll session."""
+        try:
+            await interaction.response.defer()
+            
+            session = await session_manager.get_session(session_id)
+            if not session:
+                await interaction.followup.send(
+                    "❌ Session not found or expired.", ephemeral=True
+                )
+                return
+            
+            current_step = session['current_step']
+            event_type = session['event_type']
+            processor = self.processors[event_type]
+            
+            if current_step == 'quantity_entry':
+                # Resume ore quantity entry
+                from .ui.views_v2 import OreQuantityEntryView
+                view = OreQuantityEntryView(session_id, processor)
+                embed, quantity_view = await view.build_current_view()
+                
+                await interaction.edit_original_response(embed=embed, view=quantity_view)
+                
+            elif current_step == 'pricing_review':
+                # Resume pricing review
+                from .ui.views_v2 import PricingReviewView
+                view = PricingReviewView(session_id)
+                embed, pricing_view = await view.build_current_view()
+                
+                await interaction.edit_original_response(embed=embed, view=pricing_view)
+                
+            else:
+                # Fallback to event selection
+                await self._handle_unified_payroll_calculation(interaction)
+                
+        except Exception as e:
+            logger.error(f"Error resuming session {session_id}: {e}")
+            await interaction.followup.send(
+                f"❌ Error resuming session: {str(e)}", ephemeral=True
+            )
+    
     async def _handle_unified_payroll_calculation(
         self,
         interaction: discord.Interaction
@@ -301,7 +383,10 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 inline=False
             )
             
-            view = UnifiedEventSelectionView(all_events, self.processors, self.calculator)
+            # Add cleanup of expired sessions
+            await session_manager.cleanup_expired_sessions()
+            
+            view = EventDrivenEventSelectionView(all_events, self.processors)
             
             await interaction.followup.send(embed=embed, view=view)
             
