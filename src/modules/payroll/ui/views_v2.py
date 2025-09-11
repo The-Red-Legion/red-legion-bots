@@ -519,16 +519,17 @@ class PayoutManagementView(ui.View):
     async def ensure_donation_states_loaded(self):
         """Ensure donation states are loaded from session before using them."""
         if self._donation_states_loaded:
+            logger.info(f"ENSURE_LOADED: Already loaded, current states: {self.donation_states}")
             return
             
         try:
             session = await session_manager.get_session(self.session_id)
             if session:
                 session_donation_states = session.get('donation_states', {})
-                logger.info(f"Loading donation states in ensure_loaded - session has: {session_donation_states}")
+                logger.info(f"ENSURE_LOADED: Session donation states: {session_donation_states}")
                 if session_donation_states:
                     self.donation_states = session_donation_states
-                    logger.info(f"Loaded donation states from session in ensure_loaded: {self.donation_states}")
+                    logger.info(f"ENSURE_LOADED: Set donation states from session: {self.donation_states}")
                 else:
                     # Fall back to calculation data for initial state
                     calculation_data = session.get('calculation_data', {})
@@ -574,7 +575,14 @@ class PayoutManagementView(ui.View):
             payout_text = ""
             
             # First, recalculate all payouts with current donation states
+            logger.info(f"PAYOUT DISPLAY: Current donation states: {self.donation_states}")
+            logger.info(f"PAYOUT DISPLAY: Original payouts count: {len(calculation_data['payouts'])}")
+            
             updated_payouts = self.recalculate_with_donations(calculation_data['payouts'], self.donation_states)
+            
+            logger.info(f"PAYOUT DISPLAY: Updated payouts count: {len(updated_payouts)}")
+            for payout in updated_payouts:
+                logger.info(f"PAYOUT DISPLAY: {payout['username']} - is_donor: {payout.get('is_donor', False)}")
             
             total_donated = 0
             total_recipients = 0
@@ -621,6 +629,7 @@ class PayoutManagementView(ui.View):
     
     def recalculate_with_donations(self, original_payouts, donation_states):
         """Recalculate payouts based on current donation states."""
+        logger.info(f"RECALCULATE: Starting with donation_states: {donation_states}")
         updated_payouts = []
         total_donated = Decimal('0')
         recipients = []
@@ -630,6 +639,8 @@ class PayoutManagementView(ui.View):
             user_id = str(payout['user_id'])
             is_donating = donation_states.get(user_id, False)
             base_payout = Decimal(str(payout['base_payout_auec']))
+            
+            logger.info(f"RECALCULATE: Processing {payout['username']} (ID: {user_id}) - donating: {is_donating}")
             
             updated_payout = {
                 'user_id': payout['user_id'],
@@ -943,9 +954,9 @@ class FinalizePayrollButton(ui.Button):
                     username = payout['username'][:12]  # Shorter for 2-column layout
                     
                     if payout.get('is_donor', False):
-                        left_entry = f"💝 {username:<12} DONATED    {participation_minutes:>3.0f}min"
+                        left_entry = f"💝 {username:<12} DONATED      {participation_minutes:>3.0f}min"
                     else:
-                        left_entry = f"💰 {username:<12} Is Owed {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
+                        left_entry = f"💰 {username:<12} {final_amount:>9,.0f} aUEC {participation_minutes:>3.0f}min"
                 
                 # Right column entry
                 if i < len(right_column):
@@ -955,13 +966,13 @@ class FinalizePayrollButton(ui.Button):
                     username = payout['username'][:12]  # Shorter for 2-column layout
                     
                     if payout.get('is_donor', False):
-                        right_entry = f"💝 {username:<12} DONATED    {participation_minutes:>3.0f}min"
+                        right_entry = f"💝 {username:<12} DONATED      {participation_minutes:>3.0f}min"
                     else:
-                        right_entry = f"💰 {username:<12} Is Owed {final_amount:>8,.0f} aUEC {participation_minutes:>3.0f}min"
+                        right_entry = f"💰 {username:<12} {final_amount:>9,.0f} aUEC {participation_minutes:>3.0f}min"
                 
-                # Combine columns with proper spacing for max width
+                # Combine columns with proper spacing for max width  
                 if right_entry:
-                    payout_lines.append(f"{left_entry:<44} │ {right_entry}")
+                    payout_lines.append(f"{left_entry:<42} │ {right_entry}")
                 else:
                     payout_lines.append(f"{left_entry}")
             
