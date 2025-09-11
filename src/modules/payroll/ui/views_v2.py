@@ -629,18 +629,20 @@ class ParticipantDonationButton(ui.Button):
         self.username = username
         self.session_id = session_id
         
-        # Set button appearance based on donation status
+        # Set button appearance based on donation status with enhanced visual feedback
         if is_donating:
             super().__init__(
-                label=f"✅ DONATING - {username[:12]}",
-                style=discord.ButtonStyle.success,
-                custom_id=f"donate_{user_id}"
+                label=f"🎁 {username[:15]} - DONATING",
+                style=discord.ButtonStyle.success,  # Green for donating
+                custom_id=f"donate_{user_id}",
+                emoji="✅"
             )
         else:
             super().__init__(
-                label=f"💰 RECEIVING - {username[:11]}",
-                style=discord.ButtonStyle.primary,
-                custom_id=f"receive_{user_id}"
+                label=f"💰 {username[:15]} - RECEIVING",
+                style=discord.ButtonStyle.primary,   # Blue for receiving
+                custom_id=f"receive_{user_id}",
+                emoji="💸"
             )
     
     async def callback(self, interaction: discord.Interaction):
