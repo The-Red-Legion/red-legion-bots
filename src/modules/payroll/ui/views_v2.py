@@ -56,12 +56,14 @@ class OreQuantityEntryView(EventDrivenPayrollView):
     def __init__(self, session_id: str, processor: MiningProcessor):
         super().__init__(session_id)
         self.processor = processor
+        # Use full ore names to match pricing system
         self.ore_names = {
-            'QUAN': 'Quantanium', 'LARA': 'Laranite', 'AGRI': 'Agricium', 
-            'BEXA': 'Bexalite', 'GOLD': 'Gold', 'BERY': 'Beryl', 
-            'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'BORA': 'Borase',
-            'TUNG': 'Tungsten', 'TITA': 'Titanium', 'ALUM': 'Aluminum',
-            'COPP': 'Copper', 'DIAM': 'Diamond', 'TARA': 'Taranite'
+            'QUANTAINIUM': 'Quantanium', 'LARANITE': 'Laranite', 'AGRICIUM': 'Agricium', 
+            'BEXALITE': 'Bexalite', 'GOLD': 'Gold', 'BERYL': 'Beryl', 
+            'HADANITE': 'Hadanite', 'HEPHAESTANITE': 'Hephaestanite', 'BORASE': 'Borase',
+            'TUNGSTEN': 'Tungsten', 'TITANIUM': 'Titanium', 'ALUMINUM': 'Aluminum',
+            'COPPER': 'Copper', 'DIAMOND': 'Diamond', 'TARANITE': 'Taranite',
+            'IRON': 'Iron', 'SILICON': 'Silicon', 'CORUNDUM': 'Corundum', 'QUARTZ': 'Quartz'
         }
         self.current_prices = {}
         
@@ -348,11 +350,12 @@ class PricingReviewView(EventDrivenPayrollView):
     def _get_ore_name(self, ore_code: str) -> str:
         """Get display name for ore code."""
         ore_names = {
-            'QUAN': 'Quantanium', 'LARA': 'Laranite', 'AGRI': 'Agricium',
-            'BEXA': 'Bexalite', 'GOLD': 'Gold', 'BERY': 'Beryl',
-            'HADA': 'Hadanite', 'HEPH': 'Hephaestanite', 'BORA': 'Borase',
-            'TUNG': 'Tungsten', 'TITA': 'Titanium', 'ALUM': 'Aluminum',
-            'COPP': 'Copper', 'DIAM': 'Diamond', 'TARA': 'Taranite'
+            'QUANTAINIUM': 'Quantanium', 'LARANITE': 'Laranite', 'AGRICIUM': 'Agricium',
+            'BEXALITE': 'Bexalite', 'GOLD': 'Gold', 'BERYL': 'Beryl',
+            'HADANITE': 'Hadanite', 'HEPHAESTANITE': 'Hephaestanite', 'BORASE': 'Borase',
+            'TUNGSTEN': 'Tungsten', 'TITANIUM': 'Titanium', 'ALUMINUM': 'Aluminum',
+            'COPPER': 'Copper', 'DIAMOND': 'Diamond', 'TARANITE': 'Taranite',
+            'IRON': 'Iron', 'SILICON': 'Silicon', 'CORUNDUM': 'Corundum', 'QUARTZ': 'Quartz'
         }
         return ore_names.get(ore_code, ore_code)
 
