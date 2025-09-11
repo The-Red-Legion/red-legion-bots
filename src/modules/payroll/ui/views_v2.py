@@ -936,8 +936,17 @@ class FinalizePayrollButton(ui.Button):
             calculation_data = session.get('calculation_data', {})
             view = self.view
             
+            # Ensure donation states are loaded from session before finalizing
+            await view.ensure_donation_states_loaded()
+            
+            logger.info(f"FINALIZE: Loaded donation states: {view.donation_states}")
+            
             # Update payouts with current donation states and recalculate
             updated_payouts = view.recalculate_with_donations(calculation_data['payouts'], view.donation_states)
+            
+            logger.info(f"FINALIZE: Processed {len(updated_payouts)} payouts")
+            for payout in updated_payouts:
+                logger.info(f"FINALIZE: {payout['username']} - is_donor: {payout.get('is_donor', False)}")
             
             # Complete session
             await session_manager.complete_calculation(self.session_id, {
