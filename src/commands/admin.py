@@ -773,6 +773,96 @@ class EventBulkDeleteConfirmationModal(discord.ui.Modal):
                 ),
                 ephemeral=True
             )
+    
+    @app_commands.command(name="update-prices", description="Update UEX ore prices in database (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def update_uex_prices(self, interaction: discord.Interaction):
+        """Update UEX ore prices in database."""
+        try:
+            # Check admin permissions
+            if not interaction.user.guild_permissions.administrator:
+                await interaction.response.send_message(
+                    "❌ This command requires administrator permissions.",
+                    ephemeral=True
+                )
+                return
+            
+            await interaction.response.defer()
+            
+            # Import here to avoid circular imports
+            from modules.payroll.processors.mining import MiningProcessor
+            
+            processor = MiningProcessor()
+            
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="🔄 Updating UEX Ore Prices",
+                    description="Fetching latest ore prices from UEX Corp API...",
+                    color=discord.Color.blue()
+                )
+            )
+            
+            # Fetch prices from UEX
+            ore_prices = await processor.get_current_prices(refresh=True)
+            
+            if ore_prices:
+                # Create summary embed
+                embed = discord.Embed(
+                    title="✅ UEX Prices Updated Successfully",
+                    description=f"Updated {len(ore_prices)} ore prices in database.",
+                    color=discord.Color.green()
+                )
+                
+                # Add sample prices
+                price_sample = []
+                count = 0
+                for ore_name, price_data in ore_prices.items():
+                    if count >= 8:  # Limit to avoid embed size limits
+                        break
+                    price_sample.append(f"• **{ore_name}:** {price_data['price']:,.0f} aUEC/SCU")
+                    count += 1
+                
+                if len(ore_prices) > 8:
+                    price_sample.append(f"... and {len(ore_prices) - 8} more ores")
+                
+                embed.add_field(
+                    name="🏷️ Sample Prices",
+                    value="\n".join(price_sample),
+                    inline=False
+                )
+                
+                embed.add_field(
+                    name="ℹ️ Note",
+                    value="These prices are now cached and will be used for payroll calculations.",
+                    inline=False
+                )
+                
+            else:
+                embed = discord.Embed(
+                    title="❌ UEX Price Update Failed",
+                    description="Unable to fetch prices from UEX Corp API. Check logs for details.",
+                    color=discord.Color.red()
+                )
+                
+                embed.add_field(
+                    name="🔧 Troubleshooting",
+                    value="• Check bot logs for detailed error messages\n"
+                          "• Verify UEX Corp API is accessible\n"
+                          "• Ensure bearer token is still valid",
+                    inline=False
+                )
+            
+            await interaction.edit_original_response(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Updating Prices",
+                    description=f"An unexpected error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
 
 
 async def setup(bot):

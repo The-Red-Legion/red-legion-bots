@@ -2757,35 +2757,80 @@ class DirectOreQuantityModal(ui.Modal):
                 )
                 return
             
-            # Show quantity confirmation and proceed to price fetching
-            view = QuantityConfirmationView(
-                self.event_data, self.processor, self.calculator, ore_quantities
+            # Get cached prices from database (no API calls during user interaction)
+            ore_prices = await self.processor._get_cached_prices()
+            if not ore_prices:
+                # Use fallback prices if no cache available
+                ore_prices = {
+                    'QUAN': {'price': 9000}, 'LARA': {'price': 2500}, 'AGRI': {'price': 2300},
+                    'HADA': {'price': 1800}, 'BERY': {'price': 1600}, 'BEXA': {'price': 2200},
+                    'DIAM': {'price': 3000}, 'GOLD': {'price': 2000}, 'TARA': {'price': 3200}
+                }
+            
+            # Calculate total value using cached prices
+            total_value, breakdown = await self.processor.calculate_total_value(
+                ore_quantities, ore_prices
+            )
+            
+            # Get participants for the event
+            participants = await self.calculator.get_participants_for_event(
+                self.event_data['event_id']
+            )
+            
+            if not participants:
+                await interaction.followup.send(
+                    "❌ No participants found for this mining event.",
+                    ephemeral=True
+                )
+                return
+            
+            # Show final summary with donation selection
+            view = SimpleDonationView(
+                self.event_data, self.processor, self.calculator,
+                ore_quantities, ore_prices, total_value, breakdown, participants
             )
             
             # Create quantity summary for display
             quantity_lines = []
             for ore_code, quantity in ore_quantities.items():
                 ore_name = self.get_ore_name(ore_code)
-                quantity_lines.append(f"• **{ore_name}:** {quantity} SCU")
+                if ore_code.upper() in breakdown:
+                    data = breakdown[ore_code.upper()]
+                    quantity_lines.append(f"• **{ore_name}:** {quantity} SCU @ {data['price_per_scu']:,.0f} = {data['total_value']:,.0f} aUEC")
+                else:
+                    quantity_lines.append(f"• **{ore_name}:** {quantity} SCU (no price data)")
             
             embed = discord.Embed(
-                title=f"⛏️ Mining Payroll - {self.event_data['event_id']}",
-                description=f"**Step 1 of 4: Event Selected** ✅\n"
-                           f"**Step 2 of 4: Quantities Entered** ✅\n"
-                           f"**Step 3 of 4: Confirm & Calculate** ⏳\n\n"
-                           f"Please confirm your ore quantities:",
-                color=discord.Color.blue()
+                title=f"💰 Mining Payroll - {self.event_data['event_id']}",
+                description=f"**Payroll Calculation Complete!**\n\n"
+                           f"**Total Value:** {total_value:,.0f} aUEC\n"
+                           f"**Participants:** {len(participants)}\n\n"
+                           f"Select donation percentage:",
+                color=discord.Color.gold()
             )
             
             embed.add_field(
-                name="📊 Ore Quantities",
+                name="⛏️ Ore Collections",
                 value="\n".join(quantity_lines),
                 inline=False
             )
             
+            # Add participant sample
+            participant_text = []
+            for participant in participants[:5]:
+                participant_text.append(f"• {participant.get('display_name', 'Unknown')}")
+            if len(participants) > 5:
+                participant_text.append(f"... and {len(participants) - 5} more")
+            
             embed.add_field(
-                name="🔄 Next Steps",
-                value="• Confirm quantities\n• Fetch current UEX prices\n• Calculate payroll with participants",
+                name="👥 Participants",
+                value="\n".join(participant_text),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="📊 Price Source",
+                value="Using cached database prices" + (" (fallback)" if not await self.processor._get_cached_prices() else " (from UEX)"),
                 inline=False
             )
             
@@ -2798,6 +2843,127 @@ class DirectOreQuantityModal(ui.Modal):
         except Exception as e:
             await interaction.followup.send(
                 f"❌ Error processing quantities: {str(e)}",
+                ephemeral=True
+            )
+
+
+class SimpleDonationView(ui.View):
+    """Simple donation selection view that skips complex modals."""
+    
+    def __init__(self, event_data, processor, calculator, ore_quantities, ore_prices, total_value, breakdown, participants):
+        super().__init__(timeout=300)
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.ore_prices = ore_prices
+        self.total_value = total_value
+        self.breakdown = breakdown
+        self.participants = participants
+        
+        # Add donation percentage buttons
+        donations = [0, 5, 10, 15, 20]
+        for donation in donations:
+            self.add_item(SimpleDonationButton(
+                donation, event_data, processor, calculator,
+                ore_quantities, ore_prices, total_value, breakdown, participants
+            ))
+        
+        # Add cancel button
+        self.add_item(CancelButton())
+
+
+class SimpleDonationButton(ui.Button):
+    """Simple donation button that calculates final payroll immediately."""
+    
+    def __init__(self, donation_pct, event_data, processor, calculator, ore_quantities, ore_prices, total_value, breakdown, participants):
+        super().__init__(
+            label=f"{donation_pct}% Donation",
+            style=discord.ButtonStyle.secondary if donation_pct == 0 else discord.ButtonStyle.primary,
+            emoji="💝" if donation_pct > 0 else "💰"
+        )
+        self.donation_pct = donation_pct
+        self.event_data = event_data
+        self.processor = processor
+        self.calculator = calculator
+        self.ore_quantities = ore_quantities
+        self.ore_prices = ore_prices
+        self.total_value = total_value
+        self.breakdown = breakdown
+        self.participants = participants
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Calculate final amounts
+            donation_amount = self.total_value * (self.donation_pct / 100)
+            payout_amount = self.total_value - donation_amount
+            per_participant = payout_amount / len(self.participants) if len(self.participants) > 0 else 0
+            
+            # Generate final payroll summary
+            embed = discord.Embed(
+                title=f"🎉 Payroll Complete - {self.event_data['event_id']}",
+                description=f"**Payroll calculation finished successfully!**",
+                color=discord.Color.green()
+            )
+            
+            # Add ore breakdown
+            ore_text = []
+            for ore_code, quantity in self.ore_quantities.items():
+                if ore_code.upper() in self.breakdown:
+                    data = self.breakdown[ore_code.upper()]
+                    ore_name = {'QUAN': 'Quantanium', 'LARA': 'Laranite', 'AGRI': 'Agricium', 'HADA': 'Hadanite', 'BERY': 'Beryl'}.get(ore_code, ore_code)
+                    ore_text.append(f"• **{ore_name}:** {quantity} SCU @ {data['price_per_scu']:,.0f} = {data['total_value']:,.0f} aUEC")
+            
+            embed.add_field(
+                name="⛏️ Ore Collections",
+                value="\n".join(ore_text),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="💰 Financial Summary",
+                value=f"**Total Value:** {self.total_value:,.0f} aUEC\n"
+                      f"**Donation ({self.donation_pct}%):** {donation_amount:,.0f} aUEC\n"
+                      f"**Net Payout:** {payout_amount:,.0f} aUEC",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="👥 Distribution",
+                value=f"**{len(self.participants)} participants** receive equal shares\n"
+                      f"**Per participant:** {per_participant:,.0f} aUEC\n"
+                      f"**Payment method:** Manual distribution",
+                inline=False
+            )
+            
+            # Add participant list (first few)
+            participant_text = []
+            for participant in self.participants[:8]:
+                participant_text.append(f"• {participant.get('display_name', 'Unknown')}")
+            if len(self.participants) > 8:
+                participant_text.append(f"... and {len(self.participants) - 8} more")
+            
+            embed.add_field(
+                name="📋 Participants",
+                value="\n".join(participant_text),
+                inline=False
+            )
+            
+            # Disable all buttons
+            for item in self.view.children:
+                item.disabled = True
+            
+            await interaction.followup.edit_message(
+                interaction.message.id,
+                embed=embed,
+                view=self.view
+            )
+            
+        except Exception as e:
+            await interaction.followup.send(
+                f"❌ Error generating payroll: {str(e)}",
                 ephemeral=True
             )
 
