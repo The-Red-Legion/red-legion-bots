@@ -17,6 +17,7 @@ from typing import Optional, List, Dict
 import sys
 from pathlib import Path
 import logging
+import json
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -561,6 +562,191 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
             await interaction.followup.send(
                 embed=discord.Embed(
                     title="❌ Error Getting Payroll Status",
+                    description=f"An unexpected error occurred: {str(e)}",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+    
+    @app_commands.command(name="lookup", description="Look up detailed information for a past payroll event")
+    @app_commands.describe(
+        event_id="Event ID to look up (e.g., sm-abc123)"
+    )
+    async def payroll_lookup(
+        self,
+        interaction: discord.Interaction,
+        event_id: str
+    ):
+        """Look up comprehensive details for a past payroll event."""
+        await interaction.response.defer()
+        
+        try:
+            # Clean up event ID format
+            event_id = event_id.strip().lower()
+            
+            # Get detailed payroll information
+            payroll_data = await self.calculator.get_payroll_details(event_id)
+            
+            if not payroll_data:
+                await interaction.followup.send(
+                    embed=discord.Embed(
+                        title="❌ Event Not Found",
+                        description=f"No event found with ID: `{event_id}`\n\n"
+                                   "Make sure the event ID is correct and includes the prefix "
+                                   "(e.g., `sm-abc123` for mining events).",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+                return
+            
+            # Create comprehensive summary embed
+            embed = discord.Embed(
+                title=f"📊 **{payroll_data['event_name']}** - `{payroll_data['event_id']}`",
+                color=discord.Color.blue(),
+                timestamp=payroll_data.get('payroll_calculated_at') or payroll_data['started_at']
+            )
+            
+            # Event details section
+            event_type_emoji = {'mining': '⛏️', 'salvage': '🔧', 'combat': '⚔️'}.get(
+                payroll_data['event_type'], '📋'
+            )
+            
+            duration_hours = payroll_data.get('total_duration_minutes', 0) / 60 if payroll_data.get('total_duration_minutes') else 0
+            started = payroll_data['started_at'].strftime("%B %d, %Y at %I:%M %p") if payroll_data['started_at'] else "Unknown"
+            ended = payroll_data['ended_at'].strftime("%B %d, %Y at %I:%M %p") if payroll_data['ended_at'] else "Ongoing"
+            
+            embed.add_field(
+                name=f"{event_type_emoji} **Event Information**",
+                value=f"**Type:** {payroll_data['event_type'].title()}\n"
+                      f"**Organizer:** {payroll_data['organizer_name']}\n"
+                      f"**Started:** {started}\n"
+                      f"**Ended:** {ended}\n"
+                      f"**Duration:** {duration_hours:.1f} hours",
+                inline=True
+            )
+            
+            # Location information
+            location_info = []
+            if payroll_data.get('system_location'):
+                location_info.append(f"**System:** {payroll_data['system_location']}")
+            if payroll_data.get('planet_moon'):
+                location_info.append(f"**Location:** {payroll_data['planet_moon']}")
+            if payroll_data.get('location_notes'):
+                location_info.append(f"**Notes:** {payroll_data['location_notes']}")
+            
+            if location_info:
+                embed.add_field(
+                    name="🌍 **Location**",
+                    value="\n".join(location_info),
+                    inline=True
+                )
+            
+            # Participation summary
+            participants = payroll_data.get('participants', [])
+            participant_count = len(participants)
+            org_members = sum(1 for p in participants if p.get('is_org_member'))
+            
+            embed.add_field(
+                name="👥 **Participation**",
+                value=f"**Total Participants:** {participant_count}\n"
+                      f"**Org Members:** {org_members}\n"
+                      f"**Guests:** {participant_count - org_members}",
+                inline=True
+            )
+            
+            # If payroll was calculated, show financial details
+            if payroll_data.get('payroll_id'):
+                # Parse ore yields for display
+                mining_yields = {}
+                if payroll_data.get('mining_yields'):
+                    try:
+                        mining_yields = json.loads(payroll_data['mining_yields'])
+                    except:
+                        pass
+                
+                # Create ore breakdown
+                if mining_yields and payroll_data['event_type'] == 'mining':
+                    ore_text = []
+                    for ore_name, scu_amount in mining_yields.items():
+                        if isinstance(scu_amount, (int, float)) and scu_amount > 0:
+                            ore_text.append(f"**{ore_name}:** {scu_amount:,.1f} SCU")
+                    
+                    if ore_text:
+                        embed.add_field(
+                            name="⛏️ **Ore Collection**",
+                            value="\n".join(ore_text),
+                            inline=True
+                        )
+                
+                # Financial summary
+                total_value = float(payroll_data.get('total_value_auec', 0))
+                total_donated = float(payroll_data.get('total_donated_auec', 0))
+                
+                embed.add_field(
+                    name="💰 **Financial Summary**",
+                    value=f"**Total Value:** {total_value:,.0f} aUEC\n"
+                          f"**Donated Amount:** {total_donated:,.0f} aUEC\n"
+                          f"**Calculated By:** {payroll_data.get('calculated_by_name', 'Unknown')}",
+                    inline=True
+                )
+                
+                # Individual payouts (top participants)
+                payouts = payroll_data.get('payouts', [])
+                if payouts:
+                    payout_lines = []
+                    for i, payout in enumerate(payouts[:8]):  # Show top 8
+                        final_amount = float(payout['final_payout_auec'])
+                        participation_min = payout['participation_minutes']
+                        donor_emoji = "🎁" if payout.get('is_donor') else "💰"
+                        payout_lines.append(
+                            f"{donor_emoji} **{payout['username']}:** {final_amount:,.0f} aUEC ({participation_min:.0f} min)"
+                        )
+                    
+                    if len(payouts) > 8:
+                        payout_lines.append(f"... and {len(payouts) - 8} more participants")
+                    
+                    embed.add_field(
+                        name="💸 **Individual Payouts**",
+                        value="\n".join(payout_lines),
+                        inline=False
+                    )
+            else:
+                # Event not yet calculated
+                embed.add_field(
+                    name="⏳ **Payroll Status**",
+                    value="Payroll has not been calculated yet.\n"
+                          "Use `/payroll calculate` to process this event.",
+                    inline=False
+                )
+                
+                # Show participant list instead
+                if participants:
+                    participant_lines = []
+                    for i, participant in enumerate(participants[:12]):  # Show top 12 by participation
+                        duration = participant.get('duration_minutes', 0)
+                        org_emoji = "🏢" if participant.get('is_org_member') else "👤"
+                        channel = f" ({participant['channel_name']})" if participant.get('channel_name') else ""
+                        participant_lines.append(
+                            f"{org_emoji} **{participant['username']}:** {duration:.0f} min{channel}"
+                        )
+                    
+                    if len(participants) > 12:
+                        participant_lines.append(f"... and {len(participants) - 12} more participants")
+                    
+                    embed.add_field(
+                        name="👥 **Participants** (by participation time)",
+                        value="\n".join(participant_lines),
+                        inline=False
+                    )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Error in payroll lookup: {e}")
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title="❌ Error Looking Up Payroll",
                     description=f"An unexpected error occurred: {str(e)}",
                     color=discord.Color.red()
                 ),

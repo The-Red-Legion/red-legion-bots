@@ -321,6 +321,73 @@ class PayrollCalculator:
             logger.error(f"Error getting recent payrolls: {e}")
             return []
     
+    async def get_payroll_details(self, event_id: str) -> Optional[Dict]:
+        """Get comprehensive payroll details for a specific event."""
+        try:
+            with get_cursor() as cursor:
+                # Get event details
+                cursor.execute("""
+                    SELECT 
+                        e.event_id, e.event_name, e.event_type, e.organizer_name,
+                        e.started_at, e.ended_at, e.system_location, e.planet_moon,
+                        e.location_notes, e.total_participants, e.total_duration_minutes,
+                        e.total_value_auec, e.payroll_calculated_at, e.payroll_calculated_by_id
+                    FROM events e
+                    WHERE e.event_id = %s
+                """, (event_id,))
+                
+                event_row = cursor.fetchone()
+                if not event_row:
+                    return None
+                
+                event_data = dict(event_row)
+                
+                # Get payroll details if calculated
+                cursor.execute("""
+                    SELECT 
+                        p.payroll_id, p.total_scu_collected, p.ore_prices_used,
+                        p.mining_yields, p.total_donated_auec, p.calculated_by_name
+                    FROM payrolls p
+                    WHERE p.event_id = %s
+                """, (event_id,))
+                
+                payroll_row = cursor.fetchone()
+                if payroll_row:
+                    event_data.update(dict(payroll_row))
+                
+                # Get all participants with their details
+                cursor.execute("""
+                    SELECT 
+                        user_id, username, display_name, joined_at, left_at,
+                        duration_minutes, is_org_member, channel_name
+                    FROM participation
+                    WHERE event_id = %s
+                    ORDER BY duration_minutes DESC
+                """, (event_id,))
+                
+                participants = [dict(row) for row in cursor.fetchall()]
+                event_data['participants'] = participants
+                
+                # Get payouts if payroll was calculated
+                if payroll_row:
+                    cursor.execute("""
+                        SELECT 
+                            user_id, username, participation_minutes,
+                            base_payout_auec, final_payout_auec, is_donor
+                        FROM payouts
+                        WHERE payroll_id = %s
+                        ORDER BY final_payout_auec DESC
+                    """, (payroll_row['payroll_id'],))
+                    
+                    payouts = [dict(row) for row in cursor.fetchall()]
+                    event_data['payouts'] = payouts
+                
+                return event_data
+                
+        except Exception as e:
+            logger.error(f"Error getting payroll details for {event_id}: {e}")
+            return None
+    
     async def _store_payroll(
         self,
         payroll_id: str,
