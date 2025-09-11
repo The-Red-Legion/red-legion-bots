@@ -404,28 +404,17 @@ class CalculatePayrollButton(ui.Button):
             )
             
             if result['success']:
-                # Complete session
-                await session_manager.complete_calculation(self.session_id, result)
+                # Store calculation results and move to payout management
+                await session_manager.update_session(self.session_id, {
+                    'calculation_data': result,
+                    'current_step': PayrollStep.PAYOUT_MANAGEMENT
+                })
                 
-                # Show final results
-                embed = discord.Embed(
-                    title="✅ Payroll Calculation Complete!",
-                    description=f"**Event:** {result['event_data']['event_id']}\n"
-                              f"**Total Value:** {result['total_value_auec']:,.0f} aUEC\n"
-                              f"**Participants:** {result['total_participants']}",
-                    color=discord.Color.green(),
-                    timestamp=datetime.now()
-                )
+                # Show payout management view
+                view = PayoutManagementView(self.session_id)
+                embed = await view.create_embed()
                 
-                embed.add_field(
-                    name="📊 Summary",
-                    value=f"**Payroll ID:** `{result['payroll_id']}`\n"
-                          f"**Session Duration:** {result['total_minutes']} minutes\n"
-                          f"**Total Donated:** {result['total_donated_auec']:,.0f} aUEC",
-                    inline=False
-                )
-                
-                await interaction.edit_original_response(embed=embed, view=None)
+                await interaction.edit_original_response(embed=embed, view=view)
             else:
                 await interaction.followup.send(
                     f"❌ Payroll calculation failed: {result['error']}", ephemeral=True
@@ -482,3 +471,318 @@ class CancelSessionButton(ui.Button):
         )
         
         await interaction.response.edit_message(embed=embed, view=None)
+
+
+class PayoutManagementView(ui.View):
+    """Step 4: Payout Management - Individual participant payouts with donation controls."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(timeout=1800)  # 30 minutes
+        self.session_id = session_id
+        self.donation_states = {}  # Track donation states for participants
+        
+        # Add participant buttons dynamically in create_embed
+        
+    async def create_embed(self):
+        """Create the payout management embed with participant list."""
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                return self.create_error_embed("Session not found")
+            
+            calculation_data = session.get('calculation_data', {})
+            if not calculation_data:
+                return self.create_error_embed("No calculation data found")
+            
+            # Initialize donation states from calculation data
+            for payout in calculation_data.get('payouts', []):
+                user_id = str(payout['user_id'])
+                self.donation_states[user_id] = payout.get('is_donor', False)
+            
+            # Create embed
+            embed = discord.Embed(
+                title="💰 Step 4: Payout Management",
+                description=f"**Event:** {calculation_data['event_data']['event_id']}\n"
+                          f"**Total Value:** {calculation_data['total_value_auec']:,.0f} aUEC\n"
+                          f"**Participants:** {calculation_data['total_participants']}",
+                color=discord.Color.gold()
+            )
+            
+            # Add participant payout details
+            payout_text = ""
+            total_donated = 0
+            total_recipients = 0
+            
+            for payout in calculation_data['payouts']:
+                user_id = str(payout['user_id'])
+                is_donating = self.donation_states.get(user_id, False)
+                
+                username = payout['username']
+                minutes = payout['participation_minutes']
+                percentage = payout['participation_percentage']
+                base_payout = payout['base_payout_auec']
+                
+                if is_donating:
+                    payout_text += f"☑️ **{username}** - {minutes:.0f}min ({percentage:.1f}%)\n"
+                    payout_text += f"    💝 Donating: {base_payout:,.0f} aUEC\n\n"
+                    total_donated += float(base_payout)
+                else:
+                    final_payout = float(base_payout)  # Will be recalculated with bonuses
+                    payout_text += f"□ **{username}** - {minutes:.0f}min ({percentage:.1f}%)\n"
+                    payout_text += f"    💰 Receiving: {final_payout:,.0f} aUEC\n\n"
+                    total_recipients += 1
+            
+            # Calculate bonus distribution
+            if total_donated > 0 and total_recipients > 0:
+                bonus_per_person = total_donated / total_recipients
+                payout_text += f"📊 **Distribution Summary:**\n"
+                payout_text += f"Total Donated: {total_donated:,.0f} aUEC\n"
+                payout_text += f"Bonus per Recipient: {bonus_per_person:,.0f} aUEC\n"
+            
+            embed.add_field(
+                name="👥 Participant Payouts",
+                value=payout_text[:1024] if payout_text else "No participants found",
+                inline=False
+            )
+            
+            # Add control buttons
+            self.clear_items()
+            self.add_participant_buttons(calculation_data['payouts'])
+            self.add_control_buttons()
+            
+            return embed
+            
+        except Exception as e:
+            logger.error(f"Error creating payout management embed: {e}")
+            return self.create_error_embed(f"Error: {str(e)}")
+    
+    def add_participant_buttons(self, payouts):
+        """Add toggle buttons for each participant."""
+        for i, payout in enumerate(payouts):
+            if i >= 20:  # Discord limit on buttons
+                break
+                
+            user_id = str(payout['user_id'])
+            username = payout['username']
+            is_donating = self.donation_states.get(user_id, False)
+            
+            button = ParticipantDonationButton(
+                user_id=user_id,
+                username=username,
+                is_donating=is_donating,
+                session_id=self.session_id
+            )
+            self.add_item(button)
+    
+    def add_control_buttons(self):
+        """Add main control buttons."""
+        self.add_item(RecalculatePayoutsButton(self.session_id))
+        self.add_item(FinalizePayrollButton(self.session_id))
+        self.add_item(BackToCalculationButton(self.session_id))
+        self.add_item(CancelPayrollButton(self.session_id))
+    
+    def create_error_embed(self, message: str):
+        """Create an error embed."""
+        return discord.Embed(
+            title="❌ Payout Management Error",
+            description=message,
+            color=discord.Color.red()
+        )
+
+
+class ParticipantDonationButton(ui.Button):
+    """Button to toggle donation status for a participant."""
+    
+    def __init__(self, user_id: str, username: str, is_donating: bool, session_id: str):
+        self.user_id = user_id
+        self.username = username
+        self.session_id = session_id
+        
+        # Set button appearance based on donation status
+        if is_donating:
+            super().__init__(
+                label=f"💝 {username[:15]}",
+                style=discord.ButtonStyle.success,
+                custom_id=f"donate_{user_id}"
+            )
+        else:
+            super().__init__(
+                label=f"💰 {username[:15]}",
+                style=discord.ButtonStyle.primary,
+                custom_id=f"receive_{user_id}"
+            )
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Get parent view and toggle donation state
+            view = self.view
+            current_state = view.donation_states.get(self.user_id, False)
+            view.donation_states[self.user_id] = not current_state
+            
+            # Recreate embed with updated states
+            embed = await view.create_embed()
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except Exception as e:
+            logger.error(f"Error toggling donation for {self.user_id}: {e}")
+            await interaction.followup.send(f"❌ Error updating donation status", ephemeral=True)
+
+
+class RecalculatePayoutsButton(ui.Button):
+    """Button to recalculate payouts with current donation settings."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="🔄 Update Distribution",
+            style=discord.ButtonStyle.secondary,
+            emoji="🔄"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            view = self.view
+            embed = await view.create_embed()
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except Exception as e:
+            logger.error(f"Error recalculating payouts: {e}")
+            await interaction.followup.send("❌ Error updating distribution", ephemeral=True)
+
+
+class FinalizePayrollButton(ui.Button):
+    """Button to finalize the payroll with current settings."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="✅ Finalize Payroll",
+            style=discord.ButtonStyle.success,
+            emoji="✅"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                await interaction.followup.send("❌ Session not found", ephemeral=True)
+                return
+            
+            calculation_data = session.get('calculation_data', {})
+            view = self.view
+            
+            # Update payouts with current donation states and recalculate
+            updated_payouts = self.recalculate_with_donations(calculation_data['payouts'], view.donation_states)
+            
+            # Complete session
+            await session_manager.complete_calculation(self.session_id, {
+                **calculation_data,
+                'payouts': updated_payouts,
+                'final_donation_states': view.donation_states
+            })
+            
+            # Show final summary
+            embed = discord.Embed(
+                title="✅ Payroll Finalized!",
+                description=f"**Event:** {calculation_data['event_data']['event_id']}\n"
+                          f"**Total Value:** {calculation_data['total_value_auec']:,.0f} aUEC\n"
+                          f"**Participants:** {calculation_data['total_participants']}",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+            
+            # Add final payout summary
+            payout_summary = ""
+            for payout in updated_payouts:
+                final_amount = payout['final_payout_auec']
+                payout_summary += f"💰 **{payout['username']}:** {final_amount:,.0f} aUEC\n"
+            
+            embed.add_field(
+                name="💰 Final Payouts",
+                value=payout_summary[:1024] if payout_summary else "No payouts",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="📊 Summary",
+                value=f"**Payroll ID:** `{calculation_data['payroll_id']}`\n"
+                      f"**Session Duration:** {calculation_data['total_minutes']} minutes\n"
+                      f"**Total Donated:** {calculation_data['total_donated_auec']:,.0f} aUEC",
+                inline=False
+            )
+            
+            await interaction.edit_original_response(embed=embed, view=None)
+            
+        except Exception as e:
+            logger.error(f"Error finalizing payroll: {e}")
+            await interaction.followup.send(f"❌ Error finalizing payroll: {str(e)}", ephemeral=True)
+    
+    def recalculate_with_donations(self, original_payouts, donation_states):
+        """Recalculate payouts based on current donation states."""
+        updated_payouts = []
+        total_donated = Decimal('0')
+        recipients = []
+        
+        # First pass: identify donors and recipients
+        for payout in original_payouts:
+            user_id = str(payout['user_id'])
+            is_donating = donation_states.get(user_id, False)
+            base_payout = Decimal(str(payout['base_payout_auec']))
+            
+            updated_payout = {
+                'user_id': payout['user_id'],
+                'username': payout['username'],
+                'participation_minutes': payout['participation_minutes'],
+                'participation_percentage': payout['participation_percentage'],
+                'base_payout_auec': base_payout,
+                'is_donor': is_donating
+            }
+            
+            if is_donating:
+                total_donated += base_payout
+                updated_payout['final_payout_auec'] = Decimal('0')
+            else:
+                recipients.append(updated_payout)
+                updated_payout['final_payout_auec'] = base_payout  # Will be updated with bonus
+            
+            updated_payouts.append(updated_payout)
+        
+        # Second pass: distribute donated amounts to recipients
+        if total_donated > 0 and recipients:
+            bonus_per_recipient = total_donated / len(recipients)
+            for payout in updated_payouts:
+                if not payout['is_donor']:
+                    payout['final_payout_auec'] += bonus_per_recipient
+                    payout['final_payout_auec'] = payout['final_payout_auec'].quantize(Decimal('0.01'))
+        
+        return updated_payouts
+
+
+class BackToCalculationButton(ui.Button):
+    """Button to go back to calculation review."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="⬅️ Back to Calculation",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Update session step back to calculation review
+        await session_manager.update_session(self.session_id, {
+            'current_step': PayrollStep.CALCULATION_REVIEW
+        })
+        
+        # Show calculation review view
+        view = PricingReviewView(self.session_id)
+        embed = await view.create_embed()
+        
+        await interaction.response.edit_message(embed=embed, view=view)

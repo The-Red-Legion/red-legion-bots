@@ -41,6 +41,7 @@ class PayrollStep:
     QUANTITY_ENTRY = "quantity_entry"
     PRICING_REVIEW = "pricing_review"
     CALCULATION_REVIEW = "calculation_review"
+    PAYOUT_MANAGEMENT = "payout_management"
     COMPLETED = "completed"
 
 class PayrollSessionManager:

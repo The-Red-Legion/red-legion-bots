@@ -296,6 +296,14 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 
                 await interaction.edit_original_response(embed=embed, view=pricing_view)
                 
+            elif current_step == 'payout_management':
+                # Resume payout management
+                from .ui.views_v2 import PayoutManagementView
+                view = PayoutManagementView(session_id)
+                embed = await view.create_embed()
+                
+                await interaction.edit_original_response(embed=embed, view=view)
+                
             else:
                 # Fallback to event selection
                 await self._handle_unified_payroll_calculation(interaction)
