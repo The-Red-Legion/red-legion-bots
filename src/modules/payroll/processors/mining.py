@@ -297,7 +297,7 @@ class MiningProcessor:
     def _get_current_timestamp(self):
         """Get current timestamp for database storage."""
         from datetime import datetime
-        return datetime.now()
+        return datetime.now().isoformat()
     
     def get_supported_ores(self) -> List[str]:
         """Get list of supported ore types."""

@@ -149,7 +149,7 @@ class PayrollSessionManager:
             for key, value in updates.items():
                 if key in ['ore_quantities', 'pricing_data', 'calculation_data']:
                     set_clauses.append(f"{key} = %s")
-                    values.append(json.dumps(value) if isinstance(value, dict) else value)
+                    values.append(json.dumps(value, cls=PayrollJSONEncoder) if isinstance(value, dict) else value)
                 elif key in ['current_step', 'donation_percentage', 'is_completed']:
                     set_clauses.append(f"{key} = %s")
                     values.append(value)
@@ -268,11 +268,20 @@ class PayrollSessionManager:
                     ) VALUES (%s, %s, %s, %s)
                 """, (
                     session_id, event_type, 
-                    json.dumps(event_data), session['user_id']
+                    json.dumps(event_data, cls=PayrollJSONEncoder), session['user_id']
                 ))
                 
         except Exception as e:
             logger.error(f"Error logging session event: {e}")
+
+class PayrollJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime and Decimal objects."""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
 
 # Global session manager instance
 session_manager = PayrollSessionManager()
