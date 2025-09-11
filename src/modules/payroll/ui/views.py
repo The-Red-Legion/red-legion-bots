@@ -89,8 +89,12 @@ class EventSelectionDropdown(ui.Select):
                 location_short = event['location_notes'][:20] + "..." if len(event['location_notes']) > 20 else event['location_notes']
                 description += f" • {location_short}"
             
+            # Include event name alongside creator for better identification
+            event_name = event.get('event_name', 'Unnamed Event')
+            organizer = event['organizer_name']
+            
             options.append(discord.SelectOption(
-                label=f"{event['event_id']} - {event['organizer_name']}",
+                label=f"{event['event_id']} - {event_name} ({organizer})",
                 description=description[:100],  # Discord limit
                 value=event['event_id']
             ))
@@ -216,8 +220,12 @@ class UnifiedEventSelectionDropdown(ui.Select):
                 location_short = event['location_notes'][:15] + "..." if len(event['location_notes']) > 15 else event['location_notes']
                 description += f" • {location_short}"
             
+            # Include event name alongside creator for better identification  
+            event_name = event.get('event_name', 'Unnamed Event')
+            organizer = event['organizer_name']
+            
             options.append(discord.SelectOption(
-                label=f"{event_emoji} {event['event_id']} - {event['organizer_name']}",
+                label=f"{event_emoji} {event['event_id']} - {event_name} ({organizer})",
                 description=description[:100],  # Discord limit
                 value=f"{event_type}:{event['event_id']}"  # Include type for processing
             ))
