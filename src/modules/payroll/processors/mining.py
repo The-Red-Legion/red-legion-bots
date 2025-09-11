@@ -39,45 +39,47 @@ class MiningProcessor:
         """Get description text for collection input UI."""
         return "ore collections (SCU amounts for each ore type)"
     
-    async def get_current_prices(self, refresh: bool = False) -> Dict[str, Dict]:
+    async def get_current_prices(self, refresh: bool = False, allow_api_calls: bool = False) -> Dict[str, Dict]:
         """
-        Get current ore prices from UEX Corp API or database cache.
+        Get current ore prices from database cache or UEX Corp API.
         
         Args:
             refresh: Force refresh from API instead of using cache
+            allow_api_calls: Allow API calls (set to False during Discord interactions)
             
         Returns:
             Dict mapping ore names to price data: {ore_name: {price, location, system}}
         """
         try:
-            # Check cache first unless refresh requested
-            if not refresh:
-                cached_prices = await self._get_cached_prices()
-                if cached_prices:
-                    logger.info("Using cached ore prices")
-                    return cached_prices
+            # Always check cache first
+            cached_prices = await self._get_cached_prices()
+            if cached_prices and not refresh:
+                logger.info("Using cached ore prices")
+                return cached_prices
             
-            # Fetch from UEX API
-            logger.info("Fetching ore prices from UEX Corp API")
-            api_prices = await self._fetch_from_uex_api()
+            # Only make API calls if explicitly allowed (not during Discord interactions)
+            if allow_api_calls and refresh:
+                logger.info("Fetching ore prices from UEX Corp API")
+                api_prices = await self._fetch_from_uex_api()
+                
+                if api_prices:
+                    # Update cache
+                    await self._update_price_cache(api_prices)
+                    return api_prices
             
-            if api_prices:
-                # Update cache
-                await self._update_price_cache(api_prices)
-                return api_prices
+            # Use cached prices if available
+            if cached_prices:
+                logger.info("Using cached ore prices (API calls not allowed or failed)")
+                return cached_prices
             else:
-                # Fall back to cached prices if API fails
-                cached_prices = await self._get_cached_prices()
-                if cached_prices:
-                    logger.warning("UEX API failed, using cached prices")
-                    return cached_prices
-                else:
-                    logger.error("No ore prices available (API failed and no cache)")
-                    return {}
+                logger.warning("No ore prices available in cache")
+                # Return default prices to avoid blocking the UI
+                return self._get_default_prices()
                     
         except Exception as e:
             logger.error(f"Error getting ore prices: {e}")
-            return {}
+            # Return default prices to avoid blocking the UI
+            return self._get_default_prices()
     
     async def calculate_total_value(
         self, 
@@ -290,3 +292,29 @@ class MiningProcessor:
     def get_supported_ores(self) -> List[str]:
         """Get list of supported ore types."""
         return list(ORE_TYPES.values())
+    
+    def _get_default_prices(self) -> Dict[str, Dict]:
+        """Get default fallback prices when no data is available."""
+        # These are conservative estimates to prevent the UI from breaking
+        # when no price data is available
+        default_prices = {
+            'QUANTAINIUM': {'price': 8.5, 'location': 'Area18', 'system': 'Stanton'},
+            'BEXALITE': {'price': 4.2, 'location': 'Area18', 'system': 'Stanton'},
+            'LARANITE': {'price': 28.0, 'location': 'Area18', 'system': 'Stanton'},
+            'AGRICIUM': {'price': 24.8, 'location': 'Area18', 'system': 'Stanton'},
+            'GOLD': {'price': 6.1, 'location': 'Area18', 'system': 'Stanton'},
+            'BERYL': {'price': 2.8, 'location': 'Area18', 'system': 'Stanton'},
+            'HEPHAESTANITE': {'price': 2.5, 'location': 'Area18', 'system': 'Stanton'},
+            'BORASE': {'price': 2.3, 'location': 'Area18', 'system': 'Stanton'},
+            'TUNGSTEN': {'price': 4.5, 'location': 'Area18', 'system': 'Stanton'},
+            'TITANIUM': {'price': 8.0, 'location': 'Area18', 'system': 'Stanton'},
+            'IRON': {'price': 1.8, 'location': 'Area18', 'system': 'Stanton'},
+            'COPPER': {'price': 1.5, 'location': 'Area18', 'system': 'Stanton'},
+            'ALUMINUM': {'price': 1.2, 'location': 'Area18', 'system': 'Stanton'},
+            'SILICON': {'price': 1.5, 'location': 'Area18', 'system': 'Stanton'},
+            'CORUNDUM': {'price': 1.8, 'location': 'Area18', 'system': 'Stanton'},
+            'QUARTZ': {'price': 1.3, 'location': 'Area18', 'system': 'Stanton'},
+        }
+        
+        logger.info("Using default fallback ore prices")
+        return default_prices

@@ -171,7 +171,7 @@ class MiningCollectionModal(ui.Modal):
                 )
             )
             
-            prices = await self.processor.get_current_prices()
+            prices = await self.processor.get_current_prices(refresh=False, allow_api_calls=False)
             if not prices:
                 await interaction.edit_original_response(
                     embed=discord.Embed(
@@ -634,7 +634,7 @@ class DynamicOreAmountsModal(ui.Modal):
                 )
             )
             
-            prices = await self.processor.get_current_prices()
+            prices = await self.processor.get_current_prices(refresh=False, allow_api_calls=False)
             if not prices:
                 await interaction.edit_original_response(
                     embed=discord.Embed(
@@ -1006,7 +1006,7 @@ class FinishOreSelectionButton(ui.Button):
                 )
             )
             
-            prices = await self.processor.get_current_prices()
+            prices = await self.processor.get_current_prices(refresh=False, allow_api_calls=False)
             if not prices:
                 await interaction.edit_original_response(
                     embed=discord.Embed(
@@ -1614,8 +1614,8 @@ class OreQuantityModal(ui.Modal):
             
             # All quantities collected, move to Step 3: Price Review
             try:
-                # Get UEX prices for the selected ores
-                prices = await self.processor.get_current_prices()
+                # Get UEX prices for the selected ores (database only, no API calls during interaction)
+                prices = await self.processor.get_current_prices(refresh=False, allow_api_calls=False)
                 
                 # Calculate total value to get breakdown with UEX prices
                 total_value, breakdown = await self.processor.calculate_total_value(ore_quantities, prices)
@@ -1945,7 +1945,7 @@ class ProceedToPriceReviewButton(ui.Button):
         
         try:
             # Get current ore prices
-            prices = await self.processor.get_current_prices()
+            prices = await self.processor.get_current_prices(refresh=False, allow_api_calls=False)
             if not prices:
                 await interaction.followup.send(
                     embed=discord.Embed(
@@ -3012,7 +3012,7 @@ class ConfirmQuantitiesButton(ui.Button):
                 ephemeral=True
             )
             
-            ore_prices = await self.processor.get_current_prices()
+            ore_prices = await self.processor.get_current_prices(refresh=False, allow_api_calls=False)
             if not ore_prices:
                 await interaction.followup.send(
                     "⚠️ Unable to fetch UEX prices, using fallback prices.",

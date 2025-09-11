@@ -188,12 +188,16 @@ class TestDataCreationModal(ui.Modal):
             
             try:
                 with conn.cursor() as cursor:
+                    # Calculate event duration in minutes
+                    event_duration_minutes = int((event_end - event_start).total_seconds() / 60)
+                    
                     # Create test event in unified events table
                     cursor.execute("""
                         INSERT INTO events (
                             event_id, guild_id, event_type, event_name, organizer_id, organizer_name,
-                            started_at, ended_at, status, location_notes, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            started_at, ended_at, status, location_notes, created_at,
+                            total_duration_minutes, total_participants
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (event_id) DO NOTHING
                     """, (
                         event_id,
@@ -206,7 +210,9 @@ class TestDataCreationModal(ui.Modal):
                         event_end,
                         'closed',  # Mark as closed so payroll can be calculated
                         location,
-                        datetime.now()
+                        datetime.now(),
+                        event_duration_minutes,
+                        participants  # Number of participants from form
                     ))
                     
                     # Create test participants and participation records
