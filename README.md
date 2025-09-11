@@ -100,11 +100,13 @@ The bot's flagship feature - complete automation for mining sessions:
 - 🧪 **Testing & Diagnostics** - Comprehensive health checks and test data generation
 
 **Advanced Features (Enhanced v3.0)**:
-- 🎁 **Enhanced Donation System** - Improved button feedback and "Donated Re-distribution Amount" terminology
+- 🎁 **Modal-Based Donation System** - Secure confirmation modals replacing unreliable toggle buttons
 - 🔧 **Step 2.5 Custom Pricing** - Override UEX prices with custom values per ore type
-- 📊 **Enhanced Interactive UI** - Wider windows, better spacing, markdown formatting, and color feedback
+- 📊 **Maximum Width Layout** - 110-character Discord embed utilization with 2-column participant display
+- 🎯 **Enhanced Event Selection** - Event names included in dropdown alongside creator names
 - 🔍 **Comprehensive Event Lookup** - `/payroll lookup` command for detailed historical event data
 - 📈 **Real-time Analytics** - Live participation tracking with enhanced visual design
+- 🔧 **Comprehensive Debugging** - Extensive logging system for donation state tracking
 
 ## 🚀 Future Expansions
 
@@ -181,7 +183,7 @@ red-legion-bots/
 For technical support or feature requests, contact your organization's administrators or check the bot's diagnostic commands for troubleshooting common issues.
 
 ## 🔧 Version Information
-Current version (v3.0) includes enhanced Sunday Mining operations with Step 2.5 custom pricing, improved payroll management with better UI/UX, comprehensive event lookup capabilities, enhanced visual design with wider windows and better spacing, and "Donated Re-distribution Amount" terminology for clearer donation understanding.
+Current version (v3.0) includes enhanced Sunday Mining operations with Step 2.5 custom pricing, modal-based donation system replacing broken toggle buttons, maximum Discord embed width utilization (110 characters), 2-column participant layouts, enhanced event selection with event names, comprehensive debugging system, and "Donated Re-distribution Amount" terminology for clearer donation understanding.
 
 ---
 
