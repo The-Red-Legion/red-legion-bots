@@ -1057,21 +1057,27 @@ class CustomPricingView(ui.View):
                 color=discord.Color.purple()
             )
             
-            # Show price options for ores with quantities > 0
-            pricing_text = ""
+            # Show price options for ores with quantities > 0 in code block for better readability
+            pricing_lines = []
             for ore_name, quantity in ore_quantities.items():
                 if quantity > 0:
                     uex_price = uex_prices.get(ore_name.upper(), {}).get('price', 0)
                     custom_price = custom_prices.get(ore_name, uex_price)
                     
                     if custom_price != uex_price:
-                        pricing_text += f"🔧 **{ore_name}:** {custom_price:,.1f} aUEC/SCU (Custom)\n"
+                        pricing_lines.append(f"🔧 {ore_name:<12}: {custom_price:>8,.1f} aUEC/SCU (Custom)")
                     else:
-                        pricing_text += f"📊 **{ore_name}:** {uex_price:,.1f} aUEC/SCU (UEX API)\n"
+                        pricing_lines.append(f"📊 {ore_name:<12}: {uex_price:>8,.1f} aUEC/SCU (UEX API)")
+            
+            # Format in code block with proper alignment
+            if pricing_lines:
+                pricing_text = "```\n" + "\n".join(pricing_lines) + "\n```"
+            else:
+                pricing_text = "No ores selected"
             
             embed.add_field(
                 name="💰 Current Pricing",
-                value=pricing_text if pricing_text else "No ores selected",
+                value=pricing_text,
                 inline=False
             )
             
