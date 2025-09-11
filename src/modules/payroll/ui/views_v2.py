@@ -115,18 +115,29 @@ class OreQuantityEntryView(EventDrivenPayrollView):
             else:
                 quantity_lines.append(f"{ore_name}: *Not collected*")
         
-        embed.add_field(
-            name="📊 Current Quantities",
-            value="\n".join(quantity_lines[:8]),  # First 8 ores
-            inline=False
-        )
-        
-        if len(quantity_lines) > 8:
+        # Consolidate all ores under one title, split into multiple fields if needed due to Discord limits
+        all_quantities_text = "\n".join(quantity_lines)
+        if len(all_quantities_text) <= 1024:
+            # All ores fit in one field
             embed.add_field(
-                name="📊 More Ores",
-                value="\n".join(quantity_lines[8:]),
+                name="📊 Current Quantities",
+                value=all_quantities_text,
                 inline=False
             )
+        else:
+            # Split into multiple fields but keep same title
+            embed.add_field(
+                name="📊 Current Quantities",
+                value="\n".join(quantity_lines[:8]),
+                inline=False
+            )
+            
+            if len(quantity_lines) > 8:
+                embed.add_field(
+                    name="📊 Current Quantities (cont.)",
+                    value="\n".join(quantity_lines[8:]),
+                    inline=False
+                )
         
         embed.add_field(
             name="💰 Summary",
