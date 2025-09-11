@@ -577,7 +577,7 @@ class PayoutManagementView(ui.View):
             logger.info(f"PAYOUT DISPLAY: Current donation states: {self.donation_states}")
             logger.info(f"PAYOUT DISPLAY: Original payouts count: {len(calculation_data['payouts'])}")
             
-            updated_payouts = self.recalculate_with_donations(calculation_data['payouts'], self.donation_states)
+            updated_payouts = self.recalculate_with_overrides(calculation_data['payouts'], self.donation_states)
             
             logger.info(f"PAYOUT DISPLAY: Updated payouts count: {len(updated_payouts)}")
             for payout in updated_payouts:
@@ -586,12 +586,8 @@ class PayoutManagementView(ui.View):
             total_donated = 0
             total_recipients = 0
             
-            # Create formatted lines for code block display with 2-column layout
+            # Create formatted lines for single column display with double spacing
             payout_lines = []
-            participants = list(updated_payouts)
-            mid_point = (len(participants) + 1) // 2
-            left_column = participants[:mid_point]
-            right_column = participants[mid_point:] if len(participants) > mid_point else []
             
             # Process participants for totals calculation
             for payout in updated_payouts:
@@ -600,46 +596,19 @@ class PayoutManagementView(ui.View):
                 else:
                     total_recipients += 1
             
-            # Create side-by-side layout with proper formatting
-            max_rows = max(len(left_column), len(right_column))
-            
-            for i in range(max_rows):
-                left_entry = ""
-                right_entry = ""
+            # Single column layout with double spacing
+            for payout in updated_payouts:
+                username = payout['username'][:20]  # Longer names for single column
+                minutes = payout['participation_minutes']
+                percentage = payout['participation_percentage']
+                final_amount = float(payout['final_payout_auec'])
                 
-                # Left column entry with cleaned formatting
-                if i < len(left_column):
-                    payout = left_column[i]
-                    username = payout['username'][:15]  # Longer for cleaner display
-                    minutes = payout['participation_minutes']
-                    percentage = payout['participation_percentage']
-                    final_amount = float(payout['final_payout_auec'])
-                    
-                    if payout['is_donor']:
-                        left_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
-                    else:
-                        left_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>7,.0f} au"
-                
-                # Right column entry with cleaned formatting
-                if i < len(right_column):
-                    payout = right_column[i]
-                    username = payout['username'][:15]  # Longer for cleaner display
-                    minutes = payout['participation_minutes']
-                    percentage = payout['participation_percentage']
-                    final_amount = float(payout['final_payout_auec'])
-                    
-                    if payout['is_donor']:
-                        right_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
-                    else:
-                        right_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>7,.0f} au"
-                
-                # Combine columns with separator and double spacing
-                if right_entry:
-                    payout_lines.append(f"{left_entry:<46} │ {right_entry}")
-                    payout_lines.append("")  # Double spacing
+                if payout['is_donor']:
+                    payout_lines.append(f"{username:<20} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED")
                 else:
-                    payout_lines.append(f"{left_entry}")
-                    payout_lines.append("")  # Double spacing
+                    payout_lines.append(f"{username:<20} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>9,.0f} au")
+                
+                payout_lines.append("")  # Double spacing after each participant
             
             # Add distribution summary if there are donations
             if total_donated > 0 and total_recipients > 0:
@@ -669,20 +638,18 @@ class PayoutManagementView(ui.View):
             logger.error(f"Error creating payout management embed: {e}")
             return self.create_error_embed(f"Error: {str(e)}")
     
-    def recalculate_with_donations(self, original_payouts, donation_states):
-        """Recalculate payouts based on current donation states."""
-        logger.info(f"RECALCULATE: Starting with donation_states: {donation_states}")
+    def recalculate_with_overrides(self, original_payouts, amount_overrides):
+        """Recalculate payouts based on amount overrides."""
+        logger.info(f"RECALCULATE: Starting with amount_overrides: {amount_overrides}")
         updated_payouts = []
-        total_donated = Decimal('0')
-        recipients = []
         
-        # First pass: identify donors and recipients
         for payout in original_payouts:
             user_id = str(payout['user_id'])
-            is_donating = donation_states.get(user_id, False)
             base_payout = Decimal(str(payout['base_payout_auec']))
+            override_amount = amount_overrides.get(user_id, base_payout)
+            final_amount = Decimal(str(override_amount))
             
-            logger.info(f"RECALCULATE: Processing {payout['username']} (ID: {user_id}) - donating: {is_donating}")
+            logger.info(f"RECALCULATE: Processing {payout['username']} (ID: {user_id}) - base: {base_payout}, override: {final_amount}")
             
             updated_payout = {
                 'user_id': payout['user_id'],
@@ -690,44 +657,30 @@ class PayoutManagementView(ui.View):
                 'participation_minutes': payout['participation_minutes'],
                 'participation_percentage': payout['participation_percentage'],
                 'base_payout_auec': base_payout,
-                'is_donor': is_donating
+                'final_payout_auec': final_amount,
+                'is_donor': final_amount == 0  # Consider 0 amounts as donated
             }
             
-            if is_donating:
-                total_donated += base_payout
-                updated_payout['final_payout_auec'] = Decimal('0')
-            else:
-                recipients.append(updated_payout)
-                updated_payout['final_payout_auec'] = base_payout  # Will be updated with bonus
-            
             updated_payouts.append(updated_payout)
-        
-        # Second pass: distribute donated amounts to recipients
-        if total_donated > 0 and recipients:
-            bonus_per_recipient = total_donated / len(recipients)
-            for payout in updated_payouts:
-                if not payout['is_donor']:
-                    payout['final_payout_auec'] += bonus_per_recipient
-                    payout['final_payout_auec'] = payout['final_payout_auec'].quantize(Decimal('0.01'))
         
         return updated_payouts
     
     def add_participant_buttons(self, payouts):
-        """Add donation confirmation buttons for each participant."""
+        """Add amount override buttons for each participant."""
         for i, payout in enumerate(payouts):
             if i >= 20:  # Discord limit on buttons
                 break
                 
             user_id = str(payout['user_id'])
             username = payout['username']
-            is_donating = self.donation_states.get(user_id, False)
-            payout_amount = float(payout['base_payout_auec'])  # Get the payout amount
+            base_amount = float(payout['base_payout_auec'])
+            current_amount = self.donation_states.get(user_id, base_amount)
             
-            button = ParticipantDonationButton(
+            button = ParticipantAmountButton(
                 user_id=user_id,
                 username=username,
-                is_donating=is_donating,
-                payout_amount=payout_amount,  # Pass the payout amount
+                base_amount=base_amount,
+                current_amount=current_amount,
                 session_id=self.session_id
             )
             self.add_item(button)
@@ -747,47 +700,56 @@ class PayoutManagementView(ui.View):
         )
 
 
-class DonationConfirmationModal(ui.Modal):
-    """Modal to confirm participant donation with clear amount display."""
+class AmountOverrideModal(ui.Modal):
+    """Modal to override participant payout amount."""
     
-    def __init__(self, user_id: str, username: str, donation_amount: float, session_id: str, parent_view):
+    def __init__(self, user_id: str, username: str, base_amount: float, current_amount: float, session_id: str, parent_view):
         self.user_id = user_id
         self.username = username
-        self.donation_amount = donation_amount
+        self.base_amount = base_amount
+        self.current_amount = current_amount
         self.session_id = session_id
         self.parent_view = parent_view
         
         super().__init__(
-            title=f"Confirm Donation - {username}",
+            title=f"Override Amount - {username}",
             timeout=300
         )
         
-        # Add confirmation display (read-only info)
-        self.confirmation = ui.TextInput(
-            label=f"{username} wishes to donate their share",
-            placeholder="Click Submit to confirm donation",
-            default=f"Donating {donation_amount:,.0f} aUEC",
-            required=False,
-            max_length=100,
-            style=discord.TextStyle.short
+        # Add amount input field
+        self.amount_input = ui.TextInput(
+            label=f"Override amount for {username}",
+            placeholder=f"Default: {base_amount:,.0f} aUEC (enter 0 to donate)",
+            default=str(int(current_amount)),
+            max_length=15,
+            required=True
         )
-        self.add_item(self.confirmation)
+        self.add_item(self.amount_input)
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer()
         
         try:
-            # Update donation state in parent view
-            self.parent_view.donation_states[self.user_id] = True
+            # Parse amount with validation
+            amount_str = self.amount_input.value.replace(',', '').replace(' ', '').strip()
+            if not amount_str:
+                await interaction.followup.send("❌ Amount cannot be empty", ephemeral=True)
+                return
+                
+            new_amount = float(amount_str)
+            if new_amount < 0:
+                await interaction.followup.send("❌ Amount cannot be negative", ephemeral=True)
+                return
             
-            logger.info(f"DONATION MODAL: Updated parent view donation states: {self.parent_view.donation_states}")
+            # Update amount override in parent view (using donation_states dict for storage)
+            self.parent_view.donation_states[self.user_id] = new_amount
             
-            # Update session with new donation state
+            logger.info(f"AMOUNT OVERRIDE: Updated {self.username} ({self.user_id}) from {self.current_amount:,.0f} to {new_amount:,.0f} aUEC")
+            
+            # Update session with new amount override
             await session_manager.update_session(self.session_id, {
                 'donation_states': self.parent_view.donation_states
             })
-            
-            logger.info(f"DONATION MODAL: Confirmed donation for {self.username} ({self.user_id}): {self.donation_amount:,.0f} aUEC")
             
             # Create fresh view with updated states and force reload
             new_view = PayoutManagementView(self.session_id)
@@ -796,7 +758,7 @@ class DonationConfirmationModal(ui.Modal):
             new_view._donation_states_loaded = False
             await new_view.ensure_donation_states_loaded()
             
-            logger.info(f"DONATION MODAL: New view donation states after force reload: {new_view.donation_states}")
+            logger.info(f"AMOUNT OVERRIDE: New view states after force reload: {new_view.donation_states}")
             
             embed = await new_view.create_embed()
             
@@ -805,9 +767,12 @@ class DonationConfirmationModal(ui.Modal):
                 view=new_view
             )
             
+        except ValueError as e:
+            logger.error(f"ValueError setting amount override for {self.username}: {e}")
+            await interaction.followup.send("❌ Invalid amount format. Please enter a valid number.", ephemeral=True)
         except Exception as e:
-            logger.error(f"Error confirming donation: {e}")
-            await interaction.followup.send(f"❌ Error confirming donation: {str(e)}", ephemeral=True)
+            logger.error(f"Error setting amount override: {e}")
+            await interaction.followup.send(f"❌ Error setting amount override: {str(e)}", ephemeral=True)
 
 class UndoDonationConfirmationModal(ui.Modal):
     """Modal to confirm undoing a participant donation."""
@@ -950,8 +915,8 @@ class FinalizePayrollButton(ui.Button):
             
             logger.info(f"FINALIZE: Force loaded donation states: {view.donation_states}")
             
-            # Update payouts with current donation states and recalculate
-            updated_payouts = view.recalculate_with_donations(calculation_data['payouts'], view.donation_states)
+            # Update payouts with current amount overrides and recalculate
+            updated_payouts = view.recalculate_with_overrides(calculation_data['payouts'], view.donation_states)
             
             logger.info(f"FINALIZE: Processed {len(updated_payouts)} payouts")
             for payout in updated_payouts:
@@ -986,55 +951,23 @@ class FinalizePayrollButton(ui.Button):
                 if payout.get('is_donor', False):
                     total_donated_final += payout['base_payout_auec']
             
-            # Create optimized layout for maximum Discord embed width utilization
+            # Create single column layout with double spacing
             payout_lines = []
             payout_lines.append("Participation Summary")
-            payout_lines.append("═" * 110)  # Maximum embed width utilization
+            payout_lines.append("═" * 60)  # Adjusted width for single column
             
-            # Split participants into two columns for better layout
-            participants = list(updated_payouts)
-            mid_point = (len(participants) + 1) // 2
-            left_column = participants[:mid_point]
-            right_column = participants[mid_point:] if len(participants) > mid_point else []
-            
-            # Create side-by-side layout with full width optimization
-            max_rows = max(len(left_column), len(right_column))
-            
-            for i in range(max_rows):
-                left_entry = ""
-                right_entry = ""
+            # Single column layout with double spacing
+            for payout in updated_payouts:
+                final_amount = payout['final_payout_auec']
+                participation_minutes = payout['participation_minutes']
+                username = payout['username'][:20]  # Longer names for single column
                 
-                # Left column entry with cleaned formatting
-                if i < len(left_column):
-                    payout = left_column[i]
-                    final_amount = payout['final_payout_auec']
-                    participation_minutes = payout['participation_minutes']
-                    username = payout['username'][:16]  # Longer names with cleaner format
-                    
-                    if payout.get('is_donor', False):
-                        left_entry = f"{username:<16} DONATED      {participation_minutes:>3.0f}min"
-                    else:
-                        left_entry = f"{username:<16} {final_amount:>8,.0f} au  {participation_minutes:>3.0f}min"
-                
-                # Right column entry with cleaned formatting  
-                if i < len(right_column):
-                    payout = right_column[i]
-                    final_amount = payout['final_payout_auec']
-                    participation_minutes = payout['participation_minutes']
-                    username = payout['username'][:16]  # Longer names with cleaner format
-                    
-                    if payout.get('is_donor', False):
-                        right_entry = f"{username:<16} DONATED      {participation_minutes:>3.0f}min"
-                    else:
-                        right_entry = f"{username:<16} {final_amount:>8,.0f} au  {participation_minutes:>3.0f}min"
-                
-                # Combine columns with double spacing
-                if right_entry:
-                    payout_lines.append(f"{left_entry:<42} │ {right_entry}")
-                    payout_lines.append("")  # Double spacing
+                if payout.get('is_donor', False):
+                    payout_lines.append(f"{username:<20} DONATED      {participation_minutes:>3.0f}min")
                 else:
-                    payout_lines.append(f"{left_entry}")
-                    payout_lines.append("")  # Double spacing
+                    payout_lines.append(f"{username:<20} {final_amount:>10,.0f} au  {participation_minutes:>3.0f}min")
+                
+                payout_lines.append("")  # Double spacing after each participant
             
             # Format payouts in code block for better alignment with max width
             payout_summary = "```\n" + "\n".join(payout_lines) + "\n```"
@@ -1278,6 +1211,63 @@ class OrePriceModal(ui.Modal):
         except Exception as e:
             logger.error(f"Error setting custom price for {self.ore_name}: {e}")
             await interaction.followup.send(f"❌ Error setting custom price: {str(e)}", ephemeral=True)
+
+
+class ParticipantAmountButton(ui.Button):
+    """Button to open amount override modal for a participant."""
+    
+    def __init__(self, user_id: str, username: str, base_amount: float, current_amount: float, session_id: str):
+        self.user_id = user_id
+        self.username = username
+        self.base_amount = base_amount
+        self.current_amount = current_amount
+        self.session_id = session_id
+        
+        # Determine if amount has been overridden
+        is_overridden = abs(current_amount - base_amount) > 0.01
+        is_donating = current_amount == 0
+        
+        # Set button appearance based on override status
+        if is_donating:
+            super().__init__(
+                label=f"{username[:12]} (DONATED)",
+                style=discord.ButtonStyle.success,  # Green for donated
+                custom_id=f"amount_{user_id}",
+                emoji="💝"
+            )
+        elif is_overridden:
+            super().__init__(
+                label=f"{username[:12]} ({current_amount:,.0f})",
+                style=discord.ButtonStyle.primary,  # Blue for overridden
+                custom_id=f"amount_{user_id}",
+                emoji="🔧"
+            )
+        else:
+            super().__init__(
+                label=f"{username[:12]} ({base_amount:,.0f})",
+                style=discord.ButtonStyle.secondary,  # Gray for default
+                custom_id=f"amount_{user_id}",
+                emoji="💰"
+            )
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            parent_view = self.view
+            
+            # Open amount override modal
+            modal = AmountOverrideModal(
+                user_id=self.user_id,
+                username=self.username,
+                base_amount=self.base_amount,
+                current_amount=self.current_amount,
+                session_id=self.session_id,
+                parent_view=parent_view
+            )
+            await interaction.response.send_modal(modal)
+            
+        except Exception as e:
+            logger.error(f"Error in amount button callback: {e}")
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
 
 class ContinueToPricingReviewButton(ui.Button):
