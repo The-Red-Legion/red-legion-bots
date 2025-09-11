@@ -607,37 +607,39 @@ class PayoutManagementView(ui.View):
                 left_entry = ""
                 right_entry = ""
                 
-                # Left column entry
+                # Left column entry with cleaned formatting
                 if i < len(left_column):
                     payout = left_column[i]
-                    username = payout['username'][:13]  # Truncate for 2-column layout
+                    username = payout['username'][:15]  # Longer for cleaner display
                     minutes = payout['participation_minutes']
                     percentage = payout['participation_percentage']
                     final_amount = float(payout['final_payout_auec'])
                     
                     if payout['is_donor']:
-                        left_entry = f"💝 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
+                        left_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
                     else:
-                        left_entry = f"💰 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>9,.0f}"
+                        left_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>7,.0f} au"
                 
-                # Right column entry
+                # Right column entry with cleaned formatting
                 if i < len(right_column):
                     payout = right_column[i]
-                    username = payout['username'][:13]  # Truncate for 2-column layout
+                    username = payout['username'][:15]  # Longer for cleaner display
                     minutes = payout['participation_minutes']
                     percentage = payout['participation_percentage']
                     final_amount = float(payout['final_payout_auec'])
                     
                     if payout['is_donor']:
-                        right_entry = f"💝 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
+                        right_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED"
                     else:
-                        right_entry = f"💰 {username:<13} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>9,.0f}"
+                        right_entry = f"{username:<15} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>7,.0f} au"
                 
-                # Combine columns with separator
+                # Combine columns with separator and double spacing
                 if right_entry:
-                    payout_lines.append(f"{left_entry:<48} │ {right_entry}")
+                    payout_lines.append(f"{left_entry:<46} │ {right_entry}")
+                    payout_lines.append("")  # Double spacing
                 else:
                     payout_lines.append(f"{left_entry}")
+                    payout_lines.append("")  # Double spacing
             
             # Add distribution summary if there are donations
             if total_donated > 0 and total_recipients > 0:
@@ -787,11 +789,14 @@ class DonationConfirmationModal(ui.Modal):
             
             logger.info(f"DONATION MODAL: Confirmed donation for {self.username} ({self.user_id}): {self.donation_amount:,.0f} aUEC")
             
-            # Create fresh view with updated states and auto-refresh
+            # Create fresh view with updated states and force reload
             new_view = PayoutManagementView(self.session_id)
+            
+            # Force reload by resetting the loaded flag first
+            new_view._donation_states_loaded = False
             await new_view.ensure_donation_states_loaded()
             
-            logger.info(f"DONATION MODAL: New view donation states after loading: {new_view.donation_states}")
+            logger.info(f"DONATION MODAL: New view donation states after force reload: {new_view.donation_states}")
             
             embed = await new_view.create_embed()
             
@@ -843,8 +848,11 @@ class UndoDonationConfirmationModal(ui.Modal):
             
             logger.info(f"Undid donation for {self.username} ({self.user_id})")
             
-            # Create fresh view with updated states and auto-refresh
+            # Create fresh view with force reload
             new_view = PayoutManagementView(self.session_id)
+            
+            # Force reload by resetting the loaded flag first
+            new_view._donation_states_loaded = False
             await new_view.ensure_donation_states_loaded()
             embed = await new_view.create_embed()
             
@@ -936,10 +944,11 @@ class FinalizePayrollButton(ui.Button):
             calculation_data = session.get('calculation_data', {})
             view = self.view
             
-            # Ensure donation states are loaded from session before finalizing
+            # Force reload donation states from session before finalizing
+            view._donation_states_loaded = False
             await view.ensure_donation_states_loaded()
             
-            logger.info(f"FINALIZE: Loaded donation states: {view.donation_states}")
+            logger.info(f"FINALIZE: Force loaded donation states: {view.donation_states}")
             
             # Update payouts with current donation states and recalculate
             updated_payouts = view.recalculate_with_donations(calculation_data['payouts'], view.donation_states)
@@ -995,35 +1004,37 @@ class FinalizePayrollButton(ui.Button):
                 left_entry = ""
                 right_entry = ""
                 
-                # Left column entry with optimized spacing
+                # Left column entry with cleaned formatting
                 if i < len(left_column):
                     payout = left_column[i]
                     final_amount = payout['final_payout_auec']
                     participation_minutes = payout['participation_minutes']
-                    username = payout['username'][:14]  # Slightly longer names for better readability
+                    username = payout['username'][:16]  # Longer names with cleaner format
                     
                     if payout.get('is_donor', False):
-                        left_entry = f"💝 {username:<14} DONATED        {participation_minutes:>3.0f}min"
+                        left_entry = f"{username:<16} DONATED      {participation_minutes:>3.0f}min"
                     else:
-                        left_entry = f"💰 {username:<14} {final_amount:>10,.0f} aUEC {participation_minutes:>3.0f}min"
+                        left_entry = f"{username:<16} {final_amount:>8,.0f} au  {participation_minutes:>3.0f}min"
                 
-                # Right column entry with optimized spacing
+                # Right column entry with cleaned formatting  
                 if i < len(right_column):
                     payout = right_column[i]
                     final_amount = payout['final_payout_auec']
                     participation_minutes = payout['participation_minutes']
-                    username = payout['username'][:14]  # Slightly longer names for better readability
+                    username = payout['username'][:16]  # Longer names with cleaner format
                     
                     if payout.get('is_donor', False):
-                        right_entry = f"💝 {username:<14} DONATED        {participation_minutes:>3.0f}min"
+                        right_entry = f"{username:<16} DONATED      {participation_minutes:>3.0f}min"
                     else:
-                        right_entry = f"💰 {username:<14} {final_amount:>10,.0f} aUEC {participation_minutes:>3.0f}min"
+                        right_entry = f"{username:<16} {final_amount:>8,.0f} au  {participation_minutes:>3.0f}min"
                 
-                # Combine columns with optimized spacing for maximum embed width
+                # Combine columns with double spacing
                 if right_entry:
-                    payout_lines.append(f"{left_entry:<50} │ {right_entry}")
+                    payout_lines.append(f"{left_entry:<42} │ {right_entry}")
+                    payout_lines.append("")  # Double spacing
                 else:
                     payout_lines.append(f"{left_entry}")
+                    payout_lines.append("")  # Double spacing
             
             # Format payouts in code block for better alignment with max width
             payout_summary = "```\n" + "\n".join(payout_lines) + "\n```"
