@@ -528,13 +528,16 @@ class PayoutManagementView(ui.View):
             
             # Initialize donation states - prioritize session data over calculation data
             session_donation_states = session.get('donation_states', {})
+            logger.info(f"Loading donation states - session has: {session_donation_states}")
             if session_donation_states:
                 self.donation_states = session_donation_states
+                logger.info(f"Loaded donation states from session: {self.donation_states}")
             else:
                 # Fall back to calculation data for initial state
                 for payout in calculation_data.get('payouts', []):
                     user_id = str(payout['user_id'])
                     self.donation_states[user_id] = payout.get('is_donor', False)
+                logger.info(f"Initialized donation states from calculation data: {self.donation_states}")
             
             # Create embed with enhanced formatting and wider layout
             embed = discord.Embed(
@@ -704,17 +707,27 @@ class ParticipantDonationButton(ui.Button):
             # Get parent view and toggle donation state
             old_view = self.view
             current_state = old_view.donation_states.get(self.user_id, False)
-            old_view.donation_states[self.user_id] = not current_state
+            new_state = not current_state
+            old_view.donation_states[self.user_id] = new_state
+            
+            # Debug logging
+            logger.info(f"Donation button clicked for {self.user_id} ({self.username}): {current_state} -> {new_state}")
             
             # Update session with new donation state
             await session_manager.update_session(old_view.session_id, {
                 'donation_states': old_view.donation_states
             })
+            logger.info(f"Updated session donation states: {old_view.donation_states}")
             
             # Create a completely new view - it will load the updated donation states from the session
             new_view = PayoutManagementView(old_view.session_id)
             embed = await new_view.create_embed()
+            
+            # Debug: verify new view loaded correct states
+            logger.info(f"New view donation states: {new_view.donation_states}")
+            
             await interaction.edit_original_response(embed=embed, view=new_view)
+            logger.info(f"Successfully updated view for donation toggle")
             
         except Exception as e:
             logger.error(f"Error toggling donation for {self.user_id}: {e}")
