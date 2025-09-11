@@ -531,16 +531,17 @@ class PayoutManagementView(ui.View):
                 user_id = str(payout['user_id'])
                 self.donation_states[user_id] = payout.get('is_donor', False)
             
-            # Create embed with enhanced formatting
+            # Create embed with enhanced formatting and wider layout
             embed = discord.Embed(
                 title="# 💰 Step 4: Payout Management",
                 description=f"## **Event Management Dashboard**\n\n"
                           f"```yaml\n"
                           f"Event ID:      {calculation_data['event_data']['event_id']}\n"
-                          f"Total Value:   {calculation_data['total_value_auec']:>12,.0f} aUEC\n"
-                          f"Participants:  {calculation_data['total_participants']:>12}\n"
+                          f"Total Value:   {calculation_data['total_value_auec']:>15,.0f} aUEC\n"
+                          f"Participants:  {calculation_data['total_participants']:>15}\n"
                           f"```\n"
-                          f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                          f"**Click participant buttons to toggle donation status. Green = Donating, Gray = Receiving**\n"
+                          f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
                 color=discord.Color.gold()
             )
             
@@ -561,12 +562,10 @@ class PayoutManagementView(ui.View):
                 is_donating = payout['is_donor']
                 
                 if is_donating:
-                    payout_text += f"☑️ **{username}** - {minutes:.0f}min ({percentage:.1f}%)\n"
-                    payout_text += f"    💝 **Final Amount: 0 aUEC** (DONATED)\n\n"
+                    payout_text += f"💝 **{username[:18]}** - {minutes:.0f}min ({percentage:.1f}%) → **DONATED**\n"
                     total_donated += float(payout['base_payout_auec'])
                 else:
-                    payout_text += f"□ **{username}** - {minutes:.0f}min ({percentage:.1f}%)\n"
-                    payout_text += f"    💰 **Final Amount: {final_amount:,.0f} aUEC**\n\n"
+                    payout_text += f"💰 **{username[:18]}** - {minutes:.0f}min ({percentage:.1f}%) → **{final_amount:,.0f} aUEC**\n"
                     total_recipients += 1
             
             # Calculate bonus distribution with enhanced formatting
@@ -680,17 +679,17 @@ class ParticipantDonationButton(ui.Button):
         # Set button appearance based on donation status with enhanced visual feedback
         if is_donating:
             super().__init__(
-                label=f"🎁 {username[:15]} - DONATING",
+                label=f"💝 {username[:15]} - DONATED",
                 style=discord.ButtonStyle.success,  # Green for donating
                 custom_id=f"donate_{user_id}",
-                emoji="✅"
+                emoji="💝"
             )
         else:
             super().__init__(
                 label=f"💰 {username[:15]} - RECEIVING",
-                style=discord.ButtonStyle.primary,   # Blue for receiving
+                style=discord.ButtonStyle.secondary,   # Gray for receiving
                 custom_id=f"receive_{user_id}",
-                emoji="💸"
+                emoji="💰"
             )
     
     async def callback(self, interaction: discord.Interaction):
@@ -775,28 +774,37 @@ class FinalizePayrollButton(ui.Button):
             
             # Show final summary
             embed = discord.Embed(
-                title="✅ Payroll Finalized!",
-                description=f"**Event:** {calculation_data['event_data']['event_id']}\n"
-                          f"**Total Value:** {calculation_data['total_value_auec']:,.0f} aUEC\n"
-                          f"**Participants:** {calculation_data['total_participants']}",
+                title="# ✅ Payroll Finalized!",
+                description=f"## **Mining Session Complete**\n\n"
+                          f"```yaml\n"
+                          f"Event ID:      {calculation_data['event_data']['event_id']}\n"
+                          f"Total Value:   {calculation_data['total_value_auec']:>15,.0f} aUEC\n"
+                          f"Participants:  {calculation_data['total_participants']:>15}\n"
+                          f"```\n"
+                          f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
                 color=discord.Color.green(),
                 timestamp=datetime.now()
             )
             
-            # Add final payout summary with participation time
-            payout_summary = ""
+            # Add final payout summary with enhanced formatting for multiple rows
+            payout_lines = []
             total_donated_final = Decimal('0')
             
+            # Create formatted table of payouts
             for payout in updated_payouts:
                 final_amount = payout['final_payout_auec']
                 participation_minutes = payout['participation_minutes']
+                username = payout['username'][:15]  # Limit username length for table alignment
                 
                 # Calculate total donated from updated payouts
                 if payout.get('is_donor', False):
                     total_donated_final += payout['base_payout_auec']
-                    payout_summary += f"💝 **{payout['username']}:** DONATED ({participation_minutes:.0f} min)\n"
+                    payout_lines.append(f"💝  {username:<15}  DONATED        ({participation_minutes:>3.0f} min)")
                 else:
-                    payout_summary += f"💰 **{payout['username']}:** {final_amount:,.0f} aUEC ({participation_minutes:.0f} min)\n"
+                    payout_lines.append(f"💰  {username:<15}  {final_amount:>10,.0f} aUEC  ({participation_minutes:>3.0f} min)")
+            
+            # Format payouts in code block for better alignment
+            payout_summary = "```\n" + "\n".join(payout_lines) + "\n```"
             
             embed.add_field(
                 name="💰 Final Payouts",
@@ -996,18 +1004,28 @@ class OrePriceModal(ui.Modal):
         await interaction.response.defer()
         
         try:
-            # Parse price
-            new_price = float(self.price_input.value.replace(',', ''))
+            # Parse price with better validation
+            price_str = self.price_input.value.replace(',', '').replace(' ', '').strip()
+            if not price_str:
+                await interaction.followup.send("❌ Price cannot be empty", ephemeral=True)
+                return
+                
+            new_price = float(price_str)
             if new_price < 0:
                 await interaction.followup.send("❌ Price cannot be negative", ephemeral=True)
                 return
             
-            # Update session with custom price
+            # Update session with custom price using the standard update method
             session = await session_manager.get_session(self.session_id)
+            if not session:
+                await interaction.followup.send("❌ Session not found", ephemeral=True)
+                return
+                
             custom_prices = session.get('custom_prices', {})
             custom_prices[self.ore_name] = new_price
             
-            await session_manager.set_custom_pricing_data(self.session_id, custom_prices)
+            # Use the standard update_session method instead of set_custom_pricing_data
+            await session_manager.update_session(self.session_id, {'custom_prices': custom_prices})
             
             # Refresh the view
             view = CustomPricingView(self.session_id)
@@ -1015,11 +1033,12 @@ class OrePriceModal(ui.Modal):
             
             await interaction.edit_original_response(embed=embed, view=view)
             
-        except ValueError:
+        except ValueError as e:
+            logger.error(f"ValueError setting custom price for {self.ore_name}: {e}")
             await interaction.followup.send("❌ Invalid price format. Please enter a valid number.", ephemeral=True)
         except Exception as e:
             logger.error(f"Error setting custom price for {self.ore_name}: {e}")
-            await interaction.followup.send("❌ Error setting custom price", ephemeral=True)
+            await interaction.followup.send(f"❌ Error setting custom price: {str(e)}", ephemeral=True)
 
 
 class ContinueToPricingReviewButton(ui.Button):
