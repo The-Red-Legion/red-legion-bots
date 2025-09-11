@@ -709,12 +709,12 @@ class DonationConfirmationModal(ui.Modal):
             timeout=300
         )
         
-        # Add confirmation text
+        # Add confirmation display (read-only info)
         self.confirmation = ui.TextInput(
             label=f"{username} wishes to donate their share",
-            placeholder="Type 'CONFIRM' to proceed with donation",
+            placeholder="Click Submit to confirm donation",
             default=f"Donating {donation_amount:,.0f} aUEC",
-            required=True,
+            required=False,
             max_length=100,
             style=discord.TextStyle.short
         )
@@ -724,27 +724,24 @@ class DonationConfirmationModal(ui.Modal):
         await interaction.response.defer()
         
         try:
-            # Validate confirmation
-            if self.confirmation.value.upper() != "CONFIRM":
-                await interaction.followup.send(
-                    "❌ Donation cancelled. You must type 'CONFIRM' to proceed.", 
-                    ephemeral=True
-                )
-                return
-            
             # Update donation state in parent view
             self.parent_view.donation_states[self.user_id] = True
+            
+            logger.info(f"DONATION MODAL: Updated parent view donation states: {self.parent_view.donation_states}")
             
             # Update session with new donation state
             await session_manager.update_session(self.session_id, {
                 'donation_states': self.parent_view.donation_states
             })
             
-            logger.info(f"Confirmed donation for {self.username} ({self.user_id}): {self.donation_amount:,.0f} aUEC")
+            logger.info(f"DONATION MODAL: Confirmed donation for {self.username} ({self.user_id}): {self.donation_amount:,.0f} aUEC")
             
             # Create fresh view with updated states and auto-refresh
             new_view = PayoutManagementView(self.session_id)
             await new_view.ensure_donation_states_loaded()
+            
+            logger.info(f"DONATION MODAL: New view donation states after loading: {new_view.donation_states}")
+            
             embed = await new_view.create_embed()
             
             await interaction.edit_original_response(
@@ -770,12 +767,12 @@ class UndoDonationConfirmationModal(ui.Modal):
             timeout=300
         )
         
-        # Add confirmation text
+        # Add confirmation display (read-only info)
         self.confirmation = ui.TextInput(
             label=f"Undo {username}'s donation",
-            placeholder="Type 'UNDO' to cancel donation and return to receiving",
+            placeholder="Click Submit to cancel donation and return to receiving",
             default=f"Return {username} to receiving payouts",
-            required=True,
+            required=False,
             max_length=100,
             style=discord.TextStyle.short
         )
@@ -785,14 +782,6 @@ class UndoDonationConfirmationModal(ui.Modal):
         await interaction.response.defer()
         
         try:
-            # Validate confirmation
-            if self.confirmation.value.upper() != "UNDO":
-                await interaction.followup.send(
-                    "❌ Undo cancelled. You must type 'UNDO' to proceed.", 
-                    ephemeral=True
-                )
-                return
-            
             # Update donation state in parent view
             self.parent_view.donation_states[self.user_id] = False
             
