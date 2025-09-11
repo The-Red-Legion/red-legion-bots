@@ -544,28 +544,29 @@ class PayoutManagementView(ui.View):
                 color=discord.Color.gold()
             )
             
-            # Add participant payout details
+            # Add participant payout details with live calculations
             payout_text = ""
+            
+            # First, recalculate all payouts with current donation states
+            updated_payouts = self.recalculate_with_donations(calculation_data['payouts'], self.donation_states)
+            
             total_donated = 0
             total_recipients = 0
             
-            for payout in calculation_data['payouts']:
-                user_id = str(payout['user_id'])
-                is_donating = self.donation_states.get(user_id, False)
-                
+            for payout in updated_payouts:
                 username = payout['username']
                 minutes = payout['participation_minutes']
                 percentage = payout['participation_percentage']
-                base_payout = payout['base_payout_auec']
+                final_amount = float(payout['final_payout_auec'])
+                is_donating = payout['is_donor']
                 
                 if is_donating:
                     payout_text += f"☑️ **{username}** - {minutes:.0f}min ({percentage:.1f}%)\n"
-                    payout_text += f"    💝 Donating: {base_payout:,.0f} aUEC\n\n"
-                    total_donated += float(base_payout)
+                    payout_text += f"    💝 **Final Amount: 0 aUEC** (DONATED)\n\n"
+                    total_donated += float(payout['base_payout_auec'])
                 else:
-                    final_payout = float(base_payout)  # Will be recalculated with bonuses
                     payout_text += f"□ **{username}** - {minutes:.0f}min ({percentage:.1f}%)\n"
-                    payout_text += f"    💰 Receiving: {final_payout:,.0f} aUEC + bonus\n\n"
+                    payout_text += f"    💰 **Final Amount: {final_amount:,.0f} aUEC**\n\n"
                     total_recipients += 1
             
             # Calculate bonus distribution with enhanced formatting
@@ -593,6 +594,46 @@ class PayoutManagementView(ui.View):
         except Exception as e:
             logger.error(f"Error creating payout management embed: {e}")
             return self.create_error_embed(f"Error: {str(e)}")
+    
+    def recalculate_with_donations(self, original_payouts, donation_states):
+        """Recalculate payouts based on current donation states."""
+        updated_payouts = []
+        total_donated = Decimal('0')
+        recipients = []
+        
+        # First pass: identify donors and recipients
+        for payout in original_payouts:
+            user_id = str(payout['user_id'])
+            is_donating = donation_states.get(user_id, False)
+            base_payout = Decimal(str(payout['base_payout_auec']))
+            
+            updated_payout = {
+                'user_id': payout['user_id'],
+                'username': payout['username'],
+                'participation_minutes': payout['participation_minutes'],
+                'participation_percentage': payout['participation_percentage'],
+                'base_payout_auec': base_payout,
+                'is_donor': is_donating
+            }
+            
+            if is_donating:
+                total_donated += base_payout
+                updated_payout['final_payout_auec'] = Decimal('0')
+            else:
+                recipients.append(updated_payout)
+                updated_payout['final_payout_auec'] = base_payout  # Will be updated with bonus
+            
+            updated_payouts.append(updated_payout)
+        
+        # Second pass: distribute donated amounts to recipients
+        if total_donated > 0 and recipients:
+            bonus_per_recipient = total_donated / len(recipients)
+            for payout in updated_payouts:
+                if not payout['is_donor']:
+                    payout['final_payout_auec'] += bonus_per_recipient
+                    payout['final_payout_auec'] = payout['final_payout_auec'].quantize(Decimal('0.01'))
+        
+        return updated_payouts
     
     def add_participant_buttons(self, payouts):
         """Add toggle buttons for each participant."""
@@ -661,7 +702,12 @@ class ParticipantDonationButton(ui.Button):
             current_state = view.donation_states.get(self.user_id, False)
             view.donation_states[self.user_id] = not current_state
             
-            # Recreate embed with updated states
+            # Update session with new donation state
+            await session_manager.update_session(view.session_id, {
+                'donation_states': view.donation_states
+            })
+            
+            # Recreate embed with updated states (this will recreate buttons)
             embed = await view.create_embed()
             await interaction.edit_original_response(embed=embed, view=view)
             
@@ -718,7 +764,7 @@ class FinalizePayrollButton(ui.Button):
             view = self.view
             
             # Update payouts with current donation states and recalculate
-            updated_payouts = self.recalculate_with_donations(calculation_data['payouts'], view.donation_states)
+            updated_payouts = view.recalculate_with_donations(calculation_data['payouts'], view.donation_states)
             
             # Complete session
             await session_manager.complete_calculation(self.session_id, {
@@ -748,8 +794,9 @@ class FinalizePayrollButton(ui.Button):
                 # Calculate total donated from updated payouts
                 if payout.get('is_donor', False):
                     total_donated_final += payout['base_payout_auec']
-                
-                payout_summary += f"💰 **{payout['username']}:** {final_amount:,.0f} aUEC ({participation_minutes:.0f} min)\n"
+                    payout_summary += f"💝 **{payout['username']}:** DONATED ({participation_minutes:.0f} min)\n"
+                else:
+                    payout_summary += f"💰 **{payout['username']}:** {final_amount:,.0f} aUEC ({participation_minutes:.0f} min)\n"
             
             embed.add_field(
                 name="💰 Final Payouts",
@@ -770,46 +817,6 @@ class FinalizePayrollButton(ui.Button):
         except Exception as e:
             logger.error(f"Error finalizing payroll: {e}")
             await interaction.followup.send(f"❌ Error finalizing payroll: {str(e)}", ephemeral=True)
-    
-    def recalculate_with_donations(self, original_payouts, donation_states):
-        """Recalculate payouts based on current donation states."""
-        updated_payouts = []
-        total_donated = Decimal('0')
-        recipients = []
-        
-        # First pass: identify donors and recipients
-        for payout in original_payouts:
-            user_id = str(payout['user_id'])
-            is_donating = donation_states.get(user_id, False)
-            base_payout = Decimal(str(payout['base_payout_auec']))
-            
-            updated_payout = {
-                'user_id': payout['user_id'],
-                'username': payout['username'],
-                'participation_minutes': payout['participation_minutes'],
-                'participation_percentage': payout['participation_percentage'],
-                'base_payout_auec': base_payout,
-                'is_donor': is_donating
-            }
-            
-            if is_donating:
-                total_donated += base_payout
-                updated_payout['final_payout_auec'] = Decimal('0')
-            else:
-                recipients.append(updated_payout)
-                updated_payout['final_payout_auec'] = base_payout  # Will be updated with bonus
-            
-            updated_payouts.append(updated_payout)
-        
-        # Second pass: distribute donated amounts to recipients
-        if total_donated > 0 and recipients:
-            bonus_per_recipient = total_donated / len(recipients)
-            for payout in updated_payouts:
-                if not payout['is_donor']:
-                    payout['final_payout_auec'] += bonus_per_recipient
-                    payout['final_payout_auec'] = payout['final_payout_auec'].quantize(Decimal('0.01'))
-        
-        return updated_payouts
 
 
 class BackToCalculationButton(ui.Button):
