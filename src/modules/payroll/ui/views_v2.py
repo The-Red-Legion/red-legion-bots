@@ -681,17 +681,17 @@ class ParticipantDonationButton(ui.Button):
         self.username = username
         self.session_id = session_id
         
-        # Set button appearance based on donation status with enhanced visual feedback
+        # Set button appearance with clear visual feedback like custom pricing buttons
         if is_donating:
             super().__init__(
-                label=f"💝 {username[:15]} - DONATED",
+                label=f"{username[:15]} (Donating)",
                 style=discord.ButtonStyle.success,  # Green for donating
                 custom_id=f"donate_{user_id}",
                 emoji="💝"
             )
         else:
             super().__init__(
-                label=f"💰 {username[:15]} - RECEIVING",
+                label=f"{username[:15]} (Receiving)",
                 style=discord.ButtonStyle.secondary,   # Gray for receiving
                 custom_id=f"receive_{user_id}",
                 emoji="💰"
@@ -796,7 +796,10 @@ class FinalizePayrollButton(ui.Button):
             payout_lines = []
             total_donated_final = Decimal('0')
             
-            # Create formatted table of payouts
+            # Create formatted table of payouts with better spacing and columns
+            payout_lines.append("PARTICIPANT       STATUS            AMOUNT         TIME")
+            payout_lines.append("─" * 58)
+            
             for payout in updated_payouts:
                 final_amount = payout['final_payout_auec']
                 participation_minutes = payout['participation_minutes']
@@ -805,9 +808,9 @@ class FinalizePayrollButton(ui.Button):
                 # Calculate total donated from updated payouts
                 if payout.get('is_donor', False):
                     total_donated_final += payout['base_payout_auec']
-                    payout_lines.append(f"💝  {username:<15}  DONATED        ({participation_minutes:>3.0f} min)")
+                    payout_lines.append(f"{username:<16}  💝 DONATED       {'─':<13}  {participation_minutes:>3.0f} min")
                 else:
-                    payout_lines.append(f"💰  {username:<15}  {final_amount:>10,.0f} aUEC  ({participation_minutes:>3.0f} min)")
+                    payout_lines.append(f"{username:<16}  💰 RECEIVED      {final_amount:>10,.0f} aUEC  {participation_minutes:>3.0f} min")
             
             # Format payouts in code block for better alignment
             payout_summary = "```\n" + "\n".join(payout_lines) + "\n```"
