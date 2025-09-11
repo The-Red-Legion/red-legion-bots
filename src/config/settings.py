@@ -43,6 +43,9 @@ def get_database_url():
 
 def _fix_database_url_encoding(db_url):
     """Fix URL encoding issues in database connection strings."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if not db_url:
         return db_url
     
@@ -63,7 +66,7 @@ def _fix_database_url_encoding(db_url):
             
             # Check if password is already URL-encoded by looking for % patterns
             if '%' in password and any(c in password for c in ['%23', '%2A', '%3F', '%21']):
-                print("Database URL encoding: Password already URL-encoded, using as-is")
+                logger.debug("Database URL encoding: Password already URL-encoded, using as-is")
                 return db_url
             
             # URL-encode only the password if it contains special characters
@@ -71,18 +74,18 @@ def _fix_database_url_encoding(db_url):
                 encoded_password = quote(password, safe='')
                 # Reconstruct the URL
                 fixed_url = f"{protocol}{username}:{encoded_password}@{host_port_db}"
-                print("Database URL encoding: Fixed special characters in password")
+                logger.debug("Database URL encoding: Fixed special characters in password")
                 return fixed_url
             else:
-                print("Database URL encoding: No special characters found, using as-is")
+                logger.debug("Database URL encoding: No special characters found, using as-is")
                 return db_url
         else:
             # If the regex doesn't match, return the original URL
-            print("Database URL encoding: Could not parse URL format, using as-is")
+            logger.debug("Database URL encoding: Could not parse URL format, using as-is")
             return db_url
             
     except Exception as e:
-        print(f"Warning: Could not fix database URL encoding: {e}")
+        logger.warning(f"Could not fix database URL encoding: {e}")
         return db_url
 
 # UEX API Configuration
@@ -158,15 +161,15 @@ ORE_TYPES = {
     "SILICON": "Silicon"
 }
 
-# Sunday Mining Configuration
+# Sunday Mining Configuration - Updated with correct Discord channel IDs
 SUNDAY_MINING_CHANNELS_FALLBACK = {
-    'dispatch': '1385774416755163247',
-    'alpha': '1386367354753257583',
-    'bravo': '1386367395643449414',
-    'charlie': '1386367464279478313',
-    'delta': '1386368182421635224',
-    'echo': '1386368221877272616',
-    'foxtrot': '1386368253712375828'
+    'dispatch': '1385774416755163247',  # Dispatch/Main
+    'alpha': '1386367354753257583',     # Group Alpha  
+    'bravo': '1385774498745159762',     # Group Bravo
+    'charlie': '1386344354930757782',   # Group Charlie
+    'delta': '1386344411151204442',     # Group Delta
+    'echo': '1386344461541445643',      # Group Echo
+    'foxtrot': '1386344513076854895'    # Group Foxtrot
 }
 
 def get_sunday_mining_channels(guild_id=None):
@@ -187,3 +190,13 @@ def get_sunday_mining_channels(guild_id=None):
     # Fallback to hardcoded channels
     print("Using fallback mining channels")
     return SUNDAY_MINING_CHANNELS_FALLBACK
+
+def get_config():
+    """Get complete bot configuration for admin commands."""
+    return {
+        'discord': get_discord_config(),
+        'database_url': get_database_url(),
+        'mining_channels': get_sunday_mining_channels(),
+        'uex_api': UEX_API_CONFIG,
+        'ore_types': ORE_TYPES
+    }

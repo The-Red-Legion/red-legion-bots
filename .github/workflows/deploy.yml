@@ -4,6 +4,16 @@ on:
   pull_request:
     branches: [main]
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for deployment'
+        required: true
+        default: 'Manual deployment'
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
 
 permissions:
   contents: write
@@ -16,13 +26,17 @@ jobs:
   # Phase 1: Infrastructure Preparation
   infrastructure-setup:
     runs-on: ubuntu-latest
-    if: github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'Ready To Deploy')
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'Ready To Deploy')) ||
+      github.event_name == 'workflow_dispatch'
     outputs:
       vm_ip: ${{ steps.vm_info.outputs.vm_ip }}
       ssh_status: ${{ steps.ssh_test.outputs.status }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.head_ref }}
       
       - name: Authenticate with GCP
         uses: google-github-actions/auth@v2
@@ -96,6 +110,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.head_ref }}
       
       - name: Download Ansible Inventory
         uses: actions/download-artifact@v4
@@ -354,7 +370,15 @@ jobs:
               console.log('Ready to Merge label added successfully');
               
               // Add success comment with job details
-              const deploymentSummary = "## ✅ Full Deployment Successful\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ✅ Success | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip }} |\n| Full Codebase Deployment | ✅ Success | ${{ needs.full-codebase-deployment.outputs.deployment_status }} |\n| Health Verification | ✅ Success | Process: ${{ needs.health-verification.outputs.process_status }} |\n| Log Collection | ✅ Success | Logs captured successfully |\n\n🚀 **Bot Status:** Complete codebase has been deployed and bot is responding to Discord.\n\n**Next Steps:** Add the `merge` label to trigger the merge workflow.";
+              const deploymentSummary = '## ✅ Full Deployment Successful\n\n' +
+                                      '| Phase | Status | Details |\n' +
+                                      '|-------|--------|---------|\n' +
+                                      '| Infrastructure Setup | ✅ Success | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip }} |\n' +
+                                      '| Full Codebase Deployment | ✅ Success | ${{ needs.full-codebase-deployment.outputs.deployment_status }} |\n' +
+                                      '| Health Verification | ✅ Success | Process: ${{ needs.health-verification.outputs.process_status }} |\n' +
+                                      '| Log Collection | ✅ Success | Logs captured successfully |\n\n' +
+                                      '🚀 **Bot Status:** Complete codebase has been deployed and bot is responding to Discord.\n\n' +
+                                      '**Next Steps:** Add the `merge` label to trigger the merge workflow.';
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -408,7 +432,21 @@ jobs:
               if ('${{ needs.full-codebase-deployment.result }}' === 'failure') failureDetails.push('Full Codebase Deployment');
               if ('${{ needs.health-verification.result }}' === 'failure') failureDetails.push('Health Verification');
               
-              const failureSummary = "## ❌ Full Deployment Failed\n\n| Phase | Status | Details |\n|-------|--------|---------|\n| Infrastructure Setup | ${{ needs.infrastructure-setup.result == 'success' && '✅ Success' || '❌ Failed' }} | VM IP: ${{ needs.infrastructure-setup.outputs.vm_ip || 'Not available' }} |\n| Full Codebase Deployment | ${{ needs.full-codebase-deployment.result == 'success' && '✅ Success' || '❌ Failed' }} | ${{ needs.full-codebase-deployment.outputs.deployment_status || 'Failed' }} |\n| Health Verification | ${{ needs.health-verification.result == 'success' && '✅ Success' || '❌ Failed' }} | Process: ${{ needs.health-verification.outputs.process_status || 'Unknown' }} |\n\n**Failed phases:** " + (failureDetails.join(', ') || 'Multiple phases failed') + "\n\n**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.";
+              const infraStatus = '${{ needs.infrastructure-setup.result }}' === 'success' ? '✅ Success' : '❌ Failed';
+              const deployStatus = '${{ needs.full-codebase-deployment.result }}' === 'success' ? '✅ Success' : '❌ Failed';
+              const healthStatus = '${{ needs.health-verification.result }}' === 'success' ? '✅ Success' : '❌ Failed';
+              const vmIp = '${{ needs.infrastructure-setup.outputs.vm_ip }}' || 'Not available';
+              const deploymentStatus = '${{ needs.full-codebase-deployment.outputs.deployment_status }}' || 'Failed';
+              const processStatus = '${{ needs.health-verification.outputs.process_status }}' || 'Unknown';
+              
+              const failureSummary = '## ❌ Full Deployment Failed\n\n' +
+                                      '| Phase | Status | Details |\n' +
+                                      '|-------|--------|---------|\n' +
+                                      '| Infrastructure Setup | ' + infraStatus + ' | VM IP: ' + vmIp + ' |\n' +
+                                      '| Full Codebase Deployment | ' + deployStatus + ' | ' + deploymentStatus + ' |\n' +
+                                      '| Health Verification | ' + healthStatus + ' | Process: ' + processStatus + ' |\n\n' +
+                                      '**Failed phases:** ' + (failureDetails.join(', ') || 'Multiple phases failed') + '\n\n' +
+                                      '**Action Required:** Review the deployment logs above for detailed error information. Once fixed, tests will need to pass again before re-attempting deployment.';
               
               await github.rest.issues.createComment({
                 owner: context.repo.owner,

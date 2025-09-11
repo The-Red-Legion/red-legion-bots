@@ -29,9 +29,9 @@ The Red Legion bot reorganization required updates to GitHub workflows and deplo
 **Before:**
 ```yaml
 - name: Test Python imports before starting bot
-  command: python3 -c "import src.participation_bot; print('Import successful')"
+  command: python3 -c "import src.main; print('Import successful')"
 
-ExecStart=/usr/bin/python3 -m src.participation_bot
+ExecStart=/usr/bin/python3 -m src.main
 ```
 
 **After:**

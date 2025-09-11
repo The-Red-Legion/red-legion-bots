@@ -9,12 +9,92 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
+import random
+import string
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database.connection import DatabaseManager, resolve_database_url
 from database.models import User, Guild, MiningEvent, MiningParticipation
+
+# Event ID Prefix Configuration
+EVENT_ID_PREFIXES = {
+    'mining': 'sm',        # Sunday Mining
+    'operation': 'op',     # Military Operations  
+    'training': 'tr',      # Training Events
+    'social': 'sc',        # Social Events
+    'tournament': 'tm',    # Tournaments
+    'expedition': 'ex',    # Exploration Expeditions
+    'test': 'test'         # Test Events
+}
+
+def generate_prefixed_event_id(event_type: str = 'mining', length: int = 5) -> str:
+    """
+    Generate a prefixed event ID based on event type.
+    
+    Args:
+        event_type: Type of event ('mining', 'operation', 'training', etc.)
+        length: Length of random suffix (default: 5)
+        
+    Returns:
+        Prefixed event ID (e.g., 'sm-12345', 'op-67890')
+    """
+    prefix = EVENT_ID_PREFIXES.get(event_type, 'ev')  # Default to 'ev' if unknown
+    
+    # Generate random numeric suffix (5 digits)
+    chars = '0123456789'
+    
+    suffix = ''.join(random.choice(chars) for _ in range(length))
+    
+    return f"{prefix}-{suffix}"
+
+def validate_event_id_format(event_id: str) -> bool:
+    """
+    Validate that an event ID follows the expected prefix format.
+    
+    Args:
+        event_id: Event ID to validate
+        
+    Returns:
+        True if valid format, False otherwise
+    """
+    if not event_id or '-' not in event_id:
+        return False
+    
+    prefix, suffix = event_id.split('-', 1)
+    
+    # Check if prefix is known
+    if prefix not in EVENT_ID_PREFIXES.values():
+        return False
+        
+    # Check suffix format (alphanumeric, reasonable length)
+    if not suffix.isalnum() or len(suffix) < 4 or len(suffix) > 10:
+        return False
+        
+    return True
+
+def get_event_type_from_id(event_id: str) -> str:
+    """
+    Extract event type from prefixed event ID.
+    
+    Args:
+        event_id: Prefixed event ID (e.g., 'sm-a7k2m9')
+        
+    Returns:
+        Event type string ('mining', 'operation', etc.) or 'unknown'
+    """
+    if not event_id or '-' not in event_id:
+        return 'unknown'
+    
+    prefix = event_id.split('-')[0]
+    
+    # Find event type by prefix
+    for event_type, type_prefix in EVENT_ID_PREFIXES.items():
+        if type_prefix == prefix:
+            return event_type
+    
+    return 'unknown'
 
 class BaseOperations:
     """Base class for database operations."""
@@ -223,10 +303,10 @@ def get_mining_channels_dict(database_url, guild_id):
         
         # Query mining channels for the guild
         c.execute('''
-            SELECT channel_name, channel_id 
+            SELECT name, channel_id 
             FROM mining_channels 
             WHERE guild_id = %s AND is_active = TRUE
-            ORDER BY channel_name
+            ORDER BY name
         ''', (guild_id,))
         
         rows = c.fetchall()
@@ -409,7 +489,7 @@ def remove_mining_channel(database_url, guild_id, channel_id):
         with conn.cursor() as cursor:
             # Check if channel exists
             cursor.execute("""
-                SELECT channel_name FROM mining_channels 
+                SELECT name FROM mining_channels 
                 WHERE guild_id = %s AND channel_id = %s AND is_active = true
             """, (str(guild_id), str(channel_id)))
             
@@ -749,37 +829,44 @@ def create_mining_event(database_url, guild_id, event_date=None, event_name="Sun
         with conn.cursor() as cursor:
             # Check if event already exists for this date and guild
             cursor.execute("""
-                SELECT event_id FROM mining_events 
-                WHERE guild_id = %s AND event_date = %s AND is_active = true
+                SELECT name, id FROM events 
+                WHERE guild_id = %s AND event_date = %s AND is_open = true
                 LIMIT 1
-            """, (str(guild_id), event_date))
+            """, (int(guild_id), event_date))
             
             existing_event = cursor.fetchone()
             if existing_event:
-                print(f"✅ Found existing mining event {existing_event[0]} for {event_date}")
-                return existing_event[0]
+                # Return the prefixed ID (name) if it exists, otherwise create one from integer ID
+                existing_name = existing_event[0] if existing_event[0] else f"sm-{existing_event[1]:06d}"
+                print(f"✅ Found existing mining event {existing_name} for {event_date}")
+                return existing_name
             
-            # Create new event
+            # Generate prefixed event ID
+            prefixed_event_id = generate_prefixed_event_id('mining')
+            
+            # Create new event using the prefixed ID as the event name/identifier
+            print(f"🔍 Creating event with prefixed ID: {prefixed_event_id}")
+            print(f"🔍 Event details: guild_id={guild_id}, name='{prefixed_event_id}', event_name='{event_name}', date={event_date}")
+            
             cursor.execute("""
-                INSERT INTO mining_events (
-                    guild_id, name, event_date, event_type, status, 
-                    start_time, is_active, created_at, updated_at
+                INSERT INTO events (
+                    guild_id, name, event_name, event_date, event_time, is_open, is_active
                 ) VALUES (
-                    %s, %s, %s, 'mining', 'active', 
-                    %s, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                ) RETURNING event_id
+                    %s, %s, %s, %s, %s, true, true
+                ) RETURNING id
             """, (
-                str(guild_id), 
-                event_name, 
+                int(guild_id),      # Convert to BIGINT 
+                prefixed_event_id,  # Use prefixed ID as unique name/identifier
+                event_name,         # Human-readable event name for display
                 event_date,
-                datetime.now()
+                datetime.now()      # Add event_time
             ))
+            integer_event_id = cursor.fetchone()[0]
+            print(f"✅ Created event with database ID {integer_event_id} and prefixed ID: {prefixed_event_id}")
             
-            event_id = cursor.fetchone()[0]
             conn.commit()
-            
-            print(f"✅ Created mining event {event_id} for guild {guild_id} on {event_date}")
-            return event_id
+            print(f"✅ Created mining event {prefixed_event_id} for guild {guild_id} on {event_date}")
+            return prefixed_event_id
             
     except Exception as e:
         print(f"❌ Error creating mining event: {e}")
@@ -844,42 +931,37 @@ def get_open_mining_events(database_url, guild_id=None):
     """Get open/active mining events from the database."""
     try:
         import psycopg2
-        from urllib.parse import urlparse
+        from .connection import resolve_database_url
         
-        # Convert database_url to use proxy if running locally
-        parsed = urlparse(database_url)
-        if parsed.hostname not in ['127.0.0.1', 'localhost']:
-            proxy_url = database_url.replace(f'{parsed.hostname}:{parsed.port}', '127.0.0.1:5433')
-            try:
-                conn = psycopg2.connect(proxy_url)
-            except psycopg2.OperationalError:
-                conn = psycopg2.connect(database_url)
-        else:
-            conn = psycopg2.connect(database_url)
+        # Use standardized database connection approach
+        resolved_url = resolve_database_url(database_url)
+        conn = psycopg2.connect(resolved_url)
         
         cursor = conn.cursor()
         
         if guild_id:
             # Get open events for specific guild
             cursor.execute("""
-                SELECT event_id, guild_id, event_date, start_time, name, status,
-                       0 as total_participants, total_value_auec, 
-                       false as payroll_processed, false as pdf_generated,
+                SELECT id, guild_id, event_date, event_time as start_time, name, 
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value, 
+                       payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
-                WHERE guild_id = %s AND status IN ('planned', 'active') AND is_active = true
-                ORDER BY start_time DESC
-            """, (str(guild_id),))
+                FROM events 
+                WHERE guild_id = %s AND is_open = true AND is_active = true
+                ORDER BY event_time DESC
+            """, (int(guild_id),))
         else:
             # Get all open events
             cursor.execute("""
-                SELECT event_id, guild_id, event_date, start_time, name, status,
-                       0 as total_participants, total_value_auec,
-                       false as payroll_processed, false as pdf_generated,
+                SELECT id, guild_id, event_date, event_time as start_time, name,
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value,
+                       payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
-                WHERE status IN ('planned', 'active') AND is_active = true
-                ORDER BY start_time DESC
+                FROM events 
+                WHERE is_open = true AND is_active = true
+                ORDER BY event_time DESC
             """)
         
         events = cursor.fetchall()
@@ -888,12 +970,15 @@ def get_open_mining_events(database_url, guild_id=None):
         # Convert to list of dictionaries for easier handling
         event_list = []
         for event in events:
+            # Use prefixed ID (name) if available, otherwise create from integer ID
+            event_id = event[4] if event[4] else f"sm-{event[0]:06d}"
             event_list.append({
-                'id': event[0],
+                'id': event_id,           # Use prefixed ID as main identifier
+                'database_id': event[0],   # Keep database ID for internal queries
                 'guild_id': event[1],
                 'event_date': event[2],
                 'event_time': event[3],
-                'event_name': event[4],
+                'event_name': event_id,    # Display name is the prefixed ID
                 'status': event[5],
                 'total_participants': event[6],
                 'total_value_auec': event[7],
@@ -943,23 +1028,25 @@ def get_mining_events(database_url, guild_id, event_date=None):
         if event_date:
             # Get events for specific date
             cursor.execute("""
-                SELECT id, guild_id, event_date, event_time, event_name, status,
-                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                SELECT id, guild_id, event_date, event_time, name, 
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value, payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
+                FROM events 
                 WHERE guild_id = %s AND event_date = %s
                 ORDER BY event_time DESC
-            """, (guild_id, event_date))
+            """, (int(guild_id), event_date))
         else:
             # Get recent events (last 30 days)
             cursor.execute("""
-                SELECT id, guild_id, event_date, event_time, event_name, status,
-                       total_participants, total_value_auec, payroll_processed, pdf_generated,
+                SELECT id, guild_id, event_date, event_time, name,
+                       CASE WHEN is_open THEN 'active' ELSE 'closed' END as status,
+                       total_participants, total_value, payroll_calculated as payroll_processed, pdf_generated,
                        created_at, updated_at
-                FROM mining_events 
+                FROM events 
                 WHERE guild_id = %s AND event_date >= CURRENT_DATE - INTERVAL '30 days'
                 ORDER BY event_time DESC
-            """, (guild_id,))
+            """, (int(guild_id),))
         
         events = cursor.fetchall()
         conn.close()
@@ -967,12 +1054,15 @@ def get_mining_events(database_url, guild_id, event_date=None):
         # Convert to list of dictionaries for easier handling
         event_list = []
         for event in events:
+            # Use prefixed ID (name) if available, otherwise create from integer ID
+            event_id = event[4] if event[4] else f"sm-{event[0]:06d}"
             event_list.append({
-                'id': event[0],
+                'id': event_id,           # Use prefixed ID as main identifier
+                'database_id': event[0],   # Keep database ID for internal queries
                 'guild_id': event[1],
                 'event_date': event[2],
                 'event_time': event[3],
-                'event_name': event[4],
+                'event_name': event_id,    # Display name is the prefixed ID
                 'status': event[5],
                 'total_participants': event[6],
                 'total_value_auec': event[7],

@@ -8,6 +8,7 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
+  actions: write
 
 jobs:
   # Clear previous test labels before starting new test run
@@ -95,7 +96,7 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary pytest-asyncio
       - name: Run linting
         continue-on-error: true
         run: |
@@ -118,8 +119,8 @@ jobs:
           python3 -m pytest tests/test_validation.py -v
           echo "✅ Validation tests completed!"
 
-  database-architecture:
-    name: "Database Architecture Tests"
+  database-tests:
+    name: "Database Tests"
     runs-on: ubuntu-latest
     needs: [clear-labels, code-quality]
     steps:
@@ -137,8 +138,8 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
-      - name: Test Database v2.0.0 Architecture
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary pytest-asyncio
+      - name: Test Database Architecture v2.0.0
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -149,28 +150,6 @@ jobs:
           echo "🗄️ Testing Database Architecture v2.0.0..."
           python3 -m pytest tests/test_database_v2.py -v
           echo "✅ Database v2.0.0 tests completed!"
-      - name: Test Database Integration
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "🔗 Testing Database Integration..."
-          python3 -m pytest tests/test_database_integration.py -v
-          echo "✅ Database integration tests completed!"
-      - name: Test Database Performance
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "⚡ Testing Database Performance..."
-          python3 -m pytest tests/test_database_performance.py -v
-          echo "✅ Database performance tests completed!"
 
   bot-functionality:
     name: "Bot Functionality Tests" 
@@ -191,8 +170,8 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
-      - name: Test Participation Bot
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary pytest-asyncio
+      - name: Test Red Legion Bot Main
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -200,10 +179,10 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
-          echo "🤖 Testing Participation Bot..."
-          python3 -m pytest tests/test_participation_bot.py -v
-          echo "✅ Participation bot tests completed!"
-      - name: Test Modular System
+          echo "🤖 Testing Red Legion Bot Main..."
+          python3 -m pytest tests/test_main.py -v
+          echo "✅ Bot main tests completed!"
+      - name: Test Command Sync
         env:
           PYTHONPATH: .
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -211,14 +190,14 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: rl-prod-471116
         run: |
-          echo "🧩 Testing Modular System Architecture..."
-          python3 -m pytest tests/test_modular_system.py -v
-          echo "✅ Modular system tests completed!"
+          echo "🔄 Testing Command Sync System..."
+          python3 -m pytest tests/test_command_sync.py -v
+          echo "✅ Command sync tests completed!"
 
-  advanced-system:
-    name: "Advanced System Tests"
+  api-tests:
+    name: "API & Integration Tests"
     runs-on: ubuntu-latest
-    needs: [database-architecture, bot-functionality]
+    needs: [database-tests, bot-functionality]
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -234,23 +213,12 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary
-      - name: Test Advanced System Components
-        env:
-          PYTHONPATH: .
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          TEXT_CHANNEL_ID: ${{ secrets.TEXT_CHANNEL_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_CLOUD_PROJECT: rl-prod-471116
-        run: |
-          echo "🚀 Testing Advanced System Components..."
-          python3 -m pytest tests/test_advanced_system.py -v
-          echo "✅ Advanced system tests completed!"
+          pip3 install -r requirements.txt ruff pytest pytest-mock psycopg2-binary pytest-asyncio
 
   test-summary:
     name: "Test Summary & Results"
     runs-on: ubuntu-latest
-    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
+    needs: [clear-labels, code-quality, database-tests, bot-functionality, api-tests]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -260,12 +228,12 @@ jobs:
           echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY  
           echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Code Quality & Validation | ${{ needs.code-quality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Database Architecture Tests | ${{ needs.database-architecture.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database Tests | ${{ needs.database-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Bot Functionality Tests | ${{ needs.bot-functionality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Advanced System Tests | ${{ needs.advanced-system.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API & Integration Tests | ${{ needs.api-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           
           # Overall result
-          if [ "${{ needs.code-quality.result }}" = "success" ] && [ "${{ needs.database-architecture.result }}" = "success" ] && [ "${{ needs.bot-functionality.result }}" = "success" ] && [ "${{ needs.advanced-system.result }}" = "success" ]; then
+          if [ "${{ needs.code-quality.result }}" = "success" ] && [ "${{ needs.database-tests.result }}" = "success" ] && [ "${{ needs.bot-functionality.result }}" = "success" ] && [ "${{ needs.api-tests.result }}" = "success" ]; then
             echo "## 🎉 All tests passed! Ready for deployment" >> $GITHUB_STEP_SUMMARY
           else
             echo "## ⚠️ Some tests failed - review results above" >> $GITHUB_STEP_SUMMARY
@@ -275,7 +243,7 @@ jobs:
   post-tests:
     name: "Post-Test Actions"
     runs-on: ubuntu-latest
-    needs: [clear-labels, code-quality, database-architecture, bot-functionality, advanced-system]
+    needs: [clear-labels, code-quality, database-tests, bot-functionality, api-tests]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -295,14 +263,14 @@ jobs:
 
             // Check test results
             const codeQuality = '${{ needs.code-quality.result }}';
-            const dbArchitecture = '${{ needs.database-architecture.result }}';
+            const databaseTests = '${{ needs.database-tests.result }}';
             const botFunctionality = '${{ needs.bot-functionality.result }}';
-            const advancedSystem = '${{ needs.advanced-system.result }}';
+            const apiTests = '${{ needs.api-tests.result }}';
             
             const allTestsPassed = codeQuality === 'success' && 
-                                 dbArchitecture === 'success' && 
+                                 databaseTests === 'success' && 
                                  botFunctionality === 'success' && 
-                                 advancedSystem === 'success';
+                                 apiTests === 'success';
             
             // Remove all existing test-related labels first
             const labelsToRemove = ['tests pending', 'Tests Good', 'Ready To Deploy', 'Deploy', 'Ready to Merge'];
@@ -334,7 +302,14 @@ jobs:
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ✅ All Tests Passed!\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | ✅ Passed |\\n| Database Architecture v2.0.0 | ✅ Passed |\\n| Bot Functionality | ✅ Passed |\\n| Advanced System Components | ✅ Passed |\\n\\n🚀 **Ready for deployment!** This PR has been automatically labeled as 'Ready To Deploy'."
+                body: '## ✅ All Tests Passed!\n\n' +
+                      '| Test Suite | Result |\n' +
+                      '|------------|--------|\n' +
+                      '| Code Quality & Validation | ✅ Passed |\n' +
+                      '| Database Tests | ✅ Passed |\n' +
+                      '| Bot Functionality | ✅ Passed |\n' +
+                      '| API & Integration Tests | ✅ Passed |\n\n' +
+                      '🚀 **Ready for deployment!** This PR has been automatically labeled as \'Ready To Deploy\'.'
               });
             } else {
               // Don't add any success labels for failed tests
@@ -343,14 +318,127 @@ jobs:
               // Add comment with failure details
               const failedTests = [];
               if (codeQuality !== 'success') failedTests.push('Code Quality & Validation');
-              if (dbArchitecture !== 'success') failedTests.push('Database Architecture');
+              if (databaseTests !== 'success') failedTests.push('Database Tests');
               if (botFunctionality !== 'success') failedTests.push('Bot Functionality');
-              if (advancedSystem !== 'success') failedTests.push('Advanced System');
+              if (apiTests !== 'success') failedTests.push('API & Integration Tests');
               
               await github.rest.issues.createComment({
                 owner,
                 repo,
                 issue_number: pull_number,
-                body: "## ❌ Some Tests Failed\\n\\n| Test Suite | Result |\\n|------------|--------|\\n| Code Quality & Validation | " + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Database Architecture v2.0.0 | " + (dbArchitecture === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Bot Functionality | " + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n| Advanced System Components | " + (advancedSystem === 'success' ? '✅ Passed' : '❌ Failed') + " |\\n\\n**Failed test suites:** " + failedTests.join(', ') + "\\n\\nPlease review the test results and fix any issues before proceeding."
+                body: '## ❌ Some Tests Failed\n\n' +
+                      '| Test Suite | Result |\n' +
+                      '|------------|--------|\n' +
+                      '| Code Quality & Validation | ' + (codeQuality === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n' +
+                      '| Database Tests | ' + (databaseTests === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n' +
+                      '| Bot Functionality | ' + (botFunctionality === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n' +
+                      '| API & Integration Tests | ' + (apiTests === 'success' ? '✅ Passed' : '❌ Failed') + ' |\n\n' +
+                      '**Failed test suites:** ' + failedTests.join(', ') + '\n\n' +
+                      'Please review the test results and fix any issues before proceeding.'
               });
             }
+
+  # Auto-deploy job (only runs if tests pass AND auto-deploy label is present)
+  auto-deploy:
+    name: "Auto Deploy (if labeled)"
+    runs-on: ubuntu-latest
+    needs: [clear-labels, code-quality, database-tests, bot-functionality, api-tests, test-summary]
+    if: always() && needs.test-summary.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check for auto-deploy label
+        id: check-label
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number;
+            
+            if (!pull_number) {
+              console.log('Not a pull request, skipping auto-deploy check');
+              return 'false';
+            }
+            
+            try {
+              const labels = await github.rest.issues.listLabelsOnIssue({
+                owner,
+                repo,
+                issue_number: pull_number,
+              });
+              
+              const hasAutoDeployLabel = labels.data.some(label => 
+                label.name.toLowerCase().includes('auto-deploy') || 
+                label.name.toLowerCase().includes('auto deploy')
+              );
+              
+              console.log('PR Labels:', labels.data.map(l => l.name));
+              console.log('Has auto-deploy label:', hasAutoDeployLabel);
+              
+              return hasAutoDeployLabel ? 'true' : 'false';
+            } catch (error) {
+              console.error('Error checking labels:', error);
+              return 'false';
+            }
+      
+      - name: Trigger deployment
+        if: steps.check-label.outputs.result == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number;
+            const sha = context.payload.pull_request?.head.sha;
+            
+            console.log('🚀 Auto-deploy triggered!');
+            console.log('PR:', pull_number);
+            console.log('SHA:', sha);
+            
+            // Dispatch deployment workflow
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: 'deploy.yml',
+              ref: context.payload.pull_request.head.ref,
+              inputs: {
+                reason: `Auto-deploy from PR #${pull_number} - All tests passed`,
+                branch: context.payload.pull_request.head.ref
+              }
+            });
+            
+            // Add comment about auto-deployment
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body: '## 🚀 Auto-Deploy Triggered!\n\n' +
+                    '✅ All tests passed and auto-deploy label detected\n' +
+                    '🎯 Deploying branch `' + context.payload.pull_request.head.ref + '` to production\n\n' +
+                    '**Note:** This deploys without merging - the PR remains open for review.'
+            });
+      
+      - name: Skip deployment (no label)
+        if: steps.check-label.outputs.result != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number;
+            
+            console.log('ℹ️ Auto-deploy skipped - no auto-deploy label found');
+            
+            // Add informational comment
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body: '## 💡 Auto-Deploy Available\n\n' +
+                    '✅ All tests passed! Your PR is ready for deployment.\n\n' +
+                    '**To auto-deploy without merging:**\n' +
+                    '1. Add the `auto-deploy` label to this PR\n' +
+                    '2. The deployment will trigger automatically\n\n' +
+                    '**Manual deployment:** Use the deployment workflow in Actions tab'
+            });

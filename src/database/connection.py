@@ -279,7 +279,11 @@ class DatabaseManager:
             with self.get_cursor() as cursor:
                 cursor.execute("SELECT 1")
                 result = cursor.fetchone()
-                return result[0] == 1
+                # Handle RealDictRow (dictionary-like) result
+                if hasattr(result, 'values'):
+                    return list(result.values())[0] == 1
+                else:
+                    return result[0] == 1
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
             return False

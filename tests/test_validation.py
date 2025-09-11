@@ -20,8 +20,8 @@ def test_main_bot_syntax():
     """Test main bot file syntax."""
     print("\n🧪 Testing main bot file syntax...")
     
-    # Test both the new main.py and legacy participation_bot.py
-    test_files = ['src/main.py', 'src/participation_bot.py']
+    # Test the main bot entry point
+    test_files = ['src/main.py']
     
     for file_path in test_files:
         try:
@@ -87,9 +87,9 @@ def test_critical_imports():
     critical_imports = [
         ('src.config.settings', 'DISCORD_CONFIG, get_database_url'),
         ('src.database', 'init_database'),
-        ('src.core.bot_setup', 'create_bot_instance'),
-        ('src.commands', 'register_all_commands'),
-        ('src.handlers.core', 'setup'),
+        ('src.modules.mining.commands', 'MiningCommands'),
+        ('src.modules.payroll.commands', 'PayrollCommands'),
+        ('src.bot.client', 'RedLegionBot'),
     ]
     
     all_passed = True
@@ -121,27 +121,17 @@ def test_command_count_validation():
         # Test the new slash command architecture by counting command modules
         print("  🔍 Checking slash command modules...")
         
-        # Count expected slash commands by checking the new Cog files
+        # Count expected commands by checking the new modules architecture
         expected_commands = {
-            'diagnostics': ['red-health', 'red-test', 'red-dbtest', 'red-config'],
-            'general': ['red-ping'],
-            'market': ['red-market-list', 'red-market-add'],
-            'admin_new': ['red-config-refresh', 'red-restart', 'red-add-mining-channel', 'red-remove-mining-channel', 'red-list-mining-channels'],
-            'loans_new': ['red-loan-request', 'red-loan-status'],
-            'events_new': ['red-events'],  # This is a command group with subcommands
-            'mining.core': ['red-sunday-mining-start', 'red-sunday-mining-stop', 'red-payroll', 'red-sunday-mining-test']
+            'mining': ['start', 'stop', 'status'],  # /mining start, /mining stop, /mining status
+            'payroll': ['mining', 'salvage', 'combat', 'status'],  # /payroll mining, etc.
         }
         
         # Count commands by checking if command files exist and have proper structure
         actual_commands = []
         command_modules = [
-            'src/commands/diagnostics.py',
-            'src/commands/general.py', 
-            'src/commands/market.py',
-            'src/commands/admin_new.py',
-            'src/commands/loans_new.py',
-            'src/commands/events_new.py',
-            'src/commands/mining/core.py'
+            'src/modules/mining/commands.py',
+            'src/modules/payroll/commands.py'
         ]
         
         for module_path in command_modules:
@@ -149,15 +139,15 @@ def test_command_count_validation():
                 with open(module_path, 'r') as f:
                     content = f.read()
                     
-                # Count @app_commands.command decorators
+                # Count @app_commands.command decorators and GroupCog classes
                 import re
                 command_matches = re.findall(r'@app_commands\.command\(name="([^"]+)"', content)
                 actual_commands.extend(command_matches)
                 
-                # Count @app_commands.Group class definitions
-                group_matches = re.findall(r'class\s+\w+Commands?\(app_commands\.Group\)', content)
+                # Count GroupCog class definitions (mining, payroll modules)
+                group_matches = re.findall(r'class\s+\w+Commands?\(commands\.GroupCog', content)
                 if group_matches:
-                    # Events group has subcommands, count them
+                    # GroupCog has subcommands, count them
                     subcommand_matches = re.findall(r'@app_commands\.command\(', content)
                     actual_commands.extend([f"group-command-{i}" for i in range(len(subcommand_matches))])
                 
@@ -170,29 +160,25 @@ def test_command_count_validation():
         print(f"  📊 Actual slash commands found: {actual_total}")
         print(f"  � Found commands: {actual_commands}")
         
-        # Be flexible with the count since slash command architecture is different
-        if actual_total >= 10:  # We should have at least 10 slash commands
-            print("  ✅ Slash command count looks reasonable")
+        # Be flexible with the count since we're using the new modules architecture
+        if actual_total >= 5:  # We should have at least 5 commands for the new system
+            print("  ✅ Command count looks reasonable for new modules architecture")
             assert True
         else:
-            print(f"  ❌ Too few slash commands found (expected at least 10, got {actual_total})")
-            # Don't fail the test, just warn - slash command validation is complex
-            print("  ⚠️ This may be due to slash command validation complexity - checking file structure instead")
-            
-            # Alternative validation: check that command files exist and have basic structure
+            print(f"  ❌ Too few commands found (expected at least 5, got {actual_total})")
+            # Alternative validation: check that module files exist and have basic structure
             required_files = [
-                'src/commands/diagnostics.py',
-                'src/commands/market.py',
-                'src/commands/admin_new.py'
+                'src/modules/mining/commands.py',
+                'src/modules/payroll/commands.py'
             ]
             
             files_exist = all(os.path.exists(f) for f in required_files)
             if files_exist:
-                print("  ✅ Required command files exist")
+                print("  ✅ Required module files exist")
                 assert True
             else:
-                print("  ❌ Some required command files are missing")
-                assert False, "Required command files missing"
+                print("  ❌ Some required module files are missing")
+                assert False, "Required module files missing"
                 
     except Exception as e:
         print(f"  ❌ Slash command validation failed: {e}")
@@ -226,7 +212,7 @@ def test_file_structure():
     expected_files = [
         'src/main.py',  # Entry point
         
-        # Modular structure (cleaned up)
+        # Config and database
         'src/config/__init__.py',
         'src/config/settings.py',
         'src/config/channels.py',
@@ -235,39 +221,35 @@ def test_file_structure():
         'src/database/operations.py',
         'src/database/connection.py',
         'src/database/schemas.py',
+        
+        # Bot client
         'src/bot/__init__.py',
         'src/bot/client.py',
-        'src/bot/client_clean.py',
         'src/bot/utils.py',
+        
+        # New modules architecture
+        'src/modules/__init__.py',
+        'src/modules/mining/__init__.py',
+        'src/modules/mining/commands.py',
+        'src/modules/mining/events.py',
+        'src/modules/mining/participation.py',
+        'src/modules/payroll/__init__.py',
+        'src/modules/payroll/commands.py',
+        'src/modules/payroll/core.py',
+        'src/modules/payroll/processors/__init__.py',
+        'src/modules/payroll/processors/mining.py',
+        
+        # Command wrappers (thin wrappers for modules)
+        'src/commands/__init__.py',
+        'src/commands/mining.py',
+        'src/commands/payroll.py',
+        
+        # Handlers and utils
+        'src/handlers/__init__.py',
+        'src/handlers/voice_tracking.py',
         'src/utils/__init__.py',
         'src/utils/decorators.py',
         'src/utils/discord_helpers.py',
-        
-        # Core modules
-        'src/core/__init__.py',
-        'src/core/bot_setup.py',
-        'src/core/decorators.py',
-        
-        # Commands (cleaned up structure)
-        'src/commands/__init__.py',
-        'src/commands/market_subcommand.py',  # Fixed: now subcommand files
-        'src/commands/loans_subcommand.py',   # Fixed: now subcommand files
-        'src/commands/events_subcommand.py',  # Fixed: now subcommand files
-        'src/commands/join_subcommand.py',    # Fixed: now subcommand files
-        'src/commands/events/__init__.py',
-        'src/commands/events/mining.py',
-        'src/commands/events/combat.py',
-        'src/commands/events/training.py',
-        'src/commands/diagnostics.py',
-        'src/commands/admin.py',
-        'src/commands/general.py',
-        'src/commands/mining/__init__.py',
-        'src/commands/mining/core.py',
-        
-        # Handlers
-        'src/handlers/__init__.py',
-        'src/handlers/voice_tracking.py',
-        'src/handlers/core.py',
     ]
     
     missing_files = []

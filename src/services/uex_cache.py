@@ -44,8 +44,8 @@ class UEXCache:
     """
     
     def __init__(self, 
-                 default_ttl: int = 300,  # 5 minutes default TTL
-                 refresh_interval: int = 240,  # 4 minutes refresh interval
+                 default_ttl: int = 86400,  # 24 hours default TTL (matches UEX API refresh)
+                 refresh_interval: int = 86400,  # 24 hours refresh interval
                  max_retries: int = 3):
         self.default_ttl = default_ttl
         self.refresh_interval = refresh_interval
@@ -170,6 +170,9 @@ class UEXCache:
     async def _fetch_uex_api(self, category: str) -> Optional[Dict]:
         """Make actual API call to UEX."""
         try:
+            print(f"🔍 Attempting UEX API call for category: {category}")
+            print(f"🔍 API URL: {UEX_API_CONFIG['base_url']}")
+            
             headers = {
                 'Authorization': f'Bearer {UEX_API_CONFIG["bearer_token"]}',
                 'Accept': 'application/json'
@@ -182,16 +185,26 @@ class UEXCache:
             
             connector = aiohttp.TCPConnector(ssl=ssl_context)
             async with aiohttp.ClientSession(connector=connector) as session:
+                print(f"🌐 Making HTTP GET request to UEX API...")
                 async with session.get(
                     UEX_API_CONFIG['base_url'], 
                     headers=headers,
                     timeout=UEX_API_CONFIG.get('timeout', 30)
                 ) as response:
+                    print(f"📡 UEX API response status: {response.status}")
+                    
                     if response.status == 200:
+                        print(f"✅ UEX API request successful, parsing JSON...")
                         data = await response.json()
-                        return self._process_uex_data(data, category)
+                        print(f"🔍 Raw data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+                        
+                        processed = self._process_uex_data(data, category)
+                        print(f"✅ Processed {len(processed)} items for category {category}")
+                        return processed
                     else:
                         print(f"❌ UEX API returned status {response.status}")
+                        response_text = await response.text()
+                        print(f"❌ Response body: {response_text[:200]}...")
                         return None
                         
         except asyncio.TimeoutError:
@@ -219,41 +232,61 @@ class UEXCache:
                 name = item.get('name', 'Unknown')
                 code = item.get('code', 'UNKNOWN')
                 
-                # Get price information
-                locations = item.get('locations', [])
-                if not locations:
+                # DEBUG: Let's see what the API actually returns
+                print(f"🔍 UEX API item structure for {code}: {list(item.keys())}")
+                if len(processed) < 2:  # Only log first 2 items to avoid spam
+                    print(f"🔍 Full item data for {code}: {item}")
+                
+                # Get price information directly from item (UEX API v2.0 structure)
+                sell_price = item.get('price_sell', 0)
+                buy_price = item.get('price_buy', 0)
+                
+                # Skip items with no sell price
+                if sell_price <= 0:
                     continue
-                
-                # Find highest sell price
-                best_sell_price = 0
-                best_buy_price = 0
-                price_locations = []
-                
-                for location in locations:
-                    sell_price = location.get('price_sell', 0)
-                    buy_price = location.get('price_buy', 0)
-                    location_name = location.get('name', 'Unknown Location')
-                    
-                    if sell_price > best_sell_price:
-                        best_sell_price = sell_price
-                    
-                    if buy_price > best_buy_price:
-                        best_buy_price = buy_price
-                    
-                    price_locations.append({
-                        'name': location_name,
-                        'sell_price': sell_price,
-                        'buy_price': buy_price
-                    })
                 
                 # Filter by category
                 if self._should_include_item(name, code, category):
+                    # Look for actual location data in the API response
+                    locations_data = []
+                    
+                    # Check various possible fields for location data
+                    if 'locations' in item:
+                        locations_data = item['locations']
+                        print(f"🔍 Found 'locations' field for {code}: {locations_data}")
+                    elif 'terminals' in item:
+                        locations_data = item['terminals'] 
+                        print(f"🔍 Found 'terminals' field for {code}: {locations_data}")
+                    elif 'trades' in item:
+                        locations_data = item['trades']
+                        print(f"🔍 Found 'trades' field for {code}: {locations_data}")
+                    elif 'prices' in item:
+                        locations_data = item['prices']
+                        print(f"🔍 Found 'prices' field for {code}: {locations_data}")
+                    
+                    # Process location data if found, otherwise use fallback
+                    if locations_data and isinstance(locations_data, list) and len(locations_data) > 0:
+                        processed_locations = []
+                        for loc in locations_data:
+                            if isinstance(loc, dict):
+                                loc_name = loc.get('name', loc.get('location', loc.get('terminal', 'Unknown Location')))
+                                loc_sell = loc.get('price_sell', loc.get('sell', sell_price))
+                                loc_buy = loc.get('price_buy', loc.get('buy', buy_price))
+                                processed_locations.append({
+                                    'name': loc_name,
+                                    'sell_price': loc_sell,
+                                    'buy_price': loc_buy
+                                })
+                        locations_final = processed_locations if processed_locations else [{'name': 'UEX Best Price', 'sell_price': sell_price, 'buy_price': buy_price}]
+                    else:
+                        locations_final = [{'name': 'UEX Best Price', 'sell_price': sell_price, 'buy_price': buy_price}]
+                    
                     processed[code] = {
                         'name': name,
                         'code': code,
-                        'price_sell': best_sell_price,
-                        'price_buy': best_buy_price,
-                        'locations': price_locations,
+                        'price_sell': sell_price,
+                        'price_buy': buy_price,
+                        'locations': locations_final,
                         'updated': datetime.now().isoformat()
                     }
                     

@@ -40,20 +40,13 @@ class RedLegionBot(commands.Bot):
             # Load new Cog-based slash command modules
             print("🔄 Loading Red Legion slash command extensions...")
             
-            # Core command extensions (all commands now use valid names without hyphens)
+            # New modules architecture - only load commands that exist
             extensions = [
-                'commands.diagnostics',        # /redhealth, /redtest, /reddbtest, /redconfig
-                'commands.general',            # /redping
-                'commands.market',             # /redmarketlist, /redmarketadd
-                'commands.admin',              # /redconfigrefresh, /redrestart, etc.
-                'commands.loans',              # /redloanrequest, /redloanstatus
-                'commands.events_subcommand',  # /redevents create|delete|view|list (subcommand group)
-                'commands.market_subcommand',  # /redmarket list|add (subcommand group)
-                'commands.loans_subcommand',   # /redloans request|status (subcommand group)
-                'commands.join_subcommand',    # /redjoin apply|status|withdraw (subcommand group)
-                'commands.mining.core',        # /redsundayminingstart, /redpayroll, etc.
-                'commands.test_mining',        # /redtestmining create|delete|status (test commands)
-                'commands.cache_diagnostics',  # /redcachestatus, /redcacherefresh, /redcacheclear
+                'commands.mining',             # Wrapper for mining module (/mining start, /mining stop)
+                'commands.payroll',            # Wrapper for payroll module (/payroll calculate)
+                'commands.test_data',          # Test data generation (/test-data create, /test-data delete)
+                'commands.admin',              # Admin commands (/admin delete-event, /admin voice-diagnostic)
+                'commands.diagnostics',        # Diagnostic tools (/diagnostics voice, /diagnostics channels)
             ]
             
             for extension in extensions:
@@ -65,10 +58,9 @@ class RedLegionBot(commands.Bot):
                     # Continue loading other extensions
                     continue
             
-            # Load event handlers
+            # Load event handlers (only load what exists)
             handler_extensions = [
-                'handlers.voice_tracking',
-                'handlers.core'
+                'handlers.voice_tracking',     # Voice channel participation tracking
             ]
             
             for extension in handler_extensions:
