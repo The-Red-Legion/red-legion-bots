@@ -57,24 +57,39 @@ async def test_uex_api():
                     for item in commodities:
                         name = item.get('name', '')
                         if any(ore in name.upper() for ore in ['QUANTANIUM', 'QUANTAINIUM', 'RICCITE', 'STILERON', 'AGRICIUM', 'LARANITE', 'BEXALITE']):
+                            # Show ALL available price fields
                             ore_items.append({
                                 'name': name,
                                 'code': item.get('code', ''),
                                 'price_buy': item.get('price_buy', 0),
                                 'price_sell': item.get('price_sell', 0),
+                                'price_avg': item.get('price_avg', 0),
+                                'price_max': item.get('price_max', 0),
+                                'price_min': item.get('price_min', 0),
+                                'price_best': item.get('price_best', 0),
                                 'is_refined': item.get('is_refined', 0),
                                 'is_raw': item.get('is_raw', 0),
-                                'is_mineral': item.get('is_mineral', 0)
+                                'is_mineral': item.get('is_mineral', 0),
+                                'all_fields': list(item.keys())  # Show all available fields
                             })
                     
                     # Sort by name
                     ore_items.sort(key=lambda x: x['name'])
                     
                     print("🪨 ORE PRICES FROM UEX API:")
-                    print("="*50)
+                    print("="*80)
+                    print(f"{'Name':<20} | {'Buy':>6} | {'Sell':>6} | {'Avg':>6} | {'Max':>6} | {'Min':>6} | {'Best':>6} | Status")
+                    print("="*80)
                     for item in ore_items:
                         refined_status = "✅ REFINED" if item['is_refined'] else "❌ RAW" if item['is_raw'] else "❓ OTHER"
-                        print(f"{item['name']:<20} | Buy: {item['price_buy']:>6} | Sell: {item['price_sell']:>6} | {refined_status}")
+                        print(f"{item['name']:<20} | {item['price_buy']:>6} | {item['price_sell']:>6} | {item['price_avg']:>6} | {item['price_max']:>6} | {item['price_min']:>6} | {item['price_best']:>6} | {refined_status}")
+                    
+                    print("="*80)
+                    print("📋 SAMPLE ITEM FIELDS (Quantainium):")
+                    quan_item = next((item for item in ore_items if 'Quantainium' in item['name'] and item['is_refined']), None)
+                    if quan_item:
+                        print(f"Available fields: {', '.join(quan_item['all_fields'])}")
+                    print("="*80)
                     
                     print("="*50)
                     print("🎯 FILTERED REFINED ORES (what payroll should use):")
