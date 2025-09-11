@@ -549,7 +549,7 @@ class PayoutManagementView(ui.View):
                 else:
                     final_payout = float(base_payout)  # Will be recalculated with bonuses
                     payout_text += f"□ **{username}** - {minutes:.0f}min ({percentage:.1f}%)\n"
-                    payout_text += f"    💰 Receiving: {final_payout:,.0f} aUEC\n\n"
+                    payout_text += f"    💰 Receiving: {final_payout:,.0f} aUEC + bonus\n\n"
                     total_recipients += 1
             
             # Calculate bonus distribution
@@ -621,13 +621,13 @@ class ParticipantDonationButton(ui.Button):
         # Set button appearance based on donation status
         if is_donating:
             super().__init__(
-                label=f"💝 {username[:15]}",
+                label=f"✅ DONATING - {username[:12]}",
                 style=discord.ButtonStyle.success,
                 custom_id=f"donate_{user_id}"
             )
         else:
             super().__init__(
-                label=f"💰 {username[:15]}",
+                label=f"💰 RECEIVING - {username[:11]}",
                 style=discord.ButtonStyle.primary,
                 custom_id=f"receive_{user_id}"
             )
