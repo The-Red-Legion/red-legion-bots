@@ -135,6 +135,7 @@ class PayrollSessionManager:
                     session_data['ore_quantities'] = session_data.get('ore_quantities') or {}
                     session_data['pricing_data'] = session_data.get('pricing_data') or {}
                     session_data['calculation_data'] = session_data.get('calculation_data') or {}
+                    session_data['custom_prices'] = session_data.get('custom_prices') or {}
                     return session_data
                 return None
                 
@@ -149,7 +150,7 @@ class PayrollSessionManager:
             values = []
             
             for key, value in updates.items():
-                if key in ['ore_quantities', 'pricing_data', 'calculation_data']:
+                if key in ['ore_quantities', 'pricing_data', 'calculation_data', 'custom_prices']:
                     set_clauses.append(f"{key} = %s")
                     values.append(json.dumps(value, cls=PayrollJSONEncoder) if isinstance(value, dict) else value)
                 elif key in ['current_step', 'donation_percentage', 'is_completed']:

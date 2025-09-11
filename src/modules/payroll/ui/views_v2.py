@@ -883,10 +883,15 @@ class CustomPricingView(ui.View):
         ore_count = 0
         for ore_name, quantity in ore_quantities.items():
             if quantity > 0 and ore_count < 20:  # Discord button limit
+                uex_price = uex_prices.get(ore_name.upper(), {}).get('price', 0)
+                current_price = custom_prices.get(ore_name, uex_price)
+                is_custom = ore_name in custom_prices
+                
                 button = OrePriceButton(
                     ore_name=ore_name,
-                    current_price=custom_prices.get(ore_name, uex_prices.get(ore_name.upper(), {}).get('price', 0)),
-                    session_id=self.session_id
+                    current_price=current_price,
+                    session_id=self.session_id,
+                    is_custom=is_custom
                 )
                 self.add_item(button)
                 ore_count += 1
@@ -909,15 +914,26 @@ class CustomPricingView(ui.View):
 class OrePriceButton(ui.Button):
     """Button to set custom price for a specific ore."""
     
-    def __init__(self, ore_name: str, current_price: float, session_id: str):
+    def __init__(self, ore_name: str, current_price: float, session_id: str, is_custom: bool = False):
         self.ore_name = ore_name
         self.current_price = current_price
         self.session_id = session_id
+        self.is_custom = is_custom
+        
+        # Show different style and emoji for custom vs UEX prices
+        if is_custom:
+            emoji = "🔧"
+            style = discord.ButtonStyle.success
+            label = f"{ore_name}: {current_price:,.0f} (Custom)"
+        else:
+            emoji = "💎"
+            style = discord.ButtonStyle.secondary
+            label = f"{ore_name}: {current_price:,.0f} (UEX)"
         
         super().__init__(
-            label=f"{ore_name}: {current_price:,.0f}",
-            style=discord.ButtonStyle.secondary,
-            emoji="💎",
+            label=label,
+            style=style,
+            emoji=emoji,
             custom_id=f"price_{ore_name}"
         )
     
