@@ -568,21 +568,53 @@ class PayrollCommands(commands.GroupCog, name="payroll", description="Calculate 
                 ephemeral=True
             )
     
+    async def lookup_event_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        """Autocomplete function for payroll lookup events."""
+        try:
+            guild_id = interaction.guild_id
+            choices = []
+            
+            # Get completed events from all types, including calculated ones
+            for event_type in ['mining', 'salvage', 'combat']:
+                events = await self.calculator.get_completed_events(guild_id, event_type, limit=10, include_calculated=True)
+                
+                for event in events:
+                    # Format display text with event info
+                    duration_str = f"{event.get('total_duration_minutes', 0) / 60:.1f}h" if event.get('total_duration_minutes') else "0h"
+                    participants = event.get('total_participants', 0)
+                    status = "✅ Calculated" if event.get('payroll_calculated') else "⏳ Pending"
+                    date_str = event['started_at'].strftime("%m/%d") if event.get('started_at') else "Unknown"
+                    
+                    display_text = f"{event['event_id']} - {event['event_name']} ({date_str}, {participants}p, {duration_str}) {status}"
+                    
+                    # Filter based on current input
+                    if not current or current.lower() in display_text.lower():
+                        choices.append(app_commands.Choice(name=display_text, value=event['event_id']))
+            
+            # Sort by date (most recent first) and limit to 25 (Discord limit)
+            choices.sort(key=lambda x: x.name, reverse=True)
+            return choices[:25]
+            
+        except Exception as e:
+            logger.error(f"Error in lookup autocomplete: {e}")
+            return []
+    
     @app_commands.command(name="lookup", description="Look up detailed information for a past payroll event")
     @app_commands.describe(
-        event_id="Event ID to look up (e.g., sm-abc123)"
+        event="Select an event to look up detailed information"
     )
+    @app_commands.autocomplete(event=lookup_event_autocomplete)
     async def payroll_lookup(
         self,
         interaction: discord.Interaction,
-        event_id: str
+        event: str
     ):
         """Look up comprehensive details for a past payroll event."""
         await interaction.response.defer()
         
         try:
             # Clean up event ID format
-            event_id = event_id.strip().lower()
+            event_id = event.strip().lower()
             
             # Get detailed payroll information
             payroll_data = await self.calculator.get_payroll_details(event_id)
