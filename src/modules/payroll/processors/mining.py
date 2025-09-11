@@ -207,8 +207,11 @@ class MiningProcessor:
                 # Extract ore information
                 name = item.get('name', '').upper()
                 
-                # Skip non-refined ores (we want refined prices) and non-ore items
-                if '(ORE)' in name or '(RAW)' in name:
+                # Only process refined ores (skip raw ores and non-refined items)
+                is_refined = item.get('is_refined', 0) == 1
+                is_raw = item.get('is_raw', 0) == 1
+                
+                if not is_refined or is_raw or '(ORE)' in name or '(RAW)' in name:
                     continue
                     
                 # Check if this is a mineable ore we support

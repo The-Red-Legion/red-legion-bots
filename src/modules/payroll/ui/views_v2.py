@@ -294,8 +294,8 @@ class PricingReviewView(EventDrivenPayrollView):
             )
             return embed, None
         
-        # Get current pricing
-        prices = await self.processor.get_current_prices(refresh=False, allow_api_calls=False)
+        # Get current pricing - allow API calls during pricing review step as it's not during immediate Discord interaction
+        prices = await self.processor.get_current_prices(refresh=True, allow_api_calls=True)
         total_value, breakdown = await self.processor.calculate_total_value(ore_quantities, prices)
         
         # Update session with pricing data
