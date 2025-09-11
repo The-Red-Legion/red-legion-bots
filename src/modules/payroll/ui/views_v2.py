@@ -610,7 +610,7 @@ class PayoutManagementView(ui.View):
         self.add_item(RecalculatePayoutsButton(self.session_id))
         self.add_item(FinalizePayrollButton(self.session_id))
         self.add_item(BackToCalculationButton(self.session_id))
-        self.add_item(CancelPayrollButton(self.session_id))
+        self.add_item(CancelSessionButton(self.session_id))
     
     def create_error_embed(self, message: str):
         """Create an error embed."""
