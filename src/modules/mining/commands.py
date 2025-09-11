@@ -28,6 +28,16 @@ class MiningCommands(commands.GroupCog, name="mining", description="Mining opera
         self.event_manager = MiningEventManager()
         self.voice_tracker = VoiceTracker(bot)
         super().__init__()
+    
+    async def cog_load(self):
+        """Register voice tracking event handler when cog loads."""
+        self.bot.add_listener(self.voice_tracker.on_voice_state_update, 'on_voice_state_update')
+        print("✅ Voice tracking event handler registered")
+    
+    async def cog_unload(self):
+        """Unregister voice tracking event handler when cog unloads."""
+        self.bot.remove_listener(self.voice_tracker.on_voice_state_update, 'on_voice_state_update')
+        print("🔄 Voice tracking event handler unregistered")
         
     @app_commands.command(name="start", description="Start a mining session with voice channel tracking")
     async def start_mining(

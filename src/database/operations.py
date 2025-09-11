@@ -408,18 +408,21 @@ def save_mining_participation(database_url, event_id, user_id, username, channel
                     updated_at = CURRENT_TIMESTAMP
             """, (str(user_id), username, username))
             
-            # Save mining participation
+            # Save mining participation  
             cursor.execute("""
-                INSERT INTO mining_participation (
-                    event_id, user_id, channel_id, join_time, leave_time, 
-                    duration_minutes, is_valid, created_at
+                INSERT INTO participation (
+                    event_id, user_id, username, display_name, channel_id, channel_name,
+                    joined_at, left_at, duration_minutes, was_active, created_at
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, true, CURRENT_TIMESTAMP
                 )
             """, (
                 event_id,
                 str(user_id),
+                username,
+                username,
                 str(channel_id),
+                channel_name,
                 join_time,
                 leave_time,
                 duration_minutes
