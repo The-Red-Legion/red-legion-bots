@@ -717,11 +717,19 @@ class FinalizePayrollButton(ui.Button):
                 timestamp=datetime.now()
             )
             
-            # Add final payout summary
+            # Add final payout summary with participation time
             payout_summary = ""
+            total_donated_final = Decimal('0')
+            
             for payout in updated_payouts:
                 final_amount = payout['final_payout_auec']
-                payout_summary += f"💰 **{payout['username']}:** {final_amount:,.0f} aUEC\n"
+                participation_minutes = payout['participation_minutes']
+                
+                # Calculate total donated from updated payouts
+                if payout.get('is_donor', False):
+                    total_donated_final += payout['base_payout_auec']
+                
+                payout_summary += f"💰 **{payout['username']}:** {final_amount:,.0f} aUEC ({participation_minutes:.0f} min)\n"
             
             embed.add_field(
                 name="💰 Final Payouts",
@@ -733,7 +741,7 @@ class FinalizePayrollButton(ui.Button):
                 name="📊 Summary",
                 value=f"**Payroll ID:** `{calculation_data['payroll_id']}`\n"
                       f"**Session Duration:** {calculation_data['total_minutes']} minutes\n"
-                      f"**Total Donated:** {calculation_data['total_donated_auec']:,.0f} aUEC",
+                      f"**Total Donated:** {total_donated_final:,.0f} aUEC",
                 inline=False
             )
             
