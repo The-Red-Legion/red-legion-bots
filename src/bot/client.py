@@ -140,3 +140,34 @@ class RedLegionBot(commands.Bot):
         except Exception as e:
             print(f"❌ Error starting bot: {e}")
             raise
+    
+    async def start_with_web_api(self):
+        """Start bot with web API integration."""
+        import asyncio
+        import uvicorn
+        from web_api import set_bot_instance, app as web_api_app
+        
+        # Set this bot instance in the web API
+        set_bot_instance(self)
+        
+        # Create uvicorn server config
+        config = uvicorn.Config(
+            web_api_app,
+            host="127.0.0.1", 
+            port=8001,
+            log_level="info"
+        )
+        server = uvicorn.Server(config)
+        
+        # Start bot and web API concurrently
+        async def run_bot_async():
+            await self.start(DISCORD_CONFIG['TOKEN'])
+        
+        print("🚀 Starting Discord bot with web API integration...")
+        print("📡 Web API will be available at http://localhost:8001")
+        
+        # Run both bot and web API server
+        await asyncio.gather(
+            run_bot_async(),
+            server.serve()
+        )
