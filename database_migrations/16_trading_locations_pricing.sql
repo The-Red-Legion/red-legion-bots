@@ -46,7 +46,13 @@ INSERT INTO trading_locations (location_name, system_name, planet_moon, station_
 ('HUR-L1', 'Stanton', NULL, 'HUR-L1 Shallow Fields Station', 'station'),
 ('CRU-L1', 'Stanton', NULL, 'CRU-L1 Ambitious Dream Station', 'station'),
 ('MIC-L1', 'Stanton', NULL, 'MIC-L1 Shallow Frontier Station', 'station'),
-('ARC-L1', 'Stanton', NULL, 'ARC-L1 Lively Pathway Station', 'station')
+('ARC-L1', 'Stanton', NULL, 'ARC-L1 Lively Pathway Station', 'station'),
+-- Pyro System Locations
+('Ruin Station', 'Pyro', 'Pyro I', 'Ruin Station', 'station'),
+('Checkmate Station', 'Pyro', 'Pyro III', 'Checkmate Station', 'station'),
+('Shady Glen', 'Pyro', 'Pyro IV', 'Shady Glen', 'outpost'),
+('Pyro Station', 'Pyro', 'Pyro VI', 'Pyro Station', 'station'),
+('Terminus', 'Pyro', 'Pyro VI', 'Terminus', 'outpost')
 ON CONFLICT (location_name) DO NOTHING;
 
 -- Populate materials table with mining ores and salvage materials
@@ -137,10 +143,56 @@ WITH material_location_prices AS (
     WHERE m.is_active = true AND tl.is_active = true
     AND m.name IN ('Quantainium', 'Bexalite', 'Laranite', 'Titanium', 'Diamond', 'Gold', 
                    'Recycled Material Composite', 'Electronic Components', 'Reinforced Metal Salvage')
+    AND tl.system_name = 'Stanton'
 )
 INSERT INTO material_prices (material_id, location_id, sell_price)
 SELECT material_id, location_id, sell_price
 FROM material_location_prices
+ON CONFLICT (material_id, location_id) DO UPDATE SET
+    sell_price = EXCLUDED.sell_price,
+    last_updated = CURRENT_TIMESTAMP;
+
+-- Add Pyro system pricing data (generally higher prices due to lawless nature)
+WITH pyro_material_prices AS (
+    SELECT 
+        m.material_id,
+        tl.location_id,
+        CASE 
+            WHEN m.name = 'Quantainium' THEN 
+                CASE tl.location_name 
+                    WHEN 'Ruin Station' THEN 9.50
+                    WHEN 'Checkmate Station' THEN 9.45
+                    WHEN 'Pyro Station' THEN 9.40
+                    ELSE 9.30
+                END
+            WHEN m.name = 'Bexalite' THEN 
+                CASE tl.location_name 
+                    WHEN 'Ruin Station' THEN 8.50
+                    WHEN 'Checkmate Station' THEN 8.45
+                    ELSE 8.20
+                END
+            WHEN m.name = 'Recycled Material Composite' THEN
+                CASE tl.location_name
+                    WHEN 'Ruin Station' THEN 2.40
+                    WHEN 'Checkmate Station' THEN 2.35
+                    ELSE 2.25
+                END
+            WHEN m.name = 'Electronic Components' THEN
+                CASE tl.location_name
+                    WHEN 'Ruin Station' THEN 2.50
+                    WHEN 'Checkmate Station' THEN 2.45
+                    ELSE 2.35
+                END
+            ELSE m.base_value * 1.15  -- 15% markup for Pyro system
+        END as sell_price
+    FROM materials m
+    CROSS JOIN trading_locations tl
+    WHERE m.is_active = true AND tl.system_name = 'Pyro'
+    AND m.name IN ('Quantainium', 'Bexalite', 'Laranite', 'Titanium', 'Recycled Material Composite', 'Electronic Components')
+)
+INSERT INTO material_prices (material_id, location_id, sell_price)
+SELECT material_id, location_id, sell_price
+FROM pyro_material_prices
 ON CONFLICT (material_id, location_id) DO UPDATE SET
     sell_price = EXCLUDED.sell_price,
     last_updated = CURRENT_TIMESTAMP;
