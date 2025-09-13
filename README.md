@@ -70,17 +70,18 @@ The bot's flagship feature - complete automation for mining sessions:
 ### **🎯 Sunday Mining Session (5 Simple Steps)**
 1. **Start**: `/redsundayminingstart` - Bot shows current channel members and creates event ID like `sm-a7k2m9`
 2. **Mine**: Members join voice channels and participate normally - bot tracks automatically
-3. **Calculate**: `/redpayroll calculate` - Select your event, set donations, review prices
-4. **Distribute**: Bot generates fair payroll based on participation time and current ore values
-5. **Done**: Members get transparent breakdown of earnings and any donation bonuses
+3. **Calculate**: `/payroll calculate` - Enhanced 5-step workflow with custom pricing and better UI
+4. **Distribute**: Bot generates fair payroll with optional custom pricing and enhanced visual feedback
+5. **Done**: Members get transparent breakdown with "Donated Re-distribution Amount" terminology
 
 ### **🔍 Essential Commands**
 | Command | Purpose | Example |
 |---------|---------|---------|
+| `/payroll calculate` | Enhanced 5-step payroll workflow with custom pricing | Event selection → Custom prices → Payouts |
+| `/payroll lookup` | Look up detailed past event information | Complete event history and breakdown |
 | `/redpricecheck ores` | Current ore prices with best locations | All 19 mineable ores |
 | `/redpricerefresh` | Force update price cache | Override 24-hour cache |
 | `/redeventdiagnostics` | System health check | Database, API, channels |
-| `/redtestmining create` | Generate test data | Training and validation |
 
 ### **💡 Pro Tips**
 - Bot joins dispatch channel when tracking is active (visual confirmation)
@@ -98,12 +99,14 @@ The bot's flagship feature - complete automation for mining sessions:
 - 🔒 **Security & Permissions** - Role-based access with Admin/OrgLeader controls
 - 🧪 **Testing & Diagnostics** - Comprehensive health checks and test data generation
 
-**Advanced Features (Enhanced v2.0)**:
-- 🎁 **Voluntary Donation System** - Members can share earnings with automatic redistribution
-- ✏️ **Editable Pricing** - Adjust ore values during payroll calculation as needed
-- 📊 **Interactive UI** - Discord buttons, modals, and multi-step workflows
-- 🏷️ **Smart Event IDs** - Category prefixes for mining, operations, training, social events
-- 📈 **Real-time Analytics** - Live participation tracking with detailed member statistics
+**Advanced Features (Enhanced v3.0)**:
+- 🎁 **Modal-Based Donation System** - Secure confirmation modals replacing unreliable toggle buttons
+- 🔧 **Step 2.5 Custom Pricing** - Override UEX prices with custom values per ore type
+- 📊 **Maximum Width Layout** - 110-character Discord embed utilization with 2-column participant display
+- 🎯 **Enhanced Event Selection** - Event names included in dropdown alongside creator names
+- 🔍 **Comprehensive Event Lookup** - `/payroll lookup` command for detailed historical event data
+- 📈 **Real-time Analytics** - Live participation tracking with enhanced visual design
+- 🔧 **Comprehensive Debugging** - Extensive logging system for donation state tracking
 
 ## 🚀 Future Expansions
 
@@ -180,7 +183,7 @@ red-legion-bots/
 For technical support or feature requests, contact your organization's administrators or check the bot's diagnostic commands for troubleshooting common issues.
 
 ## 🔧 Version Information
-Current version includes Sunday Mining operations, payroll management, UEX price integration, and comprehensive event tracking with ongoing enhancements for expanded organizational management.
+Current version (v3.0) includes enhanced Sunday Mining operations with Step 2.5 custom pricing, modal-based donation system replacing broken toggle buttons, maximum Discord embed width utilization (110 characters), 2-column participant layouts, enhanced event selection with event names, comprehensive debugging system, and "Donated Re-distribution Amount" terminology for clearer donation understanding.
 
 ---
 

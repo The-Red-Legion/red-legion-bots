@@ -51,7 +51,7 @@ def get_cloud_sql_ip(instance_name: str, project_id: str = None) -> Optional[str
 
 def resolve_database_url(database_url: str) -> str:
     """
-    Resolve database URL by replacing hostname with Cloud SQL internal IP and correct credentials.
+    Resolve database URL by using the complete connection string from Secret Manager if available.
     
     Args:
         database_url: Original database URL
@@ -64,13 +64,48 @@ def resolve_database_url(database_url: str) -> str:
         parsed = urlparse(database_url)
         logger.info(f"Parsed hostname: {parsed.hostname or '[redacted]'}, port: {parsed.port or '[default]'}, username: {parsed.username or '[redacted]'}")
         
-        # Known Cloud SQL configuration
-        CLOUD_SQL_INTERNAL_IP = "10.92.0.3"
-        CLOUD_SQL_USERNAME = "arccorp_sys_admin"
+        # If the URL already has the correct Cloud SQL IP, use it as-is
+        if parsed.hostname == "10.92.0.3":
+            logger.info("Database URL already using Cloud SQL internal IP, returning as-is")
+            return database_url
         
-        # If hostname looks like a Cloud SQL instance name or non-IP, use the known internal IP
+        # If hostname is localhost or other IP, return as-is
+        if _is_ip_address(parsed.hostname) or parsed.hostname in ['localhost']:
+            logger.info("Database URL using localhost/IP address, returning as-is")
+            return database_url
+            
+        # If hostname looks like a Cloud SQL instance name, try to get the complete URL from secrets
         if parsed.hostname and not _is_ip_address(parsed.hostname):
-            logger.info(f"Resolving hostname {parsed.hostname} to Cloud SQL internal IP {CLOUD_SQL_INTERNAL_IP}")
+            logger.info(f"Hostname {parsed.hostname} appears to be Cloud SQL instance, getting complete URL from Secret Manager")
+            
+            try:
+                # Try to get the complete connection string from Secret Manager
+                from google.cloud import secretmanager
+                import os
+                
+                client = secretmanager.SecretManagerServiceClient()
+                project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
+                secret_name = "database-connection-string"
+                name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+                
+                response = client.access_secret_version(request={"name": name})
+                complete_url = response.payload.data.decode("UTF-8")
+                
+                # Validate the complete URL has the correct format
+                complete_parsed = urlparse(complete_url)
+                if complete_parsed.scheme == 'postgresql' and complete_parsed.hostname == "10.92.0.3":
+                    logger.info("Successfully retrieved complete database URL from Secret Manager")
+                    return complete_url
+                else:
+                    logger.warning("Complete URL from Secret Manager has unexpected format, falling back to manual construction")
+                    
+            except Exception as e:
+                logger.warning(f"Could not get complete URL from Secret Manager: {e}")
+            
+            # Fallback to manual construction (legacy behavior)
+            logger.info("Falling back to manual URL construction")
+            CLOUD_SQL_INTERNAL_IP = "10.92.0.3"
+            CLOUD_SQL_USERNAME = "arccorp_sys_admin"
             
             # Get password from Google Secrets Manager
             try:
@@ -91,11 +126,11 @@ def resolve_database_url(database_url: str) -> str:
             database_name = parsed.path.lstrip('/') if parsed.path else 'red_legion_arccorp_data_store'
             resolved_url = f"postgresql://{CLOUD_SQL_USERNAME}:{encoded_password}@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}"
             
-            logger.info(f"Resolved database URL: postgresql://{CLOUD_SQL_USERNAME}:***@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}")
+            logger.info(f"Manually constructed URL: postgresql://{CLOUD_SQL_USERNAME}:***@{CLOUD_SQL_INTERNAL_IP}:{port}/{database_name}")
             return resolved_url
         
-        # If hostname is already an IP or localhost, return as-is
-        logger.info("Database URL already has IP address, returning as-is")
+        # Default case: return as-is
+        logger.info("No special handling needed, returning original URL")
         return database_url
         
     except Exception as e:
@@ -103,15 +138,31 @@ def resolve_database_url(database_url: str) -> str:
         logger.error("Failed to resolve database URL - check connection parameters")
         # Return a safe fallback URL
         try:
-            password = _get_db_password_from_secrets()
-            from urllib.parse import quote
-            encoded_password = quote(password, safe='')
-            fallback_url = f"postgresql://arccorp_sys_admin:{encoded_password}@10.92.0.3:5432/red_legion_arccorp_data_store"
-            logger.info("Using fallback URL with secrets manager password")
+            # Try to get complete URL from secrets first
+            from google.cloud import secretmanager
+            import os
+            
+            client = secretmanager.SecretManagerServiceClient()
+            project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'rl-prod-471116')
+            secret_name = "database-connection-string"
+            name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+            
+            response = client.access_secret_version(request={"name": name})
+            fallback_url = response.payload.data.decode("UTF-8")
+            logger.info("Using complete fallback URL from Secret Manager")
             return fallback_url
         except:
-            logger.error("Could not create fallback URL, returning original")
-            return database_url
+            # Ultimate fallback - construct manually
+            try:
+                password = _get_db_password_from_secrets()
+                from urllib.parse import quote
+                encoded_password = quote(password, safe='')
+                fallback_url = f"postgresql://arccorp_sys_admin:{encoded_password}@10.92.0.3:5432/red_legion_arccorp_data_store"
+                logger.info("Using manually constructed fallback URL")
+                return fallback_url
+            except:
+                logger.error("Could not create fallback URL, returning original")
+                return database_url
 
 def _get_db_password_from_secrets() -> str:
     """Get database password from Google Secrets Manager."""

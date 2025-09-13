@@ -1,0 +1,1344 @@
+"""
+Event-Driven View-Based Payroll UI
+
+Replaces modal chains with resilient view-based interface using session management.
+Provides smooth, non-blocking user experience with real-time updates.
+"""
+
+import discord
+from discord import ui
+from typing import Dict, List, Optional, Any
+from decimal import Decimal
+from datetime import datetime
+import logging
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+
+from ..session import session_manager, PayrollEvent, PayrollStep
+from ..processors.mining import MiningProcessor
+from ..core import PayrollCalculator
+
+logger = logging.getLogger(__name__)
+
+class EventDrivenPayrollView(ui.View):
+    """Base class for event-driven payroll views."""
+    
+    def __init__(self, session_id: str, timeout: int = 600):
+        super().__init__(timeout=timeout)
+        self.session_id = session_id
+        self.session_data = None
+        
+    async def load_session(self):
+        """Load current session data."""
+        self.session_data = await session_manager.get_session(self.session_id)
+        return self.session_data
+    
+    async def refresh_view(self, interaction: discord.Interaction):
+        """Refresh the view with current session data."""
+        await self.load_session()
+        embed, view = await self.build_current_view()
+        
+        if interaction.response.is_done():
+            await interaction.edit_original_response(embed=embed, view=view)
+        else:
+            await interaction.response.edit_message(embed=embed, view=view)
+    
+    async def build_current_view(self):
+        """Build the current view based on session state. Override in subclasses."""
+        raise NotImplementedError
+
+class OreQuantityEntryView(EventDrivenPayrollView):
+    """View-based ore quantity entry with real-time updates."""
+    
+    def __init__(self, session_id: str, processor: MiningProcessor):
+        super().__init__(session_id)
+        self.processor = processor
+        # Use full ore names to match pricing system (alphabetical order)
+        self.ore_names = {
+            'AGRICIUM': 'Agricium', 'ALUMINUM': 'Aluminum', 'BERYL': 'Beryl', 
+            'BEXALITE': 'Bexalite', 'BORASE': 'Borase', 'COPPER': 'Copper',
+            'CORUNDUM': 'Corundum', 'DIAMOND': 'Diamond', 'GOLD': 'Gold',
+            'HADANITE': 'Hadanite', 'HEPHAESTANITE': 'Hephaestanite', 'IRON': 'Iron',
+            'LARANITE': 'Laranite', 'QUANTAINIUM': 'Quantanium', 'QUARTZ': 'Quartz',
+            'RICCITE': 'Riccite', 'SILICON': 'Silicon', 'STILERON': 'Stileron',
+            'TARANITE': 'Taranite', 'TITANIUM': 'Titanium', 'TUNGSTEN': 'Tungsten'
+        }
+        self.current_prices = {}
+        
+    async def build_current_view(self):
+        """Build ore quantity entry interface."""
+        await self.load_session()
+        
+        if not self.session_data:
+            embed = discord.Embed(
+                title="❌ Session Error", 
+                description="Session not found", 
+                color=discord.Color.red()
+            )
+            return embed, None
+        
+        # Get current prices (database only)
+        self.current_prices = await self.processor.get_current_prices(
+            refresh=False, allow_api_calls=False
+        )
+        
+        # Build main embed
+        embed = discord.Embed(
+            title=f"⛏️ Mining Payroll - {self.session_data['event_id']}",
+            description="**Step 2 of 4: Enter Ore Quantities** 📊\n\n"
+                       "Enter the SCU amounts for each ore type collected.",
+            color=discord.Color.blue(),
+            timestamp=datetime.now()
+        )
+        
+        # Current quantities and totals
+        ore_quantities = self.session_data.get('ore_quantities', {})
+        total_value = Decimal('0')
+        total_scu = 0
+        
+        quantity_lines = []
+        for ore_code, ore_name in sorted(self.ore_names.items(), key=lambda x: x[1]):
+            quantity = ore_quantities.get(ore_code, 0)
+            price_info = self.current_prices.get(ore_code, {'price': 0})
+            price_per_scu = Decimal(str(price_info['price']))
+            ore_value = Decimal(str(quantity)) * price_per_scu
+            total_value += ore_value
+            total_scu += quantity
+            
+            if quantity > 0:
+                quantity_lines.append(
+                    f"**{ore_name}:** {quantity:,.0f} SCU @ {price_per_scu:,.1f} = {ore_value:,.0f} aUEC"
+                )
+            else:
+                quantity_lines.append(f"{ore_name}: *Not collected*")
+        
+        # Consolidate all ores under one title, split into multiple fields if needed due to Discord limits
+        all_quantities_text = "\n".join(quantity_lines)
+        if len(all_quantities_text) <= 1024:
+            # All ores fit in one field
+            embed.add_field(
+                name="📊 Current Quantities",
+                value=all_quantities_text,
+                inline=False
+            )
+        else:
+            # Split into multiple fields but keep same title
+            embed.add_field(
+                name="📊 Current Quantities",
+                value="\n".join(quantity_lines[:8]),
+                inline=False
+            )
+            
+            if len(quantity_lines) > 8:
+                embed.add_field(
+                    name="📊 Current Quantities (cont.)",
+                    value="\n".join(quantity_lines[8:]),
+                    inline=False
+                )
+        
+        embed.add_field(
+            name="💰 Summary",
+            value=f"**Total SCU:** {total_scu:,.0f}\n"
+                  f"**Total Value:** {total_value:,.0f} aUEC\n"
+                  f"**Ores with Quantities:** {len([q for q in ore_quantities.values() if q > 0])}",
+            inline=False
+        )
+        
+        # Build view with ore buttons
+        view = OreQuantityEntryView(self.session_id, self.processor)
+        await view._build_ore_buttons()
+        
+        return embed, view
+    
+    async def _build_ore_buttons(self):
+        """Build ore quantity entry buttons."""
+        await self.load_session()
+        ore_quantities = self.session_data.get('ore_quantities', {})
+        
+        # Create rows of ore buttons (5 per row max)
+        ore_items = list(self.ore_names.items())
+        
+        for i in range(0, len(ore_items), 5):
+            row_ores = ore_items[i:i+5]
+            for ore_code, ore_name in row_ores:
+                quantity = ore_quantities.get(ore_code, 0)
+                button_label = f"{ore_name}: {quantity:,.0f}" if quantity > 0 else ore_name
+                button_style = discord.ButtonStyle.primary if quantity > 0 else discord.ButtonStyle.secondary
+                
+                button = OreQuantityButton(ore_code, ore_name, self.session_id)
+                button.label = button_label[:80]  # Discord limit
+                button.style = button_style
+                self.add_item(button)
+        
+        # Add navigation buttons
+        continue_button = ContinueToCustomPricingButton(self.session_id)
+        continue_button.disabled = len([q for q in ore_quantities.values() if q > 0]) == 0
+        self.add_item(continue_button)
+        
+        self.add_item(CancelSessionButton(self.session_id))
+
+class OreQuantityButton(ui.Button):
+    """Button to set quantity for a specific ore."""
+    
+    def __init__(self, ore_code: str, ore_name: str, session_id: str):
+        super().__init__(emoji="📊")
+        self.ore_code = ore_code
+        self.ore_name = ore_name
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Show mini-modal for this specific ore
+        modal = SingleOreQuantityModal(self.ore_code, self.ore_name, self.session_id)
+        await interaction.response.send_modal(modal)
+
+class SingleOreQuantityModal(ui.Modal):
+    """Mini-modal for entering quantity for a single ore."""
+    
+    def __init__(self, ore_code: str, ore_name: str, session_id: str):
+        super().__init__(title=f"Set {ore_name} Quantity")
+        self.ore_code = ore_code
+        self.ore_name = ore_name
+        self.session_id = session_id
+        
+        self.quantity_input = ui.TextInput(
+            label=f"{ore_name} SCU Amount",
+            placeholder="Enter SCU quantity (0 to remove)",
+            required=True,
+            max_length=10,
+            default="0"
+        )
+        self.add_item(self.quantity_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            # Parse quantity
+            quantity_str = self.quantity_input.value.strip()
+            quantity = float(quantity_str) if quantity_str else 0
+            
+            if quantity < 0:
+                await interaction.response.send_message(
+                    f"❌ Quantity must be 0 or greater.", ephemeral=True
+                )
+                return
+            
+            # Update session via event system
+            await session_manager.update_ore_quantity(self.session_id, self.ore_code, quantity)
+            
+            # Refresh the main view
+            session = await session_manager.get_session(self.session_id)
+            if session:
+                processor = MiningProcessor()
+                view = OreQuantityEntryView(self.session_id, processor)
+                embed, new_view = await view.build_current_view()
+                
+                await interaction.response.edit_message(embed=embed, view=new_view)
+            else:
+                await interaction.response.send_message(
+                    "❌ Session not found", ephemeral=True
+                )
+                
+        except ValueError:
+            await interaction.response.send_message(
+                f"❌ Invalid quantity: '{self.quantity_input.value}'", ephemeral=True
+            )
+        except Exception as e:
+            logger.error(f"Error in ore quantity modal: {e}")
+            await interaction.response.send_message(
+                f"❌ Error updating quantity: {str(e)}", ephemeral=True
+            )
+
+class ContinueToCustomPricingButton(ui.Button):
+    """Button to continue to custom pricing step."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="Review/Set Pricing",
+            style=discord.ButtonStyle.success,
+            emoji="💰"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Advance to custom pricing step
+            await session_manager.advance_step(self.session_id, PayrollStep.CUSTOM_PRICING)
+            
+            # Show custom pricing view
+            view = CustomPricingView(self.session_id)
+            embed = await view.create_embed()
+            
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except Exception as e:
+            logger.error(f"Error advancing to custom pricing: {e}")
+            await interaction.followup.send(
+                f"❌ Error advancing to pricing review: {str(e)}", ephemeral=True
+            )
+
+class PricingReviewView(EventDrivenPayrollView):
+    """View for reviewing and confirming ore pricing."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(session_id)
+        self.processor = MiningProcessor()
+        self.calculator = PayrollCalculator()
+    
+    async def build_current_view(self):
+        """Build pricing review interface."""
+        await self.load_session()
+        
+        if not self.session_data:
+            embed = discord.Embed(title="❌ Session Error", color=discord.Color.red())
+            return embed, None
+        
+        ore_quantities = self.session_data.get('ore_quantities', {})
+        if not ore_quantities:
+            embed = discord.Embed(
+                title="❌ No Quantities", 
+                description="Please go back and enter ore quantities first.",
+                color=discord.Color.red()
+            )
+            return embed, None
+        
+        # Get current pricing - allow API calls during pricing review step as it's not during immediate Discord interaction
+        prices = await self.processor.get_current_prices(refresh=True, allow_api_calls=True)
+        
+        # Apply custom pricing overrides if they exist
+        custom_prices = self.session_data.get('custom_prices', {})
+        if custom_prices:
+            # Create reverse lookup to match display names to ore codes
+            ore_name_to_code = {
+                'Agricium': 'AGRICIUM', 'Aluminum': 'ALUMINUM', 'Beryl': 'BERYL',
+                'Bexalite': 'BEXALITE', 'Borase': 'BORASE', 'Copper': 'COPPER',
+                'Corundum': 'CORUNDUM', 'Diamond': 'DIAMOND', 'Gold': 'GOLD',
+                'Hadanite': 'HADANITE', 'Hephaestanite': 'HEPHAESTANITE', 'Iron': 'IRON',
+                'Laranite': 'LARANITE', 'Quantanium': 'QUANTAINIUM', 'Quartz': 'QUARTZ',
+                'Riccite': 'RICCITE', 'Silicon': 'SILICON', 'Stileron': 'STILERON',
+                'Taranite': 'TARANITE', 'Titanium': 'TITANIUM', 'Tungsten': 'TUNGSTEN'
+            }
+            
+            for ore_display_name, custom_price in custom_prices.items():
+                ore_code = ore_name_to_code.get(ore_display_name, ore_display_name.upper())
+                if ore_code in prices:
+                    prices[ore_code]['price'] = custom_price
+        
+        total_value, breakdown = await self.processor.calculate_total_value(ore_quantities, prices)
+        
+        # Update session with pricing data
+        await session_manager.set_pricing_data(self.session_id, {
+            'prices': prices,
+            'breakdown': breakdown,
+            'total_value': str(total_value)
+        })
+        
+        # Build embed with enhanced formatting
+        embed = discord.Embed(
+            title=f"# ⛏️ Mining Payroll - {self.session_data['event_id']}",
+            description="## **Step 3 of 4: Review Pricing** 💰\n\n"
+                       "📋 **Review ore prices and total value calculation**\n"
+                       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+        
+        # Ore breakdown with better spacing
+        breakdown_lines = []
+        for ore_code, quantity in ore_quantities.items():
+            if quantity > 0 and ore_code in breakdown:
+                data = breakdown[ore_code]
+                ore_name = self._get_ore_name(ore_code)
+                breakdown_lines.append(
+                    f"```\n{ore_name:12} │ {quantity:>8,.0f} SCU  ×  {data['price_per_scu']:>6,.0f}  =  {data['total_value']:>12,.0f} aUEC```"
+                )
+        
+        embed.add_field(
+            name="📊 Ore Value Breakdown",
+            value="\n".join(breakdown_lines) if breakdown_lines else "No ores with quantities",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💰 **TOTAL VALUE**",
+            value=f"```ansi\n[1;32m{total_value:>15,.0f} aUEC[0m```",
+            inline=False
+        )
+        
+        # Build view
+        view = PricingReviewView(self.session_id)
+        await view._build_review_buttons()
+        
+        return embed, view
+    
+    async def _build_review_buttons(self):
+        """Build pricing review buttons."""
+        self.add_item(CalculatePayrollButton(self.session_id))
+        self.add_item(BackToQuantitiesButton(self.session_id))
+        self.add_item(CancelSessionButton(self.session_id))
+    
+    def _get_ore_name(self, ore_code: str) -> str:
+        """Get display name for ore code."""
+        ore_names = {
+            'AGRICIUM': 'Agricium', 'ALUMINUM': 'Aluminum', 'BERYL': 'Beryl',
+            'BEXALITE': 'Bexalite', 'BORASE': 'Borase', 'COPPER': 'Copper',
+            'CORUNDUM': 'Corundum', 'DIAMOND': 'Diamond', 'GOLD': 'Gold',
+            'HADANITE': 'Hadanite', 'HEPHAESTANITE': 'Hephaestanite', 'IRON': 'Iron',
+            'LARANITE': 'Laranite', 'QUANTAINIUM': 'Quantanium', 'QUARTZ': 'Quartz',
+            'RICCITE': 'Riccite', 'SILICON': 'Silicon', 'STILERON': 'Stileron',
+            'TARANITE': 'Taranite', 'TITANIUM': 'Titanium', 'TUNGSTEN': 'Tungsten'
+        }
+        return ore_names.get(ore_code, ore_code)
+
+class CalculatePayrollButton(ui.Button):
+    """Button to calculate final payroll."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="Calculate Payroll",
+            style=discord.ButtonStyle.success,
+            emoji="🧮"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                await interaction.followup.send("❌ Session not found", ephemeral=True)
+                return
+            
+            # Get pricing data
+            pricing_data = session.get('pricing_data', {})
+            if not pricing_data:
+                await interaction.followup.send("❌ No pricing data available", ephemeral=True)
+                return
+            
+            # Calculate payroll
+            calculator = PayrollCalculator()
+            result = await calculator.calculate_payroll(
+                event_id=session['event_id'],
+                total_value_auec=Decimal(pricing_data['total_value']),
+                collection_data={
+                    'ores': session['ore_quantities'],
+                    'total_scu': sum(session['ore_quantities'].values()),
+                    'breakdown': pricing_data['breakdown']
+                },
+                price_data=pricing_data['prices'],
+                calculated_by_id=session['user_id'],
+                calculated_by_name="Payroll Calculator",
+                donation_percentage=session.get('donation_percentage', 0)
+            )
+            
+            if result['success']:
+                # Store calculation results and move to payout management
+                await session_manager.update_session(self.session_id, {
+                    'calculation_data': result,
+                    'current_step': PayrollStep.PAYOUT_MANAGEMENT
+                })
+                
+                # Show payout management view
+                view = PayoutManagementView(self.session_id)
+                embed = await view.create_embed()
+                
+                await interaction.edit_original_response(embed=embed, view=view)
+            else:
+                await interaction.followup.send(
+                    f"❌ Payroll calculation failed: {result['error']}", ephemeral=True
+                )
+                
+        except Exception as e:
+            logger.error(f"Error calculating payroll: {e}")
+            await interaction.followup.send(
+                f"❌ Error calculating payroll: {str(e)}", ephemeral=True
+            )
+
+class BackToQuantitiesButton(ui.Button):
+    """Button to go back to quantity entry."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="Back to Quantities",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        # Go back to quantity entry
+        await session_manager.advance_step(self.session_id, PayrollStep.QUANTITY_ENTRY)
+        
+        processor = MiningProcessor()
+        view = OreQuantityEntryView(self.session_id, processor)
+        embed, quantity_view = await view.build_current_view()
+        
+        await interaction.edit_original_response(embed=embed, view=quantity_view)
+
+class CancelSessionButton(ui.Button):
+    """Button to cancel the session."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="Cancel",
+            style=discord.ButtonStyle.danger,
+            emoji="❌"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Mark session as completed (cancelled)
+        await session_manager.update_session(self.session_id, {'is_completed': True})
+        
+        embed = discord.Embed(
+            title="❌ Payroll Calculation Cancelled",
+            description="The payroll calculation has been cancelled.",
+            color=discord.Color.orange()
+        )
+        
+        await interaction.response.edit_message(embed=embed, view=None)
+
+
+class PayoutManagementView(ui.View):
+    """Step 4: Payout Management - Individual participant payouts with donation controls."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(timeout=1800)  # 30 minutes
+        self.session_id = session_id
+        self.donation_states = {}  # Track donation states for participants
+        self._donation_states_loaded = False  # Track if we've loaded states
+        
+        # Add participant buttons dynamically in create_embed
+        
+    async def ensure_donation_states_loaded(self):
+        """Ensure donation states are loaded from session before using them."""
+        if self._donation_states_loaded:
+            logger.info(f"ENSURE_LOADED: Already loaded, current states: {self.donation_states}")
+            return
+            
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if session:
+                session_donation_states = session.get('donation_states', {})
+                logger.info(f"ENSURE_LOADED: Session donation states: {session_donation_states}")
+                if session_donation_states:
+                    self.donation_states = session_donation_states
+                    logger.info(f"ENSURE_LOADED: Set donation states from session: {self.donation_states}")
+                else:
+                    # Fall back to calculation data for initial state
+                    calculation_data = session.get('calculation_data', {})
+                    if calculation_data:
+                        for payout in calculation_data.get('payouts', []):
+                            user_id = str(payout['user_id'])
+                            # Store base amount instead of boolean donation status
+                            base_amount = float(payout['base_payout_auec'])
+                            # If they were a donor, set amount to 0, otherwise use base amount
+                            if payout.get('is_donor', False):
+                                self.donation_states[user_id] = 0
+                            else:
+                                self.donation_states[user_id] = base_amount
+                        logger.info(f"Initialized donation states from calculation data in ensure_loaded: {self.donation_states}")
+                
+                self._donation_states_loaded = True
+        except Exception as e:
+            logger.error(f"Error loading donation states: {e}")
+        
+    async def create_embed(self):
+        """Create the payout management embed with participant list."""
+        try:
+            # Ensure donation states are loaded first
+            await self.ensure_donation_states_loaded()
+            
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                return self.create_error_embed("Session not found")
+            
+            calculation_data = session.get('calculation_data', {})
+            if not calculation_data:
+                return self.create_error_embed("No calculation data found")
+            
+            # Create embed with enhanced formatting and wider layout
+            embed = discord.Embed(
+                title="# 💰 Step 4: Payout Management",
+                description=f"## **Event Management Dashboard**\n\n"
+                          f"```yaml\n"
+                          f"Event ID:      {calculation_data['event_data']['event_id']}\n"
+                          f"Total Value:   {calculation_data['total_value_auec']:>15,.0f} aUEC\n"
+                          f"Participants:  {calculation_data['total_participants']:>15}\n"
+                          f"```\n"
+                          f"**Click participant buttons to toggle donation status. Green = Donating, Gray = Receiving**\n"
+                          f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                color=discord.Color.gold()
+            )
+            
+            # Add participant payout details with live calculations in code block format
+            
+            # First, recalculate all payouts with current donation states
+            logger.info(f"PAYOUT DISPLAY: Current donation states: {self.donation_states}")
+            logger.info(f"PAYOUT DISPLAY: Original payouts count: {len(calculation_data['payouts'])}")
+            
+            updated_payouts = self.recalculate_with_overrides(calculation_data['payouts'], self.donation_states)
+            
+            logger.info(f"PAYOUT DISPLAY: Updated payouts count: {len(updated_payouts)}")
+            for payout in updated_payouts:
+                logger.info(f"PAYOUT DISPLAY: {payout['username']} - is_donor: {payout.get('is_donor', False)}")
+            
+            total_donated = 0
+            total_recipients = 0
+            
+            # Create formatted lines for single column display with double spacing
+            payout_lines = []
+            
+            # Process participants for totals calculation
+            for payout in updated_payouts:
+                if payout['is_donor']:
+                    total_donated += float(payout['base_payout_auec'])
+                else:
+                    total_recipients += 1
+            
+            # Single column layout with double spacing
+            for payout in updated_payouts:
+                username = payout['username'][:20]  # Longer names for single column
+                minutes = payout['participation_minutes']
+                percentage = payout['participation_percentage']
+                final_amount = float(payout['final_payout_auec'])
+                
+                if payout['is_donor']:
+                    payout_lines.append(f"{username:<20} {minutes:>3.0f}min ({percentage:>4.1f}%) → DONATED")
+                else:
+                    payout_lines.append(f"{username:<20} {minutes:>3.0f}min ({percentage:>4.1f}%) → {final_amount:>9,.0f} au")
+                
+                payout_lines.append("")  # Double spacing after each participant
+            
+            # Add distribution summary if there are donations
+            if total_donated > 0 and total_recipients > 0:
+                bonus_per_person = total_donated / total_recipients
+                payout_lines.append("─" * 100)  # Separator line
+                payout_lines.append(f"Distribution Summary:")
+                payout_lines.append(f"  Donated Re-distribution: {total_donated:>12,.0f} aUEC")
+                payout_lines.append(f"  Bonus per Recipient:     {bonus_per_person:>12,.0f} aUEC")
+            
+            # Format in code block
+            payout_text = "```\n" + "\n".join(payout_lines) + "\n```"
+            
+            embed.add_field(
+                name="# 👥 **PARTICIPANT PAYOUTS**",
+                value=payout_text[:1024] if payout_text else "No participants found",
+                inline=False
+            )
+            
+            # Add control buttons
+            self.clear_items()
+            self.add_participant_buttons(calculation_data['payouts'])
+            self.add_control_buttons()
+            
+            return embed
+            
+        except Exception as e:
+            logger.error(f"Error creating payout management embed: {e}")
+            return self.create_error_embed(f"Error: {str(e)}")
+    
+    def recalculate_with_overrides(self, original_payouts, amount_overrides):
+        """Recalculate payouts based on amount overrides."""
+        logger.info(f"RECALCULATE: Starting with amount_overrides: {amount_overrides}")
+        updated_payouts = []
+        
+        for payout in original_payouts:
+            user_id = str(payout['user_id'])
+            base_payout = Decimal(str(payout['base_payout_auec']))
+            override_amount = amount_overrides.get(user_id, base_payout)
+            
+            # Handle legacy boolean values from old sessions
+            if isinstance(override_amount, bool):
+                if override_amount == False:  # False means donation (0 amount)
+                    final_amount = Decimal('0')
+                else:  # True would mean... unclear, default to base
+                    final_amount = base_payout
+            else:
+                final_amount = Decimal(str(override_amount))
+            
+            logger.info(f"RECALCULATE: Processing {payout['username']} (ID: {user_id}) - base: {base_payout}, override: {final_amount}")
+            
+            updated_payout = {
+                'user_id': payout['user_id'],
+                'username': payout['username'],
+                'participation_minutes': payout['participation_minutes'],
+                'participation_percentage': payout['participation_percentage'],
+                'base_payout_auec': base_payout,
+                'final_payout_auec': final_amount,
+                'is_donor': final_amount == 0  # Consider 0 amounts as donated
+            }
+            
+            updated_payouts.append(updated_payout)
+        
+        return updated_payouts
+    
+    def add_participant_buttons(self, payouts):
+        """Add amount override buttons for each participant."""
+        for i, payout in enumerate(payouts):
+            if i >= 20:  # Discord limit on buttons
+                break
+                
+            user_id = str(payout['user_id'])
+            username = payout['username']
+            base_amount = float(payout['base_payout_auec'])
+            current_amount = self.donation_states.get(user_id, base_amount)
+            
+            button = ParticipantAmountButton(
+                user_id=user_id,
+                username=username,
+                base_amount=base_amount,
+                current_amount=current_amount,
+                session_id=self.session_id
+            )
+            self.add_item(button)
+    
+    def add_control_buttons(self):
+        """Add main control buttons."""
+        self.add_item(FinalizePayrollButton(self.session_id))
+        self.add_item(BackToCalculationButton(self.session_id))
+        self.add_item(CancelSessionButton(self.session_id))
+    
+    def create_error_embed(self, message: str):
+        """Create an error embed."""
+        return discord.Embed(
+            title="❌ Payout Management Error",
+            description=message,
+            color=discord.Color.red()
+        )
+
+
+class AmountOverrideModal(ui.Modal):
+    """Modal to override participant payout amount."""
+    
+    def __init__(self, user_id: str, username: str, base_amount: float, current_amount: float, session_id: str, parent_view):
+        self.user_id = user_id
+        self.username = username
+        self.base_amount = base_amount
+        self.current_amount = current_amount
+        self.session_id = session_id
+        self.parent_view = parent_view
+        
+        super().__init__(
+            title=f"Override Amount - {username}",
+            timeout=300
+        )
+        
+        # Add amount input field
+        self.amount_input = ui.TextInput(
+            label=f"Override amount for {username}",
+            placeholder=f"Default: {base_amount:,.0f} aUEC (enter 0 to donate)",
+            default=str(int(current_amount)),
+            max_length=15,
+            required=True
+        )
+        self.add_item(self.amount_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse amount with validation
+            amount_str = self.amount_input.value.replace(',', '').replace(' ', '').strip()
+            if not amount_str:
+                await interaction.followup.send("❌ Amount cannot be empty", ephemeral=True)
+                return
+                
+            new_amount = float(amount_str)
+            if new_amount < 0:
+                await interaction.followup.send("❌ Amount cannot be negative", ephemeral=True)
+                return
+            
+            # Update amount override in parent view (using donation_states dict for storage)
+            self.parent_view.donation_states[self.user_id] = new_amount
+            
+            logger.info(f"AMOUNT OVERRIDE: Updated {self.username} ({self.user_id}) from {self.current_amount:,.0f} to {new_amount:,.0f} aUEC")
+            
+            # Update session with new amount override
+            await session_manager.update_session(self.session_id, {
+                'donation_states': self.parent_view.donation_states
+            })
+            
+            # Create fresh view with updated states and force reload
+            new_view = PayoutManagementView(self.session_id)
+            
+            # Force reload by resetting the loaded flag first
+            new_view._donation_states_loaded = False
+            await new_view.ensure_donation_states_loaded()
+            
+            logger.info(f"AMOUNT OVERRIDE: New view states after force reload: {new_view.donation_states}")
+            
+            embed = await new_view.create_embed()
+            
+            await interaction.edit_original_response(
+                embed=embed, 
+                view=new_view
+            )
+            
+        except ValueError as e:
+            logger.error(f"ValueError setting amount override for {self.username}: {e}")
+            await interaction.followup.send("❌ Invalid amount format. Please enter a valid number.", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error setting amount override: {e}")
+            await interaction.followup.send(f"❌ Error setting amount override: {str(e)}", ephemeral=True)
+
+class UndoDonationConfirmationModal(ui.Modal):
+    """Modal to confirm undoing a participant donation."""
+    
+    def __init__(self, user_id: str, username: str, session_id: str, parent_view):
+        self.user_id = user_id
+        self.username = username 
+        self.session_id = session_id
+        self.parent_view = parent_view
+        
+        super().__init__(
+            title=f"Undo Donation - {username}",
+            timeout=300
+        )
+        
+        # Add confirmation display (read-only info)
+        self.confirmation = ui.TextInput(
+            label=f"Undo {username}'s donation",
+            placeholder="Click Submit to cancel donation and return to receiving",
+            default=f"Return {username} to receiving payouts",
+            required=False,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        self.add_item(self.confirmation)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Update donation state in parent view (set to 0 for donation)
+            self.parent_view.donation_states[self.user_id] = 0
+            
+            # Update session with new donation state
+            await session_manager.update_session(self.session_id, {
+                'donation_states': self.parent_view.donation_states
+            })
+            
+            logger.info(f"Undid donation for {self.username} ({self.user_id})")
+            
+            # Create fresh view with force reload
+            new_view = PayoutManagementView(self.session_id)
+            
+            # Force reload by resetting the loaded flag first
+            new_view._donation_states_loaded = False
+            await new_view.ensure_donation_states_loaded()
+            embed = await new_view.create_embed()
+            
+            await interaction.edit_original_response(
+                embed=embed, 
+                view=new_view
+            )
+            
+        except Exception as e:
+            logger.error(f"Error undoing donation: {e}")
+            await interaction.followup.send(f"❌ Error undoing donation: {str(e)}", ephemeral=True)
+
+class ParticipantDonationButton(ui.Button):
+    """Button to open donation confirmation modal for a participant."""
+    
+    def __init__(self, user_id: str, username: str, is_donating: bool, payout_amount: float, session_id: str):
+        self.user_id = user_id
+        self.username = username
+        self.payout_amount = payout_amount
+        self.session_id = session_id
+        self.is_donating = is_donating
+        
+        # Set button appearance with clear visual feedback
+        if is_donating:
+            super().__init__(
+                label=f"{username[:12]} (Donating)",
+                style=discord.ButtonStyle.success,  # Green for donating
+                custom_id=f"donate_{user_id}",
+                emoji="💝"
+            )
+        else:
+            super().__init__(
+                label=f"{username[:12]} (Receiving)",
+                style=discord.ButtonStyle.secondary,   # Gray for receiving
+                custom_id=f"receive_{user_id}",
+                emoji="💰"
+            )
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            parent_view = self.view
+            
+            if self.is_donating:
+                # Open undo donation modal
+                modal = UndoDonationConfirmationModal(
+                    user_id=self.user_id,
+                    username=self.username,
+                    session_id=self.session_id,
+                    parent_view=parent_view
+                )
+            else:
+                # Open donation confirmation modal
+                modal = DonationConfirmationModal(
+                    user_id=self.user_id,
+                    username=self.username,
+                    donation_amount=self.payout_amount,
+                    session_id=self.session_id,
+                    parent_view=parent_view
+                )
+            
+            await interaction.response.send_modal(modal)
+            
+        except Exception as e:
+            logger.error(f"Error opening donation modal for {self.user_id}: {e}")
+            await interaction.response.send_message(f"❌ Error opening donation modal", ephemeral=True)
+
+
+
+class FinalizePayrollButton(ui.Button):
+    """Button to finalize the payroll with current settings."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="✅ Finalize Payroll",
+            style=discord.ButtonStyle.success,
+            emoji="✅"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                await interaction.followup.send("❌ Session not found", ephemeral=True)
+                return
+            
+            calculation_data = session.get('calculation_data', {})
+            view = self.view
+            
+            # Force reload donation states from session before finalizing
+            view._donation_states_loaded = False
+            await view.ensure_donation_states_loaded()
+            
+            logger.info(f"FINALIZE: Force loaded donation states: {view.donation_states}")
+            
+            # Update payouts with current amount overrides and recalculate
+            updated_payouts = view.recalculate_with_overrides(calculation_data['payouts'], view.donation_states)
+            
+            logger.info(f"FINALIZE: Processed {len(updated_payouts)} payouts")
+            for payout in updated_payouts:
+                logger.info(f"FINALIZE: {payout['username']} - is_donor: {payout.get('is_donor', False)}")
+            
+            # Complete session
+            await session_manager.complete_calculation(self.session_id, {
+                **calculation_data,
+                'payouts': updated_payouts,
+                'final_donation_states': view.donation_states
+            })
+            
+            # Show final summary
+            embed = discord.Embed(
+                title="# ✅ Payroll Finalized!",
+                description=f"## **Mining Session Complete**\n\n"
+                          f"```yaml\n"
+                          f"Event ID:      {calculation_data['event_data']['event_id']}\n"
+                          f"Total Value:   {calculation_data['total_value_auec']:>15,.0f} aUEC\n"
+                          f"Participants:  {calculation_data['total_participants']:>15}\n"
+                          f"```\n"
+                          f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                color=discord.Color.green(),
+                timestamp=datetime.now()
+            )
+            
+            # Add final payout summary with enhanced formatting for multiple rows and 2-column layout
+            total_donated_final = Decimal('0')
+            
+            # Calculate total donated amount first
+            for payout in updated_payouts:
+                if payout.get('is_donor', False):
+                    total_donated_final += payout['base_payout_auec']
+            
+            # Create single column layout with double spacing
+            payout_lines = []
+            payout_lines.append("Participation Summary")
+            payout_lines.append("═" * 60)  # Adjusted width for single column
+            
+            # Single column layout with double spacing
+            for payout in updated_payouts:
+                final_amount = payout['final_payout_auec']
+                participation_minutes = payout['participation_minutes']
+                username = payout['username'][:20]  # Longer names for single column
+                
+                if payout.get('is_donor', False):
+                    payout_lines.append(f"{username:<20} DONATED      {participation_minutes:>3.0f}min")
+                else:
+                    payout_lines.append(f"{username:<20} {final_amount:>10,.0f} au  {participation_minutes:>3.0f}min")
+                
+                payout_lines.append("")  # Double spacing after each participant
+            
+            # Format payouts in code block for better alignment with max width
+            payout_summary = "```\n" + "\n".join(payout_lines) + "\n```"
+            
+            embed.add_field(
+                name="🎯 **Final Distribution**",
+                value=payout_summary[:1024] if payout_summary else "No payouts",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="📊 Summary",
+                value=f"**Payroll ID:** `{calculation_data['payroll_id']}`\n"
+                      f"**Session Duration:** {calculation_data['total_minutes']} minutes\n"
+                      f"**Donated Re-distribution Amount:** {total_donated_final:,.0f} aUEC",
+                inline=False
+            )
+            
+            await interaction.edit_original_response(embed=embed, view=None)
+            
+        except Exception as e:
+            logger.error(f"Error finalizing payroll: {e}")
+            await interaction.followup.send(f"❌ Error finalizing payroll: {str(e)}", ephemeral=True)
+
+
+class BackToCalculationButton(ui.Button):
+    """Button to go back to calculation review."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="⬅️ Back to Calculation",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Update session step back to calculation review
+        await session_manager.update_session(self.session_id, {
+            'current_step': PayrollStep.CALCULATION_REVIEW
+        })
+        
+        # Show calculation review view
+        view = PricingReviewView(self.session_id)
+        embed = await view.create_embed()
+        
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class CustomPricingView(ui.View):
+    """Step 2.5: Custom Pricing - Allow modification of imported per-SCU prices."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(timeout=1800)  # 30 minutes
+        self.session_id = session_id
+        
+    async def create_embed(self):
+        """Create the custom pricing embed with ore price options."""
+        try:
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                return self.create_error_embed("Session not found")
+            
+            ore_quantities = session.get('ore_quantities', {})
+            custom_prices = session.get('custom_prices', {})
+            
+            # Get current UEX prices for comparison
+            processor = MiningProcessor()
+            try:
+                uex_prices = await processor.get_current_prices(refresh=True, allow_api_calls=True)
+            except:
+                uex_prices = {}
+            
+            # Create embed
+            embed = discord.Embed(
+                title="💎 Step 2.5: Custom Pricing (Optional)",
+                description=f"**Event:** {session['event_id']}\n\n"
+                          "Review and optionally override ore prices. "
+                          "Default prices are from UEX Corp API.",
+                color=discord.Color.purple()
+            )
+            
+            # Show price options for ores with quantities > 0 in code block for better readability
+            pricing_lines = []
+            for ore_name, quantity in ore_quantities.items():
+                if quantity > 0:
+                    uex_price = uex_prices.get(ore_name.upper(), {}).get('price', 0)
+                    custom_price = custom_prices.get(ore_name, uex_price)
+                    
+                    if custom_price != uex_price:
+                        pricing_lines.append(f"🔧 {ore_name:<12}: {custom_price:>8,.1f} aUEC/SCU (Custom)")
+                    else:
+                        pricing_lines.append(f"📊 {ore_name:<12}: {uex_price:>8,.1f} aUEC/SCU (UEX API)")
+            
+            # Format in code block with proper alignment
+            if pricing_lines:
+                pricing_text = "```\n" + "\n".join(pricing_lines) + "\n```"
+            else:
+                pricing_text = "No ores selected"
+            
+            embed.add_field(
+                name="💰 Current Pricing",
+                value=pricing_text,
+                inline=False
+            )
+            
+            # Add control buttons
+            self.clear_items()
+            self.add_ore_pricing_buttons(ore_quantities, custom_prices, uex_prices)
+            self.add_navigation_buttons()
+            
+            return embed
+            
+        except Exception as e:
+            logger.error(f"Error creating custom pricing embed: {e}")
+            return self.create_error_embed(f"Error: {str(e)}")
+    
+    def add_ore_pricing_buttons(self, ore_quantities: Dict, custom_prices: Dict, uex_prices: Dict):
+        """Add buttons for each ore with quantity > 0."""
+        ore_count = 0
+        for ore_name, quantity in ore_quantities.items():
+            if quantity > 0 and ore_count < 20:  # Discord button limit
+                uex_price = uex_prices.get(ore_name.upper(), {}).get('price', 0)
+                current_price = custom_prices.get(ore_name, uex_price)
+                is_custom = ore_name in custom_prices
+                
+                button = OrePriceButton(
+                    ore_name=ore_name,
+                    current_price=current_price,
+                    session_id=self.session_id,
+                    is_custom=is_custom
+                )
+                self.add_item(button)
+                ore_count += 1
+    
+    def add_navigation_buttons(self):
+        """Add main navigation buttons."""
+        self.add_item(ContinueToPricingReviewButton(self.session_id))
+        self.add_item(BackToQuantitiesFromPricingButton(self.session_id))
+        self.add_item(CancelSessionButton(self.session_id))
+    
+    def create_error_embed(self, message: str):
+        """Create an error embed."""
+        return discord.Embed(
+            title="❌ Custom Pricing Error",
+            description=message,
+            color=discord.Color.red()
+        )
+
+
+class OrePriceButton(ui.Button):
+    """Button to set custom price for a specific ore."""
+    
+    def __init__(self, ore_name: str, current_price: float, session_id: str, is_custom: bool = False):
+        self.ore_name = ore_name
+        self.current_price = current_price
+        self.session_id = session_id
+        self.is_custom = is_custom
+        
+        # Show different style and emoji for custom vs UEX prices
+        if is_custom:
+            emoji = "🔧"
+            style = discord.ButtonStyle.success
+            label = f"{ore_name}: {current_price:,.0f} (Custom)"
+        else:
+            emoji = "💎"
+            style = discord.ButtonStyle.secondary
+            label = f"{ore_name}: {current_price:,.0f} (UEX)"
+        
+        super().__init__(
+            label=label,
+            style=style,
+            emoji=emoji,
+            custom_id=f"price_{ore_name}"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Show modal for custom price input
+        modal = OrePriceModal(
+            ore_name=self.ore_name,
+            current_price=self.current_price,
+            session_id=self.session_id
+        )
+        await interaction.response.send_modal(modal)
+
+
+class OrePriceModal(ui.Modal):
+    """Modal for entering custom ore price."""
+    
+    def __init__(self, ore_name: str, current_price: float, session_id: str):
+        self.ore_name = ore_name
+        self.session_id = session_id
+        
+        super().__init__(title=f"Set Price for {ore_name}")
+        
+        self.price_input = ui.TextInput(
+            label="Price per SCU (aUEC)",
+            placeholder=f"Current: {current_price:,.1f}",
+            default=str(current_price),
+            max_length=10,
+            required=True
+        )
+        self.add_item(self.price_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Parse price with better validation
+            price_str = self.price_input.value.replace(',', '').replace(' ', '').strip()
+            if not price_str:
+                await interaction.followup.send("❌ Price cannot be empty", ephemeral=True)
+                return
+                
+            new_price = float(price_str)
+            if new_price < 0:
+                await interaction.followup.send("❌ Price cannot be negative", ephemeral=True)
+                return
+            
+            # Update session with custom price using the standard update method
+            session = await session_manager.get_session(self.session_id)
+            if not session:
+                await interaction.followup.send("❌ Session not found", ephemeral=True)
+                return
+                
+            custom_prices = session.get('custom_prices', {})
+            custom_prices[self.ore_name] = new_price
+            
+            # Use the standard update_session method instead of set_custom_pricing_data
+            await session_manager.update_session(self.session_id, {'custom_prices': custom_prices})
+            
+            # Refresh the view
+            view = CustomPricingView(self.session_id)
+            embed = await view.create_embed()
+            
+            await interaction.edit_original_response(embed=embed, view=view)
+            
+        except ValueError as e:
+            logger.error(f"ValueError setting custom price for {self.ore_name}: {e}")
+            await interaction.followup.send("❌ Invalid price format. Please enter a valid number.", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error setting custom price for {self.ore_name}: {e}")
+            await interaction.followup.send(f"❌ Error setting custom price: {str(e)}", ephemeral=True)
+
+
+class ParticipantAmountButton(ui.Button):
+    """Button to open amount override modal for a participant."""
+    
+    def __init__(self, user_id: str, username: str, base_amount: float, current_amount: float, session_id: str):
+        self.user_id = user_id
+        self.username = username
+        self.base_amount = base_amount
+        self.current_amount = current_amount
+        self.session_id = session_id
+        
+        # Determine if amount has been overridden
+        is_overridden = abs(current_amount - base_amount) > 0.01
+        is_donating = current_amount == 0
+        
+        # Set button appearance based on override status
+        if is_donating:
+            super().__init__(
+                label=f"{username[:12]} (DONATED)",
+                style=discord.ButtonStyle.success,  # Green for donated
+                custom_id=f"amount_{user_id}",
+                emoji="💝"
+            )
+        elif is_overridden:
+            super().__init__(
+                label=f"{username[:12]} ({current_amount:,.0f})",
+                style=discord.ButtonStyle.primary,  # Blue for overridden
+                custom_id=f"amount_{user_id}",
+                emoji="🔧"
+            )
+        else:
+            super().__init__(
+                label=f"{username[:12]} ({base_amount:,.0f})",
+                style=discord.ButtonStyle.secondary,  # Gray for default
+                custom_id=f"amount_{user_id}",
+                emoji="💰"
+            )
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            parent_view = self.view
+            
+            # Open amount override modal
+            modal = AmountOverrideModal(
+                user_id=self.user_id,
+                username=self.username,
+                base_amount=self.base_amount,
+                current_amount=self.current_amount,
+                session_id=self.session_id,
+                parent_view=parent_view
+            )
+            await interaction.response.send_modal(modal)
+            
+        except Exception as e:
+            logger.error(f"Error in amount button callback: {e}")
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+
+class ContinueToPricingReviewButton(ui.Button):
+    """Button to continue to final pricing review."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="Continue to Pricing Review",
+            style=discord.ButtonStyle.success,
+            emoji="📊"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        try:
+            # Advance to pricing review step
+            await session_manager.advance_step(self.session_id, PayrollStep.PRICING_REVIEW)
+            
+            # Show pricing review view
+            view = PricingReviewView(self.session_id)
+            embed, pricing_view = await view.build_current_view()
+            
+            await interaction.edit_original_response(embed=embed, view=pricing_view)
+            
+        except Exception as e:
+            logger.error(f"Error advancing to pricing review: {e}")
+            await interaction.followup.send(
+                f"❌ Error advancing to pricing review: {str(e)}", ephemeral=True
+            )
+
+
+class BackToQuantitiesFromPricingButton(ui.Button):
+    """Button to go back to quantity entry from custom pricing."""
+    
+    def __init__(self, session_id: str):
+        super().__init__(
+            label="⬅️ Back to Quantities",
+            style=discord.ButtonStyle.secondary,
+            emoji="⬅️"
+        )
+        self.session_id = session_id
+    
+    async def callback(self, interaction: discord.Interaction):
+        # Update session step back to quantity entry
+        await session_manager.update_session(self.session_id, {
+            'current_step': PayrollStep.QUANTITY_ENTRY
+        })
+        
+        # Show quantity entry view
+        session = await session_manager.get_session(self.session_id)
+        event_type = session['event_type']
+        
+        # Import the appropriate processor
+        processor = MiningProcessor()
+        view = OreQuantityEntryView(self.session_id, processor)
+        embed, quantity_view = await view.build_current_view()
+        
+        await interaction.response.edit_message(embed=embed, view=quantity_view)

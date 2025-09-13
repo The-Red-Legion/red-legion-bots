@@ -110,16 +110,21 @@ class VoiceTracker:
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         """Handle voice state changes for tracked events."""
         try:
+            logger.info(f"🎙️ Voice state update: {member.display_name} - Before: {before.channel.name if before.channel else 'None'}, After: {after.channel.name if after.channel else 'None'}")
+            
             # Check each tracked event to see if this affects them
             for event_id, tracking_data in self.tracked_events.items():
                 channel_ids = tracking_data['channel_ids']
+                logger.debug(f"Checking event {event_id} with tracked channels: {channel_ids}")
                 
                 # Member left a tracked channel
                 if before.channel and before.channel.id in channel_ids:
+                    logger.info(f"📤 {member.display_name} left tracked channel {before.channel.name} for event {event_id}")
                     await self._record_participant_leave(event_id, member.id)
                 
                 # Member joined a tracked channel  
                 if after.channel and after.channel.id in channel_ids:
+                    logger.info(f"📥 {member.display_name} joined tracked channel {after.channel.name} for event {event_id}")
                     await self._record_participant_join(event_id, member, after.channel)
                     
         except Exception as e:

@@ -1,6 +1,6 @@
 # Red Legion Discord Bot Documentation Index
 
-Welcome to the comprehensive documentation for the Red Legion Discord Bot. This documentation covers the current v2.0.0 Enhanced Mining System with modern PostgreSQL architecture.
+Welcome to the comprehensive documentation for the Red Legion Discord Bot. This documentation covers the current v3.0 Enhanced Mining System with Step 2.5 Custom Pricing, improved UI/UX, and comprehensive event lookup capabilities.
 
 ## 📁 Documentation Structure
 
@@ -27,7 +27,9 @@ Welcome to the comprehensive documentation for the Red Legion Discord Bot. This 
 
 ### 📖 Guides
 
-- **[QUICK_COMMAND_REFERENCE.md](guides/QUICK_COMMAND_REFERENCE.md)** - Complete command reference with current `/red*` command names
+- **[COMMANDS.md](COMMANDS.md)** - Complete command reference v3.0 with new `/payroll` system
+- **[PAYROLL_WORKFLOW.md](PAYROLL_WORKFLOW.md)** - Updated 5-step payroll workflow with Step 2.5 Custom Pricing
+- **[PAYROLL_SYSTEM_UPDATES_v3.0.md](PAYROLL_SYSTEM_UPDATES_v3.0.md)** - Comprehensive v3.0 feature update documentation
 - **[SUNDAY_MINING_OPERATIONS.md](guides/SUNDAY_MINING_OPERATIONS.md)** - Complete guide to Sunday Mining operations and payroll system
 
 ### 🔧 Troubleshooting
@@ -52,20 +54,22 @@ Welcome to the comprehensive documentation for the Red Legion Discord Bot. This 
 
 ## 🤖 Current System Status
 
-### Bot Version: v2.0.0 Enhanced Mining System
-- **Database**: PostgreSQL v2.0.0 with modern architecture
-- **Commands**: All slash commands with `/red*` prefix
-- **Mining System**: Multi-channel voice tracking with UEX integration
-- **Caching**: Intelligent UEX API caching with auto-refresh
+### Bot Version: v3.0 Enhanced Mining System with Custom Pricing
+- **Database**: PostgreSQL v3.0 with enhanced session management and custom pricing storage
+- **Commands**: Enhanced `/payroll` system with 5-step workflow and new `/payroll lookup` command
+- **Mining System**: Multi-channel voice tracking with UEX integration and custom pricing override
+- **UI/UX**: Enhanced visual design with wider windows, better spacing, and improved feedback
 - **Deployment**: Full codebase deployment with GitHub Actions
 
 ### Key Features
-- **Enhanced Mining Operations**: 7-channel voice tracking, participant summaries, UEX price integration
+- **Enhanced Payroll System**: 5-step workflow with Step 2.5 Custom Pricing, improved button feedback, and enhanced visual design
+- **Event Lookup**: New `/payroll lookup` command for comprehensive historical event data
+- **Enhanced Mining Operations**: 7-channel voice tracking, participant summaries, custom pricing integration
+- **Improved UI/UX**: Wider windows, better spacing, markdown formatting, and "Donated Re-distribution Amount" terminology
 - **Event Management**: Complete `/redevents` subcommand system
 - **Financial Systems**: `/redloans` and `/redmarket` management
 - **Recruitment**: `/redjoin` application system
 - **Diagnostics**: Comprehensive health checking and cache management
-- **CI/CD**: Automated testing and deployment workflows
 
 ## 📋 Documentation Standards
 
@@ -90,16 +94,17 @@ Welcome to the comprehensive documentation for the Red Legion Discord Bot. This 
 
 ## 🔄 Recent Updates
 
-- **December 2024**: Complete documentation overhaul for v2.0.0 system
-- **December 2024**: Updated all command references to current `/red*` names
-- **December 2024**: Removed outdated summary and plan documents
-- **December 2024**: Enhanced command reference with current features
-- **December 2024**: Updated system status and CI/CD integration docs
+- **September 2025**: v3.0 release with Step 2.5 Custom Pricing system
+- **September 2025**: Enhanced payroll workflow with improved UI/UX and visual feedback
+- **September 2025**: New `/payroll lookup` command for comprehensive event history
+- **September 2025**: Updated terminology to "Donated Re-distribution Amount"
+- **September 2025**: Enhanced visual design with wider windows and better spacing
+- **September 2025**: Complete documentation update for v3.0 features
 
 ---
 
-**System Version**: v2.0.0 Enhanced Mining System  
-**Database Version**: v2.0.0 Modern PostgreSQL Architecture  
-**Last Updated**: December 2024
+**System Version**: v3.0 Enhanced Mining System with Custom Pricing  
+**Database Version**: v3.0 with Custom Pricing and Session Management  
+**Last Updated**: September 2025
 
 *For questions about this documentation or to suggest improvements, please create an issue in the repository.*
