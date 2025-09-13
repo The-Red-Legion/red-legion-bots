@@ -240,6 +240,51 @@ async def test_leave_voice_channel(channel_id: str):
         logger.error(f"Error leaving voice channel {channel_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to leave voice channel: {str(e)}")
 
+@bot_api.post("/admin/sync-members")
+async def sync_all_guild_members():
+    """Manually trigger synchronization of all guild members to database."""
+    if not discord_bot or discord_bot.is_closed():
+        raise HTTPException(status_code=503, detail="Discord bot not connected")
+    
+    try:
+        logger.info("🔄 Manual guild member sync triggered via API")
+        
+        # Import the sync function
+        from database.operations import sync_guild_member
+        
+        synced_count = 0
+        failed_count = 0
+        
+        # Iterate through all guilds
+        for guild in discord_bot.guilds:
+            logger.info(f"🏰 Syncing members for guild: {guild.name} (ID: {guild.id})")
+            guild_id = str(guild.id)
+            
+            # Sync all members
+            for member in guild.members:
+                try:
+                    success = await sync_guild_member(guild_id, member)
+                    if success:
+                        synced_count += 1
+                        logger.info(f"✅ Synced member: {member.name}")
+                    else:
+                        failed_count += 1
+                        logger.warning(f"❌ Failed to sync member: {member.name}")
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(f"❌ Error syncing member {member.name}: {e}")
+        
+        return {
+            "success": True,
+            "message": f"Member sync completed: {synced_count} synced, {failed_count} failed",
+            "synced_count": synced_count,
+            "failed_count": failed_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during member sync: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to sync members: {str(e)}")
+
 # Export the FastAPI app
 app = bot_api
 

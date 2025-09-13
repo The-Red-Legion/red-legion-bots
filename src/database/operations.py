@@ -1256,9 +1256,9 @@ async def delete_event(event_id: int, guild_id: str = None) -> bool:
 # Guild Member Management Operations
 # =============================================================================
 
-async def upsert_guild_membership(guild_id: str, user_id: str, username: str, 
-                                  roles: List[str], nickname: str = None, 
-                                  display_name: str = None, joined_at: datetime = None) -> bool:
+def upsert_guild_membership(guild_id: str, user_id: str, username: str, 
+                            roles: List[str], nickname: str = None, 
+                            display_name: str = None, joined_at: datetime = None) -> bool:
     """
     Insert or update a guild membership record with roles.
     
@@ -1275,35 +1275,43 @@ async def upsert_guild_membership(guild_id: str, user_id: str, username: str,
         True if successful, False otherwise
     """
     try:
-        db = await DatabaseManager.get_instance()
+        import psycopg2
+        from config.settings import get_database_url
+        
+        database_url = get_database_url()
+        conn = get_legacy_connection(database_url)
         
         if joined_at is None:
             joined_at = datetime.now()
             
-        # First ensure user exists
-        await db.execute_query("""
-            INSERT INTO users (user_id, username, display_name, first_seen, last_seen, is_active)
-            VALUES ($1, $2, $3, $4, $5, TRUE)
-            ON CONFLICT (user_id) 
-            DO UPDATE SET 
-                username = EXCLUDED.username,
-                display_name = EXCLUDED.display_name,
-                last_seen = EXCLUDED.last_seen
-        """, user_id, username, display_name, joined_at, datetime.now())
+        with conn.cursor() as cursor:
+            # First ensure user exists
+            cursor.execute("""
+                INSERT INTO users (user_id, username, display_name, first_seen, last_seen, is_active)
+                VALUES (%s, %s, %s, %s, %s, TRUE)
+                ON CONFLICT (user_id) 
+                DO UPDATE SET 
+                    username = EXCLUDED.username,
+                    display_name = EXCLUDED.display_name,
+                    last_seen = EXCLUDED.last_seen
+            """, (user_id, username, display_name, joined_at, datetime.now()))
+            
+            # Then upsert guild membership
+            cursor.execute("""
+                INSERT INTO guild_memberships 
+                (guild_id, user_id, joined_at, roles, nickname, is_active)
+                VALUES (%s, %s, %s, %s, %s, TRUE)
+                ON CONFLICT (guild_id, user_id)
+                DO UPDATE SET
+                    roles = EXCLUDED.roles,
+                    nickname = EXCLUDED.nickname,
+                    is_active = TRUE,
+                    left_at = NULL
+            """, (guild_id, user_id, joined_at, roles, nickname))
+            
+            conn.commit()
         
-        # Then upsert guild membership
-        await db.execute_query("""
-            INSERT INTO guild_memberships 
-            (guild_id, user_id, joined_at, roles, nickname, is_active)
-            VALUES ($1, $2, $3, $4, $5, TRUE)
-            ON CONFLICT (guild_id, user_id)
-            DO UPDATE SET
-                roles = EXCLUDED.roles,
-                nickname = EXCLUDED.nickname,
-                is_active = TRUE,
-                left_at = NULL
-        """, guild_id, user_id, joined_at, roles, nickname)
-        
+        conn.close()
         print(f"✅ Synced member {username} ({user_id}) with {len(roles)} roles")
         return True
         
@@ -1311,7 +1319,7 @@ async def upsert_guild_membership(guild_id: str, user_id: str, username: str,
         print(f"❌ Error upserting guild membership for {user_id}: {e}")
         return False
 
-async def update_member_roles(guild_id: str, user_id: str, roles: List[str]) -> bool:
+def update_member_roles(guild_id: str, user_id: str, roles: List[str]) -> bool:
     """
     Update roles for an existing guild member.
     
@@ -1324,15 +1332,25 @@ async def update_member_roles(guild_id: str, user_id: str, roles: List[str]) -> 
         True if successful, False otherwise
     """
     try:
-        db = await DatabaseManager.get_instance()
+        import psycopg2
+        from config.settings import get_database_url
         
-        result = await db.execute_query("""
-            UPDATE guild_memberships 
-            SET roles = $3
-            WHERE guild_id = $1 AND user_id = $2 AND is_active = TRUE
-        """, guild_id, user_id, roles)
+        database_url = get_database_url()
+        conn = get_legacy_connection(database_url)
         
-        if result:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE guild_memberships 
+                SET roles = %s
+                WHERE guild_id = %s AND user_id = %s AND is_active = TRUE
+            """, (roles, guild_id, user_id))
+            
+            rows_affected = cursor.rowcount
+            conn.commit()
+        
+        conn.close()
+        
+        if rows_affected > 0:
             print(f"✅ Updated roles for user {user_id} in guild {guild_id}")
             return True
         else:
@@ -1343,7 +1361,7 @@ async def update_member_roles(guild_id: str, user_id: str, roles: List[str]) -> 
         print(f"❌ Error updating member roles for {user_id}: {e}")
         return False
 
-async def deactivate_guild_membership(guild_id: str, user_id: str) -> bool:
+def deactivate_guild_membership(guild_id: str, user_id: str) -> bool:
     """
     Mark a guild membership as inactive (user left).
     
@@ -1355,14 +1373,22 @@ async def deactivate_guild_membership(guild_id: str, user_id: str) -> bool:
         True if successful, False otherwise
     """
     try:
-        db = await DatabaseManager.get_instance()
+        import psycopg2
+        from config.settings import get_database_url
         
-        await db.execute_query("""
-            UPDATE guild_memberships 
-            SET is_active = FALSE, left_at = $3
-            WHERE guild_id = $1 AND user_id = $2
-        """, guild_id, user_id, datetime.now())
+        database_url = get_database_url()
+        conn = get_legacy_connection(database_url)
         
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE guild_memberships 
+                SET is_active = FALSE, left_at = %s
+                WHERE guild_id = %s AND user_id = %s
+            """, (datetime.now(), guild_id, user_id))
+            
+            conn.commit()
+        
+        conn.close()
         print(f"✅ Deactivated membership for user {user_id} in guild {guild_id}")
         return True
         
@@ -1424,7 +1450,7 @@ async def get_all_guild_memberships(guild_id: str) -> List[Dict[str, Any]]:
         print(f"❌ Error getting guild memberships: {e}")
         return []
 
-async def sync_guild_member(guild_id: str, member) -> bool:
+def sync_guild_member(guild_id: str, member) -> bool:
     """
     Sync a Discord member to the database.
     
@@ -1439,7 +1465,7 @@ async def sync_guild_member(guild_id: str, member) -> bool:
         # Extract role IDs (skip @everyone role)
         role_ids = [str(role.id) for role in member.roles if role.name != "@everyone"]
         
-        return await upsert_guild_membership(
+        return upsert_guild_membership(
             guild_id=guild_id,
             user_id=str(member.id),
             username=member.name,
