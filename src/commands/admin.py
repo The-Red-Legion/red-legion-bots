@@ -864,6 +864,92 @@ class EventBulkDeleteConfirmationModal(discord.ui.Modal):
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="sync-members", description="Synchronize all guild members to database")
+    @app_commands.default_permissions(administrator=True)
+    async def sync_members(self, interaction: discord.Interaction):
+        """Bulk synchronize all guild members to the database."""
+        try:
+            # Check admin permissions
+            if not interaction.user.guild_permissions.administrator:
+                await interaction.response.send_message(
+                    "❌ This command requires administrator permissions.",
+                    ephemeral=True
+                )
+                return
+            
+            await interaction.response.defer(ephemeral=True)
+            
+            guild = interaction.guild
+            guild_id = str(guild.id)
+            
+            embed = discord.Embed(
+                title="🔄 Member Synchronization",
+                description=f"Starting bulk sync of members in **{guild.name}**...",
+                color=discord.Color.blue()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+            # Import database operations
+            from database.operations import sync_guild_member, get_all_guild_memberships
+            
+            success_count = 0
+            error_count = 0
+            total_members = len(guild.members)
+            
+            # Sync all members
+            for member in guild.members:
+                if member.bot:  # Skip bots
+                    continue
+                    
+                try:
+                    success = await sync_guild_member(guild_id, member)
+                    if success:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        
+                except Exception as e:
+                    print(f"❌ Error syncing member {member.name}: {e}")
+                    error_count += 1
+            
+            # Get final membership count
+            memberships = await get_all_guild_memberships(guild_id)
+            db_member_count = len(memberships)
+            
+            # Create success embed
+            embed = discord.Embed(
+                title="✅ Member Synchronization Complete",
+                color=discord.Color.green()
+            )
+            
+            embed.add_field(
+                name="📊 Statistics",
+                value=f"**Total Members**: {total_members}\n"
+                      f"**Synced Successfully**: {success_count}\n"
+                      f"**Errors**: {error_count}\n"
+                      f"**Database Records**: {db_member_count}",
+                inline=False
+            )
+            
+            if error_count > 0:
+                embed.add_field(
+                    name="⚠️ Note",
+                    value=f"{error_count} members had sync errors. Check bot logs for details.",
+                    inline=False
+                )
+            
+            embed.set_footer(text=f"Guild: {guild.name} ({guild_id})")
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Member Sync Error",
+                description=f"Failed to sync guild members: {str(e)}",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 async def setup(bot):
     """Setup function for discord.py extension loading."""

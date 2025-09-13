@@ -1252,6 +1252,207 @@ async def delete_event(event_id: int, guild_id: str = None) -> bool:
         print(f"Error deleting event: {e}")
         return False
 
+# =============================================================================
+# Guild Member Management Operations
+# =============================================================================
+
+async def upsert_guild_membership(guild_id: str, user_id: str, username: str, 
+                                  roles: List[str], nickname: str = None, 
+                                  display_name: str = None, joined_at: datetime = None) -> bool:
+    """
+    Insert or update a guild membership record with roles.
+    
+    Args:
+        guild_id: Discord guild ID
+        user_id: Discord user ID  
+        username: Discord username
+        roles: List of Discord role IDs
+        nickname: Guild-specific nickname
+        display_name: User display name
+        joined_at: When user joined the guild
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        db = await DatabaseManager.get_instance()
+        
+        if joined_at is None:
+            joined_at = datetime.now()
+            
+        # First ensure user exists
+        await db.execute_query("""
+            INSERT INTO users (user_id, username, display_name, first_seen, last_seen, is_active)
+            VALUES ($1, $2, $3, $4, $5, TRUE)
+            ON CONFLICT (user_id) 
+            DO UPDATE SET 
+                username = EXCLUDED.username,
+                display_name = EXCLUDED.display_name,
+                last_seen = EXCLUDED.last_seen
+        """, user_id, username, display_name, joined_at, datetime.now())
+        
+        # Then upsert guild membership
+        await db.execute_query("""
+            INSERT INTO guild_memberships 
+            (guild_id, user_id, joined_at, roles, nickname, is_active)
+            VALUES ($1, $2, $3, $4, $5, TRUE)
+            ON CONFLICT (guild_id, user_id)
+            DO UPDATE SET
+                roles = EXCLUDED.roles,
+                nickname = EXCLUDED.nickname,
+                is_active = TRUE,
+                left_at = NULL
+        """, guild_id, user_id, joined_at, roles, nickname)
+        
+        print(f"✅ Synced member {username} ({user_id}) with {len(roles)} roles")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error upserting guild membership for {user_id}: {e}")
+        return False
+
+async def update_member_roles(guild_id: str, user_id: str, roles: List[str]) -> bool:
+    """
+    Update roles for an existing guild member.
+    
+    Args:
+        guild_id: Discord guild ID
+        user_id: Discord user ID
+        roles: Updated list of role IDs
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        db = await DatabaseManager.get_instance()
+        
+        result = await db.execute_query("""
+            UPDATE guild_memberships 
+            SET roles = $3
+            WHERE guild_id = $1 AND user_id = $2 AND is_active = TRUE
+        """, guild_id, user_id, roles)
+        
+        if result:
+            print(f"✅ Updated roles for user {user_id} in guild {guild_id}")
+            return True
+        else:
+            print(f"⚠️ No active membership found for user {user_id} in guild {guild_id}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error updating member roles for {user_id}: {e}")
+        return False
+
+async def deactivate_guild_membership(guild_id: str, user_id: str) -> bool:
+    """
+    Mark a guild membership as inactive (user left).
+    
+    Args:
+        guild_id: Discord guild ID
+        user_id: Discord user ID
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        db = await DatabaseManager.get_instance()
+        
+        await db.execute_query("""
+            UPDATE guild_memberships 
+            SET is_active = FALSE, left_at = $3
+            WHERE guild_id = $1 AND user_id = $2
+        """, guild_id, user_id, datetime.now())
+        
+        print(f"✅ Deactivated membership for user {user_id} in guild {guild_id}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error deactivating membership for {user_id}: {e}")
+        return False
+
+async def get_guild_membership(guild_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get guild membership information for a specific user.
+    
+    Args:
+        guild_id: Discord guild ID
+        user_id: Discord user ID
+        
+    Returns:
+        Dict with membership info or None if not found
+    """
+    try:
+        db = await DatabaseManager.get_instance()
+        
+        result = await db.fetch_one("""
+            SELECT gm.*, u.username, u.display_name
+            FROM guild_memberships gm
+            JOIN users u ON gm.user_id = u.user_id
+            WHERE gm.guild_id = $1 AND gm.user_id = $2 AND gm.is_active = TRUE
+        """, guild_id, user_id)
+        
+        return dict(result) if result else None
+        
+    except Exception as e:
+        print(f"❌ Error getting guild membership for {user_id}: {e}")
+        return None
+
+async def get_all_guild_memberships(guild_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all active guild memberships for a guild.
+    
+    Args:
+        guild_id: Discord guild ID
+        
+    Returns:
+        List of membership records
+    """
+    try:
+        db = await DatabaseManager.get_instance()
+        
+        results = await db.fetch_all("""
+            SELECT gm.*, u.username, u.display_name
+            FROM guild_memberships gm
+            JOIN users u ON gm.user_id = u.user_id
+            WHERE gm.guild_id = $1 AND gm.is_active = TRUE
+            ORDER BY u.username
+        """, guild_id)
+        
+        return [dict(row) for row in results] if results else []
+        
+    except Exception as e:
+        print(f"❌ Error getting guild memberships: {e}")
+        return []
+
+async def sync_guild_member(guild_id: str, member) -> bool:
+    """
+    Sync a Discord member to the database.
+    
+    Args:
+        guild_id: Discord guild ID
+        member: Discord member object
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Extract role IDs (skip @everyone role)
+        role_ids = [str(role.id) for role in member.roles if role.name != "@everyone"]
+        
+        return await upsert_guild_membership(
+            guild_id=guild_id,
+            user_id=str(member.id),
+            username=member.name,
+            roles=role_ids,
+            nickname=member.nick,
+            display_name=member.display_name,
+            joined_at=member.joined_at
+        )
+        
+    except Exception as e:
+        print(f"❌ Error syncing guild member {member.id}: {e}")
+        return False
+
 __all__ = [
     'init_db',
     'get_market_items',
@@ -1279,4 +1480,11 @@ __all__ = [
     'create_event',
     'get_all_events',
     'delete_event',
+    # Guild member management functions
+    'upsert_guild_membership',
+    'update_member_roles',
+    'deactivate_guild_membership',
+    'get_guild_membership',
+    'get_all_guild_memberships',
+    'sync_guild_member',
 ]

@@ -121,6 +121,69 @@ class RedLegionBot(commands.Bot):
         except Exception as e:
             print(f"❌ Failed to sync commands for {guild.name}: {e}")
     
+    # =============================================================================
+    # Member Synchronization Event Handlers
+    # =============================================================================
+    
+    async def on_member_join(self, member):
+        """Called when a member joins a guild."""
+        try:
+            from database.operations import sync_guild_member
+            
+            guild_id = str(member.guild.id)
+            success = await sync_guild_member(guild_id, member)
+            
+            if success:
+                print(f"✅ Synced new member: {member.name} joined {member.guild.name}")
+            else:
+                print(f"❌ Failed to sync new member: {member.name}")
+                
+        except Exception as e:
+            print(f"❌ Error syncing member join for {member.name}: {e}")
+    
+    async def on_member_remove(self, member):
+        """Called when a member leaves a guild."""
+        try:
+            from database.operations import deactivate_guild_membership
+            
+            guild_id = str(member.guild.id)
+            user_id = str(member.id)
+            
+            success = await deactivate_guild_membership(guild_id, user_id)
+            
+            if success:
+                print(f"✅ Deactivated member: {member.name} left {member.guild.name}")
+            else:
+                print(f"❌ Failed to deactivate member: {member.name}")
+                
+        except Exception as e:
+            print(f"❌ Error handling member leave for {member.name}: {e}")
+    
+    async def on_member_update(self, before, after):
+        """Called when a member updates their profile or roles."""
+        try:
+            # Only sync if roles changed
+            if before.roles != after.roles or before.nick != after.nick:
+                from database.operations import sync_guild_member
+                
+                guild_id = str(after.guild.id)
+                success = await sync_guild_member(guild_id, after)
+                
+                if success:
+                    role_changes = []
+                    if before.roles != after.roles:
+                        role_changes.append("roles")
+                    if before.nick != after.nick:
+                        role_changes.append("nickname")
+                    
+                    changes = ", ".join(role_changes)
+                    print(f"✅ Updated member: {after.name} ({changes} changed)")
+                else:
+                    print(f"❌ Failed to update member: {after.name}")
+                    
+        except Exception as e:
+            print(f"❌ Error handling member update for {after.name}: {e}")
+    
     async def close(self):
         """Cleanup when bot is closing."""
         try:
@@ -153,7 +216,7 @@ class RedLegionBot(commands.Bot):
         # Create uvicorn server config
         config = uvicorn.Config(
             web_api_app,
-            host="127.0.0.1", 
+            host="0.0.0.0", 
             port=8001,
             log_level="info"
         )

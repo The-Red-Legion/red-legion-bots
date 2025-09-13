@@ -205,9 +205,44 @@ async def get_bot_status():
         "voice_connections": len(discord_bot.voice_clients) if not discord_bot.is_closed() else 0
     }
 
+@bot_api.post("/test/voice/{channel_id}/join")
+async def test_join_voice_channel(channel_id: str):
+    """Test endpoint to join a voice channel."""
+    if not discord_bot or discord_bot.is_closed():
+        raise HTTPException(status_code=503, detail="Discord bot not connected")
+    
+    try:
+        channel_id_int = int(channel_id)
+        success = await voice_tracker.join_voice_channel(channel_id_int)
+        
+        if success:
+            return {"success": True, "message": f"Successfully joined voice channel {channel_id}"}
+        else:
+            return {"success": False, "message": f"Failed to join voice channel {channel_id}"}
+            
+    except Exception as e:
+        logger.error(f"Error joining voice channel {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to join voice channel: {str(e)}")
+
+@bot_api.post("/test/voice/{channel_id}/leave")
+async def test_leave_voice_channel(channel_id: str):
+    """Test endpoint to leave a voice channel."""
+    if not discord_bot or discord_bot.is_closed():
+        raise HTTPException(status_code=503, detail="Discord bot not connected")
+    
+    try:
+        channel_id_int = int(channel_id)
+        await voice_tracker.leave_voice_channel(channel_id_int)
+        
+        return {"success": True, "message": f"Successfully left voice channel {channel_id}"}
+            
+    except Exception as e:
+        logger.error(f"Error leaving voice channel {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to leave voice channel: {str(e)}")
+
 # Export the FastAPI app
 app = bot_api
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
