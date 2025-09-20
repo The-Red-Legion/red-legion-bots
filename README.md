@@ -1,5 +1,7 @@
 # 🤖 Red Legion Discord Bot
 
+> **⚠️ ARCHITECTURE UPDATE**: This bot now integrates with the [Red Legion Management Portal](../red-legion-management-portal) for user-facing operations. Most Discord commands have been deprecated in favor of a superior web interface. The bot retains core voice tracking and API functionality.
+
 ## What is this Bot?
 
 The Red Legion Discord Bot is an **automated operations manager** for Star Citizen organizations. It eliminates manual administrative work by automatically tracking member participation, calculating fair payouts, and managing events.

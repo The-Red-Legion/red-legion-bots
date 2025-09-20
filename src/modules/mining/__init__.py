@@ -1,22 +1,19 @@
 """
-Mining Module for Red Legion Bot
+Mining Module for Red Legion Bot - API Mode
 
-Handles all mining operations including:
-- Mining session management (/mining start, /mining stop) 
-- Voice channel participation tracking
-- Event creation with unified database schema
-- Integration with payroll system for ore distribution
+Handles mining operations for Management Portal integration:
+- Voice channel participation tracking (Core functionality)
+- Event management through API endpoints
+- Integration with Management Portal for session control
 
-This module focuses solely on mining operations. Payroll calculations
-are handled by the shared payroll module.
+Discord commands have been deprecated in favor of the Management Portal.
+Core voice tracking functionality remains active.
 """
 
-from .commands import MiningCommands
 from .events import MiningEventManager
 from .participation import VoiceTracker
 
 __all__ = [
-    'MiningCommands',
-    'MiningEventManager', 
+    'MiningEventManager',
     'VoiceTracker',
 ]

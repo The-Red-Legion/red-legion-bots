@@ -1,9 +1,8 @@
 """
-Mining Commands - Thin Wrapper
+Mining Commands - DEPRECATED
 
-Lightweight wrapper that imports and registers the MiningCommands class
-from the mining module. Maintains Discord.py compatibility while keeping
-business logic in the modules package.
+Mining commands have been moved to the Management Portal web interface.
+This module is kept for imports but no longer registers Discord commands.
 """
 
 import sys
@@ -12,16 +11,12 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from modules.mining import MiningCommands
+# Import for compatibility but don't register commands
+from modules.mining import MiningEventManager, VoiceTracker
 
 async def setup(bot):
     """
-    Setup function for discord.py extension loading.
-    
-    This function is called by the main bot to register mining commands.
-    The MiningCommands cog contains app_command.Group setup internally.
+    DEPRECATED: Mining commands moved to Management Portal.
+    This setup function no longer registers any Discord commands.
     """
-    # Add the MiningCommands cog to the bot
-    await bot.add_cog(MiningCommands(bot))
-    
-    print("✅ Mining commands registered")
+    print("⚠️ Mining commands deprecated - use Management Portal web interface")

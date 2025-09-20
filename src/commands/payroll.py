@@ -1,9 +1,8 @@
 """
-Payroll Commands - Thin Wrapper
+Payroll Commands - DEPRECATED
 
-Lightweight wrapper that imports and registers the PayrollCommands class
-from the payroll module. Maintains Discord.py compatibility while keeping
-business logic in the modules package.
+Payroll commands have been moved to the Management Portal web interface.
+This module is kept for imports but no longer registers Discord commands.
 """
 
 import sys
@@ -12,16 +11,12 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from modules.payroll import PayrollCommands
+# Import for compatibility but don't register commands
+from modules.payroll import PayrollCalculator, MiningProcessor, SalvageProcessor, CombatProcessor
 
 async def setup(bot):
     """
-    Setup function for discord.py extension loading.
-    
-    This function is called by the main bot to register payroll commands.
-    The PayrollCommands cog contains app_command.Group setup internally.
+    DEPRECATED: Payroll commands moved to Management Portal.
+    This setup function no longer registers any Discord commands.
     """
-    # Add the PayrollCommands cog to the bot
-    await bot.add_cog(PayrollCommands(bot))
-    
-    print("✅ Payroll commands registered")
+    print("⚠️ Payroll commands deprecated - use Management Portal web interface")

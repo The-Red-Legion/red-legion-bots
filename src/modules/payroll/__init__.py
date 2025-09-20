@@ -1,29 +1,26 @@
 """
-Payroll Module for Red Legion Bot
+Payroll Module for Red Legion Bot - API Mode
 
-Universal payroll system for all event types that collect valuable materials.
+Universal payroll system for Management Portal integration.
 Supports mining, salvage, combat, hauling, and any future operations.
 
-Commands:
-- /payroll mining - Calculate mining session payroll
-- /payroll salvage - Calculate salvage operation payroll  
-- /payroll combat - Calculate combat mission payroll
-
-Features:
-- Participation-based distribution
+Management Portal Features:
+- Web-based payroll calculation interface
+- Participation-based distribution algorithms
 - Voluntary donation system
 - Multiple material type processors
-- Unified UI/UX across all event types
+- API endpoints for portal integration
+
+Discord commands have been deprecated in favor of the Management Portal.
+Core calculation and processor functionality remains active.
 """
 
-from .commands import PayrollCommands
 from .core import PayrollCalculator
 from .processors import MiningProcessor, SalvageProcessor, CombatProcessor
 
 __all__ = [
-    'PayrollCommands',
     'PayrollCalculator',
     'MiningProcessor',
-    'SalvageProcessor', 
+    'SalvageProcessor',
     'CombatProcessor',
 ]

@@ -98,6 +98,14 @@ class RedLegionBot(commands.Bot):
         except Exception as e:
             print(f"❌ Failed to sync commands: {e}")
 
+        # Start API server for Management Portal integration
+        try:
+            print("🌐 Starting API server for Management Portal integration...")
+            await self._start_api_server()
+            print("✅ API server started on port 8001")
+        except Exception as e:
+            print(f"❌ Failed to start API server: {e}")
+
     async def on_guild_join(self, guild):
         """Called when the bot joins a new guild."""
         print(f'🎉 Joined new guild: {guild.name} (ID: {guild.id})')
@@ -120,7 +128,29 @@ class RedLegionBot(commands.Bot):
             print(f"✅ Synced {len(synced)} command(s) for {guild.name}")
         except Exception as e:
             print(f"❌ Failed to sync commands for {guild.name}: {e}")
-    
+
+    async def _start_api_server(self):
+        """Initialize and start the API server for Management Portal integration."""
+        try:
+            from api.server import initialize_api, start_api_server
+            from modules.mining.participation import VoiceTracker
+            from modules.mining.events import MiningEventManager
+
+            # Initialize components
+            voice_tracker = VoiceTracker(self)
+            event_manager = MiningEventManager()
+
+            # Create API app
+            api_app = initialize_api(self, voice_tracker, event_manager)
+
+            # Start server in background task
+            import asyncio
+            asyncio.create_task(start_api_server(api_app, port=8001))
+
+        except Exception as e:
+            print(f"Error initializing API server: {e}")
+            raise
+
     async def close(self):
         """Cleanup when bot is closing."""
         try:
