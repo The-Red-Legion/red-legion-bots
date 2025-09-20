@@ -18,9 +18,10 @@ def test_imports():
     try:
         # Test new modular config system
         from src.config.settings import get_database_url, DISCORD_CONFIG, UEX_API_CONFIG, get_secret
-        from src.modules.mining import MiningCommands
-        from src.modules.payroll import PayrollCommands
-        print("   ✅ Config and module imports successful")
+        # Test core classes (commands deprecated for Management Portal)
+        from src.modules.mining import MiningEventManager, VoiceTracker
+        from src.modules.payroll import PayrollCalculator, MiningProcessor
+        print("   ✅ Config and core module imports successful")
         return True
     except Exception as e:
         print(f"   ❌ Import error: {e}")
