@@ -189,6 +189,50 @@ class BotAPI:
                 logger.error(f"Error refreshing prices: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
+        @self.app.get("/discord/channels/{guild_id}")
+        async def get_discord_channels(guild_id: int):
+            """Get Discord voice channels for a guild."""
+            try:
+                if not bot_instance:
+                    raise HTTPException(status_code=503, detail="Bot instance not available")
+
+                if not bot_instance.is_ready():
+                    raise HTTPException(status_code=503, detail="Bot not ready")
+
+                # Find the guild
+                guild = bot_instance.get_guild(guild_id)
+                if not guild:
+                    raise HTTPException(status_code=404, detail=f"Guild {guild_id} not found")
+
+                # Get voice channels
+                voice_channels = []
+                for channel in guild.voice_channels:
+                    voice_channels.append({
+                        "id": str(channel.id),
+                        "name": channel.name,
+                        "type": "voice",
+                        "category": channel.category.name if channel.category else None,
+                        "user_count": len(channel.members),
+                        "position": channel.position
+                    })
+
+                # Sort by position
+                voice_channels.sort(key=lambda x: x["position"])
+
+                return {
+                    "channels": voice_channels,
+                    "guild_id": guild_id,
+                    "guild_name": guild.name,
+                    "total_channels": len(voice_channels),
+                    "timestamp": datetime.now().isoformat()
+                }
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error fetching Discord channels for guild {guild_id}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         @self.app.get("/bot/status")
         async def get_bot_status():
             """Get detailed bot status information."""
