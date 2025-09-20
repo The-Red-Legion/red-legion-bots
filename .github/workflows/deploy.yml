@@ -1,6 +1,8 @@
 name: Deploy Bots
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
     types: [labeled]
@@ -27,6 +29,7 @@ jobs:
   infrastructure-setup:
     runs-on: ubuntu-latest
     if: |
+      github.event_name == 'push' ||
       (github.event.action == 'labeled' && github.event.label.name == 'deploy' && contains(github.event.pull_request.labels.*.name, 'Ready To Deploy')) ||
       github.event_name == 'workflow_dispatch'
     outputs:
